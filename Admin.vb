@@ -1,0 +1,758 @@
+﻿Imports System.Drawing.Drawing2D
+Imports DAUNTLESS_WOLVES_PROF.Core
+Public Class Admin
+
+    Private tabButtons As Button()
+
+
+    Private Sub Admin_Load(sender As Object, e As EventArgs) Handles MyBase.Load
+
+        If AppSession.CurrentUser Is Nothing Then
+            MessageBox.Show("Please log in to access this page.", "Access Denied", MessageBoxButtons.OK, MessageBoxIcon.Warning)
+
+            Dim loginForm As New frmlogin()
+            loginForm.Show()
+            Me.Close()
+            Return
+        End If
+
+        tabButtons = {btnDashboard, btnStudents, btnProfessors}
+        ShowPanel(pnlDashboard, btnDashboard)   ' page shown first
+        InitProfessorPage()
+        InitStudentPage()
+        InitDashboardPage()
+
+
+
+        ' (Optional) Display user name on a label on your form
+        ' lblAdminName.Text = $"Logged in as: {AppSession.CurrentUser.FullName}"
+    End Sub
+
+
+    Private Sub ShowPanel(p As Panel, activeBtn As Button)
+        pnlDashboard.Visible = False
+        pnlStudents.Visible = False
+        pnlProfessors.Visible = False
+
+        p.Visible = True
+        p.BringToFront()
+
+        ' highlight the active tab
+        For Each b As Button In tabButtons
+            Dim isActive As Boolean = (b Is activeBtn)
+            b.BackColor = If(isActive, Color.White, Color.FromArgb(200, 215, 205))
+            b.Font = New Font(b.Font, If(isActive, FontStyle.Bold, FontStyle.Regular))
+        Next
+    End Sub
+
+    Private Sub btnDashboard_Click(sender As Object, e As EventArgs) Handles btnDashboard.Click
+        ShowPanel(pnlDashboard, btnDashboard)
+    End Sub
+
+    Private Sub btnStudents_Click(sender As Object, e As EventArgs) Handles btnStudents.Click
+        ShowPanel(pnlStudents, btnStudents)
+    End Sub
+
+    Private Sub btnProfessors_Click(sender As Object, e As EventArgs) Handles btnProfessors.Click
+        ShowPanel(pnlProfessors, btnProfessors)
+    End Sub
+
+    ' ===== PROFESSOR PAGE =====
+    Private allProfs As New List(Of ProfessorInfo)
+    Private filteredProfs As New List(Of ProfessorInfo)
+    Private profPage As Integer = 1
+    Private Const ProfPageSize As Integer = 11
+    Private ReadOnly pillFont As New Font("Segoe UI", 8.5F, FontStyle.Bold)
+
+    Private Sub InitProfessorPage()
+        SetupProfGrid()
+
+        cboDeptProf.Items.Clear()
+        cboDeptProf.Items.AddRange({"All", "CCS", "CAS", "CHTM", "CHS", "CED", "COE", "COA", "CON"})
+        cboDeptProf.SelectedIndex = 0
+
+        LoadSampleProfs()
+        ApplyProfFilter()
+    End Sub
+
+    Private Sub SetupProfGrid()
+        Dim headerColor As Color = Color.FromArgb(224, 247, 250)
+
+        With dgvProf
+            .AllowUserToAddRows = False
+            .AllowUserToDeleteRows = False
+            .AllowUserToResizeRows = False
+            .RowHeadersVisible = False
+            .BackgroundColor = Color.White
+            .BorderStyle = BorderStyle.None
+            .CellBorderStyle = DataGridViewCellBorderStyle.SingleHorizontal
+            .GridColor = Color.Gainsboro
+            .SelectionMode = DataGridViewSelectionMode.FullRowSelect
+            .AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill
+            .RowTemplate.Height = 36
+
+            .EnableHeadersVisualStyles = False
+            .ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.DisableResizing
+            .ColumnHeadersHeight = 32
+            .ColumnHeadersBorderStyle = DataGridViewHeaderBorderStyle.None
+            With .ColumnHeadersDefaultCellStyle
+                .BackColor = headerColor
+                .ForeColor = Color.FromArgb(0, 80, 0)
+                .Font = New Font("Segoe UI", 9, FontStyle.Bold)
+                .SelectionBackColor = headerColor
+                .SelectionForeColor = Color.FromArgb(0, 80, 0)
+            End With
+
+            With .DefaultCellStyle
+                .BackColor = Color.White
+                .ForeColor = Color.Black
+                .Font = New Font("Segoe UI", 9, FontStyle.Bold)
+                .SelectionBackColor = Color.FromArgb(235, 250, 240)
+                .SelectionForeColor = Color.Black
+            End With
+
+            .Columns.Clear()
+
+            Dim chk As New DataGridViewCheckBoxColumn()
+            chk.Name = "colCheck" : chk.HeaderText = ""
+            .Columns.Add(chk)
+
+            .Columns.Add("colName", "Name")
+            .Columns.Add("colEmpId", "Employee ID")
+            .Columns.Add("colDept", "Department")
+            .Columns.Add("colClasses", "Assigned Class")
+            .Columns.Add("colStatus", "Status")
+            .Columns.Add("colActions", "Actions")
+
+            ' Fixed-width columns (never get squeezed)
+            For Each item In {("colCheck", 45), ("colStatus", 110), ("colActions", 130)}
+                With .Columns(item.Item1)
+                    .AutoSizeMode = DataGridViewAutoSizeColumnMode.None
+                    .Width = item.Item2
+                    .Resizable = DataGridViewTriState.False
+                End With
+            Next
+
+            ' Stretching columns (share the leftover space)
+            .Columns("colName").FillWeight = 30
+            .Columns("colEmpId").FillWeight = 18
+            .Columns("colDept").FillWeight = 18
+            .Columns("colClasses").FillWeight = 22
+            For Each n In {"colName", "colEmpId", "colDept", "colClasses"}
+                .Columns(n).MinimumWidth = 110
+            Next
+
+            .Columns("colStatus").HeaderCell.Style.Alignment = DataGridViewContentAlignment.MiddleCenter
+            .Columns("colActions").HeaderCell.Style.Alignment = DataGridViewContentAlignment.MiddleCenter
+
+            For Each c As DataGridViewColumn In .Columns
+                If c.Name <> "colCheck" Then c.ReadOnly = True
+                c.SortMode = DataGridViewColumnSortMode.NotSortable
+            Next
+        End With
+    End Sub
+
+    Private Sub LoadSampleProfs()
+        allProfs.Clear()
+        Dim names = {"Santos", "San Juan", "Cruz", "Jonathan", "DelaCruz", "Mariano",
+                     "Lalata", "Albert", "San Jose", "Robles", "Francisco"}
+        Dim depts = {"CCS", "CCS", "CCS", "CAS", "CHTM", "CHS", "CED", "COE", "COA", "CON", "COE"}
+        Dim cls = {4, 6, 4, 2, 3, 4, 6, 3, 2, 5, 6}
+        For i As Integer = 0 To names.Length - 1
+            allProfs.Add(New ProfessorInfo With {
+                .Name = "Prof." & names(i),
+                .EmployeeID = "P" & (i + 1).ToString("000"),
+                .Department = depts(i),
+                .Classes = cls(i),
+                .Status = "Active"})
+        Next
+    End Sub
+
+    Private Sub ApplyProfFilter()
+        Dim q As String = txtSearchProf.Text.Trim().ToLower()
+        Dim dept As String = If(cboDeptProf.SelectedItem Is Nothing, "All", cboDeptProf.SelectedItem.ToString())
+
+        filteredProfs = allProfs.Where(Function(p) _
+            (q = "" OrElse p.Name.ToLower().Contains(q) OrElse p.EmployeeID.ToLower().Contains(q)) AndAlso
+            (dept = "All" OrElse p.Department = dept)).ToList()
+
+        profPage = 1
+        ShowProfPage()
+    End Sub
+
+    Private Sub ShowProfPage()
+        dgvProf.Rows.Clear()
+        For Each p In filteredProfs.Skip((profPage - 1) * ProfPageSize).Take(ProfPageSize)
+            dgvProf.Rows.Add(False, p.Name, p.EmployeeID, p.Department, p.Classes & " classes", p.Status, "")
+        Next
+        lblTotalProf.Text = "Total Professors: " & filteredProfs.Count
+        dgvProf.ClearSelection()
+        BuildProfPager()
+    End Sub
+
+    ' Always shows at least 5 page buttons; slides a window of 5 when there are more pages
+    Private Sub BuildProfPager()
+        flowProfPager.SuspendLayout()
+        flowProfPager.Controls.Clear()
+
+        Const MinButtons As Integer = 5
+        Dim totalPages As Integer = Math.Max(1, CInt(Math.Ceiling(filteredProfs.Count / ProfPageSize)))
+
+        Dim startPage As Integer = Math.Max(1, profPage - 2)
+        If totalPages > MinButtons Then
+            startPage = Math.Min(startPage, totalPages - MinButtons + 1)
+        Else
+            startPage = 1
+        End If
+
+        ' Previous
+        flowProfPager.Controls.Add(MakePagerButton("<", Math.Max(1, profPage - 1), False, profPage > 1))
+
+        ' Number buttons (pages that don't exist are shown disabled)
+        For i As Integer = 0 To MinButtons - 1
+            Dim pageNo As Integer = startPage + i
+            Dim exists As Boolean = pageNo <= totalPages
+            flowProfPager.Controls.Add(MakePagerButton(pageNo.ToString(), pageNo, pageNo = profPage, exists))
+        Next
+
+        ' Next
+        flowProfPager.Controls.Add(MakePagerButton(">", Math.Min(totalPages, profPage + 1), False, profPage < totalPages))
+
+        ' Make sure all buttons fit (fixes the clipped pager)
+        flowProfPager.AutoSize = False
+        flowProfPager.Width = flowProfPager.Controls.Count * 32 + 8
+
+        flowProfPager.ResumeLayout()
+    End Sub
+
+    Private Function MakePagerButton(text As String, page As Integer, active As Boolean, enabled As Boolean) As Button
+        Dim b As New Button()
+        b.Text = text
+        b.Size = New Size(28, 28)
+        b.Margin = New Padding(2)
+        b.FlatStyle = FlatStyle.Flat
+        b.FlatAppearance.BorderColor = If(enabled, Color.FromArgb(0, 100, 0), Color.Silver)
+        b.BackColor = If(active, Color.FromArgb(0, 100, 0), Color.White)
+        b.ForeColor = If(active, Color.White, If(enabled, Color.Black, Color.Silver))
+        b.Enabled = enabled
+
+        If enabled Then
+            AddHandler b.Click, Sub()
+                                    profPage = page
+                                    ShowProfPage()
+                                End Sub
+        End If
+        Return b
+    End Function
+
+    Private Sub txtSearchProf_TextChanged(sender As Object, e As EventArgs) Handles txtSearchProf.TextChanged
+        ApplyProfFilter()
+    End Sub
+
+    Private Sub cboDeptProf_SelectedIndexChanged(sender As Object, e As EventArgs) Handles cboDeptProf.SelectedIndexChanged
+        If allProfs.Count > 0 Then ApplyProfFilter()
+    End Sub
+
+    ' ---------- drawing helpers ----------
+    Private Function RoundedRect(r As Rectangle, radius As Integer) As GraphicsPath
+        Dim gp As New GraphicsPath()
+        Dim d As Integer = radius * 2
+        gp.AddArc(r.X, r.Y, d, d, 180, 90)
+        gp.AddArc(r.Right - d, r.Y, d, d, 270, 90)
+        gp.AddArc(r.Right - d, r.Bottom - d, d, d, 0, 90)
+        gp.AddArc(r.X, r.Bottom - d, d, d, 90, 90)
+        gp.CloseFigure()
+        Return gp
+    End Function
+
+    Private Sub DrawPill(g As Graphics, r As Rectangle, back As Color, fore As Color, text As String)
+        Using path = RoundedRect(r, 8), br As New SolidBrush(back), tb As New SolidBrush(fore)
+            g.FillPath(br, path)
+            Dim sf As New StringFormat() With {.Alignment = StringAlignment.Center, .LineAlignment = StringAlignment.Center}
+            g.DrawString(text, pillFont, tb, r, sf)
+        End Using
+    End Sub
+
+    ' Edit / Delete rectangles inside a cell
+    Private Function ActionRects(cell As Rectangle) As Rectangle()
+        Const w As Integer = 52, h As Integer = 24, gap As Integer = 6
+        Dim startX As Integer = cell.X + (cell.Width - (w * 2 + gap)) \ 2
+        Dim y As Integer = cell.Y + (cell.Height - h) \ 2
+        Return {New Rectangle(startX, y, w, h), New Rectangle(startX + w + gap, y, w, h)}
+    End Function
+
+    Private Sub dgvProf_CellPainting(sender As Object, e As DataGridViewCellPaintingEventArgs) Handles dgvProf.CellPainting
+        If e.RowIndex < 0 Then Return
+        Dim col As String = dgvProf.Columns(e.ColumnIndex).Name
+        If col <> "colStatus" AndAlso col <> "colActions" Then Return
+
+        e.PaintBackground(e.ClipBounds, False)
+        e.Graphics.SmoothingMode = SmoothingMode.AntiAlias
+
+        If col = "colStatus" Then
+            Dim status As String = Convert.ToString(e.Value)
+            Dim r As New Rectangle(e.CellBounds.X + (e.CellBounds.Width - 80) \ 2,
+                                   e.CellBounds.Y + (e.CellBounds.Height - 24) \ 2, 80, 24)
+            If status = "Active" Then
+                DrawPill(e.Graphics, r, Color.FromArgb(198, 240, 214), Color.FromArgb(0, 100, 0), "Active")
+            Else
+                DrawPill(e.Graphics, r, Color.FromArgb(250, 190, 190), Color.FromArgb(180, 0, 0), "Inactive")
+            End If
+        Else
+            Dim rects = ActionRects(e.CellBounds)
+            DrawPill(e.Graphics, rects(0), Color.FromArgb(198, 240, 214), Color.FromArgb(0, 100, 0), "Edit")
+            DrawPill(e.Graphics, rects(1), Color.FromArgb(250, 190, 190), Color.FromArgb(180, 0, 0), "Delete")
+        End If
+
+        e.Handled = True
+    End Sub
+
+    Private Sub dgvProf_CellMouseClick(sender As Object, e As DataGridViewCellMouseEventArgs) Handles dgvProf.CellMouseClick
+        If e.RowIndex < 0 Then Return
+        If dgvProf.Columns(e.ColumnIndex).Name <> "colActions" Then Return
+
+        Dim size = dgvProf.GetCellDisplayRectangle(e.ColumnIndex, e.RowIndex, False).Size
+        Dim rects = ActionRects(New Rectangle(0, 0, size.Width, size.Height))
+        Dim empId As String = dgvProf.Rows(e.RowIndex).Cells("colEmpId").Value.ToString()
+
+        If rects(0).Contains(e.Location) Then
+            MessageBox.Show("Edit " & empId)             ' open your edit form here
+        ElseIf rects(1).Contains(e.Location) Then
+            If MessageBox.Show("Delete " & empId & "?", "Confirm", MessageBoxButtons.YesNo) = DialogResult.Yes Then
+                allProfs.RemoveAll(Function(p) p.EmployeeID = empId)
+                ApplyProfFilter()
+            End If
+        End If
+    End Sub
+
+    Private Sub btnAddProf_Click(sender As Object, e As EventArgs) Handles btnAddProf.Click
+        MessageBox.Show("Open Add Professor form here")
+    End Sub
+
+    Private Sub pnlStudents_Paint(sender As Object, e As PaintEventArgs) Handles pnlStudents.Paint
+
+    End Sub
+
+
+
+    Private Sub Label3_Click(sender As Object, e As EventArgs) Handles Label3.Click
+
+    End Sub
+
+
+    Private Sub CustomButton3_Click(sender As Object, e As EventArgs) Handles btnaddstudent.Click
+
+    End Sub
+    ' ===== STUDENT PAGE =====
+    Private allStudents As New List(Of StudentInfo)
+    Private filteredStudents As New List(Of StudentInfo)
+    Private studentPage As Integer = 1
+    Private Const StudentPageSize As Integer = 10
+
+    Private Sub InitStudentPage()
+        SetupStudentGrid()
+        LoadSampleStudents()
+
+        cboYearLevel.DropDownStyle = ComboBoxStyle.DropDownList
+        cboSection.DropDownStyle = ComboBoxStyle.DropDownList
+
+        cboYearLevel.Items.Clear()
+        cboYearLevel.Items.AddRange({"All", "1", "2", "3", "4"})
+        cboYearLevel.SelectedIndex = 0
+
+        cboSection.Items.Clear()
+        cboSection.Items.Add("All")
+        For Each s In allStudents.Select(Function(x) x.Section).Distinct().OrderBy(Function(x) x)
+            cboSection.Items.Add(s)
+        Next
+        cboSection.SelectedIndex = 0
+
+        ApplyStudentFilter()
+
+
+    End Sub
+
+    Private Sub SetupStudentGrid()
+        Dim headerColor As Color = Color.FromArgb(224, 247, 250)
+
+        With dgvStudents
+            .AllowUserToAddRows = False
+            .AllowUserToDeleteRows = False
+            .AllowUserToResizeRows = False
+            .RowHeadersVisible = False
+            .BackgroundColor = Color.White
+            .BorderStyle = BorderStyle.None
+            .CellBorderStyle = DataGridViewCellBorderStyle.SingleHorizontal
+            .GridColor = Color.Gainsboro
+            .SelectionMode = DataGridViewSelectionMode.FullRowSelect
+            .AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill
+            .RowTemplate.Height = 36
+
+            .EnableHeadersVisualStyles = False
+            .ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.DisableResizing
+            .ColumnHeadersHeight = 32
+            .ColumnHeadersBorderStyle = DataGridViewHeaderBorderStyle.None
+            With .ColumnHeadersDefaultCellStyle
+                .BackColor = headerColor
+                .ForeColor = Color.FromArgb(0, 80, 0)
+                .Font = New Font("Segoe UI", 9, FontStyle.Bold)
+                .SelectionBackColor = headerColor
+                .SelectionForeColor = Color.FromArgb(0, 80, 0)
+            End With
+
+            With .DefaultCellStyle
+                .BackColor = Color.White
+                .ForeColor = Color.Black
+                .Font = New Font("Segoe UI", 9, FontStyle.Bold)
+                .SelectionBackColor = Color.FromArgb(235, 250, 240)
+                .SelectionForeColor = Color.Black
+            End With
+
+            .Columns.Clear()
+
+            Dim chk As New DataGridViewCheckBoxColumn()
+            chk.Name = "colCheck" : chk.HeaderText = ""
+            .Columns.Add(chk)
+
+            .Columns.Add("colStudentId", "Student ID")
+            .Columns.Add("colFullName", "Full Name")
+            .Columns.Add("colYear", "Year Level")
+            .Columns.Add("colSection", "Section")
+            .Columns.Add("colProgram", "Program")
+            .Columns.Add("colStatus", "Status")
+            .Columns.Add("colActions", "Actions")
+
+            ' Fixed-width columns
+            For Each item In {("colCheck", 45), ("colYear", 90), ("colSection", 100),
+                              ("colStatus", 110), ("colActions", 130)}
+                With .Columns(item.Item1)
+                    .AutoSizeMode = DataGridViewAutoSizeColumnMode.None
+                    .Width = item.Item2
+                    .Resizable = DataGridViewTriState.False
+                End With
+            Next
+
+            ' Stretching columns
+            .Columns("colStudentId").FillWeight = 20
+            .Columns("colFullName").FillWeight = 40
+            .Columns("colProgram").FillWeight = 40
+            For Each n In {"colStudentId", "colFullName", "colProgram"}
+                .Columns(n).MinimumWidth = 110
+            Next
+
+            For Each n In {"colYear", "colSection", "colStatus", "colActions"}
+                .Columns(n).HeaderCell.Style.Alignment = DataGridViewContentAlignment.MiddleCenter
+            Next
+            .Columns("colYear").DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter
+            .Columns("colSection").DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter
+
+            For Each c As DataGridViewColumn In .Columns
+                If c.Name <> "colCheck" Then c.ReadOnly = True
+                c.SortMode = DataGridViewColumnSortMode.NotSortable
+            Next
+        End With
+    End Sub
+
+    Private Sub LoadSampleStudents()
+        ' Sample data. Replace with MySQL later.
+        allStudents.Clear()
+        Dim rows = {
+            ("25-00839", "Mariano, Geoff Andreil", 2, "BSCS-2A", "BS Computer Science", "Active"),
+            ("23-00239", "Condes, Hope Gian D.", 4, "BSIT-4B", "BS Information Management", "Active"),
+            ("24-00934", "Lalata, Carl Jade", 3, "BSHM-3B", "BS Hospitality Management", "Inactive"),
+            ("25-00902", "Santos, Maria Angelica", 2, "BSCS-2A", "BS Computer Science", "Inactive"),
+            ("26-00783", "Oropilla, Charles", 1, "BSCS-2A", "BS Computer Science", "Active"),
+            ("26-00273", "Puyat, Ron Jacob", 1, "BSCS-1A", "BS Computer Science", "Active"),
+            ("25-00749", "Buluran, Family I.", 2, "BSCS-2A", "BS Computer Science", "Inactive"),
+            ("23-00111", "Rodas, Rodas P.", 4, "BSCS-4A", "BS Computer Science", "Active"),
+            ("23-06767", "Ramos, Reago W.", 4, "BSCS-4A", "BS Computer Science", "Inactive"),
+            ("25-08392", "Salceda, Poknat X.", 2, "BSA 2A", "BS Accountancy", "Active")}
+        For Each r In rows
+            allStudents.Add(New StudentInfo With {
+                .StudentID = r.Item1, .FullName = r.Item2, .YearLevel = r.Item3,
+                .Section = r.Item4, .Program = r.Item5, .Status = r.Item6})
+        Next
+    End Sub
+
+    Private Sub ApplyStudentFilter()
+        If cboYearLevel.SelectedItem Is Nothing OrElse cboSection.SelectedItem Is Nothing Then Return
+
+        Dim q As String = txtStudentSearch.Text.Trim().ToLower()
+        Dim yr As String = cboYearLevel.SelectedItem.ToString()
+        Dim sec As String = cboSection.SelectedItem.ToString()
+
+        filteredStudents = allStudents.Where(Function(s) _
+            (q = "" OrElse s.FullName.ToLower().Contains(q) OrElse s.StudentID.ToLower().Contains(q)) AndAlso
+            (yr = "All" OrElse s.YearLevel.ToString() = yr) AndAlso
+            (sec = "All" OrElse s.Section = sec)).ToList()
+
+        studentPage = 1
+        ShowStudentPage()
+    End Sub
+
+    Private Sub ShowStudentPage()
+        dgvStudents.Rows.Clear()
+        For Each s In filteredStudents.Skip((studentPage - 1) * StudentPageSize).Take(StudentPageSize)
+            dgvStudents.Rows.Add(False, s.StudentID, s.FullName, s.YearLevel,
+                                 s.Section, s.Program, s.Status, "")
+        Next
+        lblTotalStudents.Text = "Total Students: " & filteredStudents.Count
+        dgvStudents.ClearSelection()
+        BuildStudentPager()
+    End Sub
+
+    ' Same pager logic as the professor page: always 5 number buttons
+    Private Sub BuildStudentPager()
+        flowStudentPager.SuspendLayout()
+        flowStudentPager.Controls.Clear()
+
+        Const MinButtons As Integer = 5
+        Dim totalPages As Integer = Math.Max(1, CInt(Math.Ceiling(filteredStudents.Count / StudentPageSize)))
+
+        Dim startPage As Integer = Math.Max(1, studentPage - 2)
+        If totalPages > MinButtons Then
+            startPage = Math.Min(startPage, totalPages - MinButtons + 1)
+        Else
+            startPage = 1
+        End If
+
+        flowStudentPager.Controls.Add(MakeStudentPagerButton("<", Math.Max(1, studentPage - 1), False, studentPage > 1))
+        For i As Integer = 0 To MinButtons - 1
+            Dim pageNo As Integer = startPage + i
+            flowStudentPager.Controls.Add(MakeStudentPagerButton(pageNo.ToString(), pageNo, pageNo = studentPage, pageNo <= totalPages))
+        Next
+        flowStudentPager.Controls.Add(MakeStudentPagerButton(">", Math.Min(totalPages, studentPage + 1), False, studentPage < totalPages))
+
+        flowStudentPager.AutoSize = False
+        flowStudentPager.Width = flowStudentPager.Controls.Count * 32 + 8
+        flowStudentPager.ResumeLayout()
+    End Sub
+
+    Private Function MakeStudentPagerButton(text As String, page As Integer, active As Boolean, enabled As Boolean) As Button
+        Dim b As New Button()
+        b.Text = text
+        b.Size = New Size(28, 28)
+        b.Margin = New Padding(2)
+        b.FlatStyle = FlatStyle.Flat
+        b.FlatAppearance.BorderColor = If(enabled, Color.FromArgb(0, 100, 0), Color.Silver)
+        b.BackColor = If(active, Color.FromArgb(0, 100, 0), Color.White)
+        b.ForeColor = If(active, Color.White, If(enabled, Color.Black, Color.Silver))
+        b.Enabled = enabled
+        If enabled Then
+            AddHandler b.Click, Sub()
+                                    studentPage = page
+                                    ShowStudentPage()
+                                End Sub
+        End If
+        Return b
+    End Function
+
+    ' ----- search / filter / reset -----
+    Private Sub txtStudentSearch_TextChanged(sender As Object, e As EventArgs) Handles txtStudentSearch.TextChanged
+        ApplyStudentFilter()
+    End Sub
+
+    Private Sub cboYearLevel_SelectedIndexChanged(sender As Object, e As EventArgs) Handles cboYearLevel.SelectedIndexChanged
+        If allStudents.Count > 0 Then ApplyStudentFilter()
+    End Sub
+
+    Private Sub cboSection_SelectedIndexChanged(sender As Object, e As EventArgs) Handles cboSection.SelectedIndexChanged
+        If allStudents.Count > 0 Then ApplyStudentFilter()
+    End Sub
+
+    Private Sub btnStudentFilter_Click(sender As Object, e As EventArgs) Handles btnStudentFilter.Click
+        ApplyStudentFilter()
+    End Sub
+
+    Private Sub btnStudentReset_Click(sender As Object, e As EventArgs) Handles btnStudentReset.Click
+        txtStudentSearch.Clear()
+        cboYearLevel.SelectedIndex = 0
+        cboSection.SelectedIndex = 0
+        ApplyStudentFilter()
+    End Sub
+
+    Private Sub btnAddStudent_Click(sender As Object, e As EventArgs) Handles btnAddStudent.Click
+        MessageBox.Show("Open Add Student form here")
+    End Sub
+
+    ' ----- pills for Status and Actions (reuses DrawPill and ActionRects) -----
+    Private Sub dgvStudents_CellPainting(sender As Object, e As DataGridViewCellPaintingEventArgs) Handles dgvStudents.CellPainting
+        If e.RowIndex < 0 Then Return
+        Dim col As String = dgvStudents.Columns(e.ColumnIndex).Name
+        If col <> "colStatus" AndAlso col <> "colActions" Then Return
+
+        e.PaintBackground(e.ClipBounds, False)
+        e.Graphics.SmoothingMode = SmoothingMode.AntiAlias
+
+        If col = "colStatus" Then
+            Dim status As String = Convert.ToString(e.Value)
+            Dim r As New Rectangle(e.CellBounds.X + (e.CellBounds.Width - 80) \ 2,
+                                   e.CellBounds.Y + (e.CellBounds.Height - 24) \ 2, 80, 24)
+            If status = "Active" Then
+                DrawPill(e.Graphics, r, Color.FromArgb(198, 240, 214), Color.FromArgb(0, 100, 0), "Active")
+            Else
+                DrawPill(e.Graphics, r, Color.FromArgb(250, 190, 190), Color.FromArgb(180, 0, 0), "Inactive")
+            End If
+        Else
+            Dim rects = ActionRects(e.CellBounds)
+            DrawPill(e.Graphics, rects(0), Color.FromArgb(198, 240, 214), Color.FromArgb(0, 100, 0), "Edit")
+            DrawPill(e.Graphics, rects(1), Color.FromArgb(250, 190, 190), Color.FromArgb(180, 0, 0), "Delete")
+        End If
+
+        e.Handled = True
+    End Sub
+
+    Private Sub dgvStudents_CellMouseClick(sender As Object, e As DataGridViewCellMouseEventArgs) Handles dgvStudents.CellMouseClick
+        If e.RowIndex < 0 Then Return
+        If dgvStudents.Columns(e.ColumnIndex).Name <> "colActions" Then Return
+
+        Dim size = dgvStudents.GetCellDisplayRectangle(e.ColumnIndex, e.RowIndex, False).Size
+        Dim rects = ActionRects(New Rectangle(0, 0, size.Width, size.Height))
+        Dim id As String = dgvStudents.Rows(e.RowIndex).Cells("colStudentId").Value.ToString()
+
+        If rects(0).Contains(e.Location) Then
+            MessageBox.Show("Edit " & id)                 ' open your edit form here
+        ElseIf rects(1).Contains(e.Location) Then
+            If MessageBox.Show("Delete " & id & "?", "Confirm", MessageBoxButtons.YesNo) = DialogResult.Yes Then
+                allStudents.RemoveAll(Function(s) s.StudentID = id)
+                ApplyStudentFilter()
+            End If
+        End If
+    End Sub
+
+    Private Sub Label5_Click(sender As Object, e As EventArgs) Handles lbltotalstudents.Click
+
+    End Sub
+
+    Private Sub pnlDashboard_Paint(sender As Object, e As PaintEventArgs) Handles pnlDashboard.Paint
+
+    End Sub
+
+    Private Sub Label7_Click(sender As Object, e As EventArgs)
+
+    End Sub
+
+    Private Sub Label7_Click_1(sender As Object, e As EventArgs) Handles Label7.Click
+
+    End Sub
+
+    Private Sub Label12_Click(sender As Object, e As EventArgs) Handles lblStatClasses.Click
+
+    End Sub
+
+
+
+    Private Sub Label11_Click(sender As Object, e As EventArgs) Handles Label11.Click
+
+    End Sub
+
+    Private Sub PictureBox4_Click(sender As Object, e As EventArgs) Handles PictureBox4.Click
+
+    End Sub
+
+
+    ' ===== DASHBOARD PAGE =====
+
+    Private Sub InitDashboardPage()
+        SetupUpdatesGrid()
+        LoadDashboard()
+    End Sub
+
+    Private Sub SetupUpdatesGrid()
+        With dgvUpdates
+            .Columns.Clear()
+            .AllowUserToAddRows = False
+            .AllowUserToDeleteRows = False
+            .AllowUserToResizeRows = False
+            .ReadOnly = True
+            .RowHeadersVisible = False
+            .ColumnHeadersVisible = False
+            .BorderStyle = BorderStyle.None
+            .BackgroundColor = Color.White
+            .CellBorderStyle = DataGridViewCellBorderStyle.None
+            .AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill
+            .RowTemplate.Height = 26
+            .DefaultCellStyle.Font = New Font("Consolas", 9)
+            .DefaultCellStyle.ForeColor = Color.FromArgb(0, 100, 50)
+            .DefaultCellStyle.BackColor = Color.White
+            .DefaultCellStyle.SelectionBackColor = Color.White
+            .DefaultCellStyle.SelectionForeColor = Color.FromArgb(0, 100, 50)
+            .Columns.Add("colUpdate", "Update")
+            .Columns.Add("colBy", "By")
+            .Columns("colUpdate").FillWeight = 70
+            .Columns("colBy").FillWeight = 30
+        End With
+    End Sub
+
+    Private Sub LoadDashboard()
+        ' Counts come from the student and professor lists already loaded.
+        ' Active classes and pending requests are sample values. Replace with MySQL later.
+        lblStatStudents.Text = allStudents.Count.ToString("N0")
+        lblStatProfs.Text = allProfs.Count.ToString("N0")
+        lblStatClasses.Text = "142"
+        lblStatPending.Text = "12"
+
+        ' Sample data. Replace with the latest rows from the audit log.
+        dgvUpdates.Rows.Clear()
+        dgvUpdates.Rows.Add("Updated Lalata, Carl Jade's Quiz #1", "-Prof. Jhun")
+        dgvUpdates.Rows.Add("Updated Condes, Hope Gian's SW #2", "-Prof. Becca")
+        dgvUpdates.Rows.Add("Student added- Mariano, Geoff Andreii", "-DBMS2")
+        dgvUpdates.Rows.Add("Professor added- Ramos, Aldrich Andreii", "-IT101")
+        dgvUpdates.ClearSelection()
+    End Sub
+
+    Private Sub btnUpdatesFilter_Click(sender As Object, e As EventArgs) Handles btnupdatesfilter.Click
+        MessageBox.Show("Updates filter goes here")
+    End Sub
+
+    ' Quick Actions (placeholders until the dialogs are built)
+    Private Sub btnAddClass_Click(sender As Object, e As EventArgs) Handles btnAddClass.Click
+        Using dlg As New frmAddClass()
+            dlg.LoadProfessors(allProfs.Select(Function(p) p.Name))
+            If dlg.ShowDialog(Me) = DialogResult.OK Then
+                ' Sample behaviour: bump the Active Classes count.
+                ' Replace with a database reload later.
+                Dim n As Integer = CInt(lblStatClasses.Text.Replace(",", "")) + 1
+                lblStatClasses.Text = n.ToString("N0")
+                dgvupdates.Rows.Insert(0, "Class added- " & dlg.SubjectName, "-" & dlg.SectionName)
+                dgvupdates.ClearSelection()
+            End If
+        End Using
+    End Sub
+
+    ' One shared dialog for Enter Grades, View Requests and Audit Logs
+    Private ReadOnly quickForm As New quickactions()
+
+    Private Sub OpenQuickAction(mode As quickactions.FormMode)
+        quickForm.ShowMode(mode)
+        quickForm.ShowDialog(Me)
+    End Sub
+
+    Private Sub btnEnterGrades_Click(sender As Object, e As EventArgs) Handles btnEnterGrades.Click
+        OpenQuickAction(quickactions.FormMode.EnterGrades)
+    End Sub
+
+    Private Sub btnViewRequests_Click(sender As Object, e As EventArgs) Handles btnViewRequests.Click
+        OpenQuickAction(quickactions.FormMode.ViewRequests)
+    End Sub
+
+    Private Sub btnViewLogs_Click(sender As Object, e As EventArgs) Handles btnViewLogs.Click
+        OpenQuickAction(quickactions.FormMode.ViewAuditLogs)
+    End Sub
+
+
+    Private Sub Admin_FormClosed(sender As Object, e As FormClosedEventArgs) Handles MyBase.FormClosed
+        quickForm.Dispose()
+    End Sub
+
+    ' Add to Admin.vb, frmprof.vb, and frmstudent.vb
+    Private Sub btnLogout_Click(sender As Object, e As EventArgs) Handles btnLogout.Click
+        ' 1. Clear active global session
+        AppSession.ClearSession()
+
+        ' 2. Re-open login form and close current dashboard
+        Dim loginForm As New frmlogin()
+        loginForm.Show()
+        Me.Close()
+    End Sub
+End Class
