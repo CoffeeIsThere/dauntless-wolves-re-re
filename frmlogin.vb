@@ -1,5 +1,6 @@
 ﻿Imports DAUNTLESS_WOLVES_PROF.Core
 Imports DAUNTLESS_WOLVES_PROF.Models
+Imports DAUNTLESS_WOLVES_PROF.Services
 
 
 Public Class frmlogin
@@ -34,12 +35,13 @@ Public Class frmlogin
 
     ' LOG IN BUTTON CLICK (Button1)
     Private Sub Button1_Click(sender As Object, e As EventArgs) Handles Button1.Click
-        Dim username As String = boxuser.Text.Trim()
+        Dim username As String = ValidationHelper.SanitizeInput(boxuser.Text)
         Dim password As String = TextBox1.Text.Trim()
 
-        ' 1. Input Validation
-        If String.IsNullOrWhiteSpace(username) OrElse String.IsNullOrWhiteSpace(password) Then
+
+        If Not ValidationHelper.IsRequired(username) OrElse Not ValidationHelper.IsRequired(password) Then
             MessageBox.Show("Please enter both your Username/ID and Password.", "Validation Error", MessageBoxButtons.OK, MessageBoxIcon.Warning)
+            boxuser.Focus()
             Return
         End If
 
@@ -74,6 +76,8 @@ Public Class frmlogin
                 End Select
             Else
                 MessageBox.Show("Invalid Username/ID or Password.", "Login Failed", MessageBoxButtons.OK, MessageBoxIcon.Error)
+                TextBox1.Clear()
+                TextBox1.Focus()
             End If
 
         Catch ex As Exception

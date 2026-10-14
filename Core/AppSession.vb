@@ -1,7 +1,7 @@
-﻿Imports DAUNTLESS_WOLVES_PROF.Models ' <-- Replace "WinFormsApp2" with your actual root project name if different
+﻿Imports DAUNTLESS_WOLVES_PROF.Models
 
-Namespace Core
-    Public Module AppSession
+
+Public Module AppSession
 
         Public Property CurrentUser As UserModel
 
@@ -37,5 +37,4 @@ Namespace Core
             CurrentUser = Nothing
         End Sub
 
-    End Module
-End Namespace
+End Module
