@@ -26,12 +26,14 @@ Partial Class frmprof
         pnlHeader = New Panel()
         Lbltransparentgradingsytem = New Label()
         pnlTabs = New Panel()
+        ComboBox5 = New ComboBox()
         LblRole = New PillLabel()
         btnLogout = New Button()
         ComboBox1 = New ComboBox()
         lblProfName = New Label()
         PictureBox1 = New PictureBox()
         pnl2ndtab = New Panel()
+        CustomButton6 = New CustomButton()
         CustomButton4 = New CustomButton()
         btnRevisionRequests = New Button()
         btnAuditLogs = New Button()
@@ -80,7 +82,7 @@ Partial Class frmprof
         Label13 = New Label()
         PictureBox3 = New PictureBox()
         LblClassGradeSheet = New Label()
-        pnlRevisionRequests = New Panel()
+        pnlClarificationRequests = New Panel()
         RoundedPanel3 = New RoundedPanel()
         dgvRequests = New DataGridView()
         Label20 = New Label()
@@ -128,8 +130,6 @@ Partial Class frmprof
         CustomButton1 = New CustomButton()
         PictureBox5 = New PictureBox()
         Label59 = New Label()
-        CustomButton6 = New CustomButton()
-        ComboBox5 = New ComboBox()
         pnlHeader.SuspendLayout()
         pnlTabs.SuspendLayout()
         CType(PictureBox1, ComponentModel.ISupportInitialize).BeginInit()
@@ -147,7 +147,7 @@ Partial Class frmprof
         CType(dgvClassGrades, ComponentModel.ISupportInitialize).BeginInit()
         RoundedPanel2.SuspendLayout()
         CType(PictureBox3, ComponentModel.ISupportInitialize).BeginInit()
-        pnlRevisionRequests.SuspendLayout()
+        pnlClarificationRequests.SuspendLayout()
         RoundedPanel3.SuspendLayout()
         CType(dgvRequests, ComponentModel.ISupportInitialize).BeginInit()
         CType(PictureBox4, ComponentModel.ISupportInitialize).BeginInit()
@@ -203,6 +203,17 @@ Partial Class frmprof
         pnlTabs.Name = "pnlTabs"
         pnlTabs.Size = New Size(1104, 38)
         pnlTabs.TabIndex = 1
+        ' 
+        ' ComboBox5
+        ' 
+        ComboBox5.FlatStyle = FlatStyle.Flat
+        ComboBox5.FormattingEnabled = True
+        ComboBox5.Items.AddRange(New Object() {"DSA", "OOP"})
+        ComboBox5.Location = New Point(490, 8)
+        ComboBox5.Margin = New Padding(3, 2, 3, 2)
+        ComboBox5.Name = "ComboBox5"
+        ComboBox5.Size = New Size(124, 23)
+        ComboBox5.TabIndex = 6
         ' 
         ' LblRole
         ' 
@@ -279,6 +290,26 @@ Partial Class frmprof
         pnl2ndtab.Name = "pnl2ndtab"
         pnl2ndtab.Size = New Size(1104, 38)
         pnl2ndtab.TabIndex = 2
+        ' 
+        ' CustomButton6
+        ' 
+        CustomButton6.Anchor = AnchorStyles.Top Or AnchorStyles.Right
+        CustomButton6.BackColor = Color.Green
+        CustomButton6.BorderColor = Color.Black
+        CustomButton6.BorderSize = 2
+        CustomButton6.CornerRadius = 10
+        CustomButton6.FlatStyle = FlatStyle.Flat
+        CustomButton6.Font = New Font("Segoe UI Semibold", 7.8F, FontStyle.Bold)
+        CustomButton6.ForeColor = Color.White
+        CustomButton6.HoverColor = Color.DarkGreen
+        CustomButton6.Location = New Point(783, 11)
+        CustomButton6.Margin = New Padding(3, 2, 3, 2)
+        CustomButton6.Name = "CustomButton6"
+        CustomButton6.NormalColor = Color.Green
+        CustomButton6.Size = New Size(147, 22)
+        CustomButton6.TabIndex = 17
+        CustomButton6.Text = "Add Assessment"
+        CustomButton6.UseVisualStyleBackColor = False
         ' 
         ' CustomButton4
         ' 
@@ -389,9 +420,9 @@ Partial Class frmprof
         ' 
         pnlContent.Anchor = AnchorStyles.Top Or AnchorStyles.Bottom Or AnchorStyles.Left Or AnchorStyles.Right
         pnlContent.BackColor = Color.White
+        pnlContent.Controls.Add(pnlClarificationRequests)
         pnlContent.Controls.Add(pnlAnalytics)
         pnlContent.Controls.Add(pnlClassGrades)
-        pnlContent.Controls.Add(pnlRevisionRequests)
         pnlContent.Controls.Add(pnlRecordScores)
         pnlContent.Controls.Add(pnlAuditLogs)
         pnlContent.Location = New Point(0, 105)
@@ -947,17 +978,17 @@ Partial Class frmprof
         LblClassGradeSheet.TabIndex = 0
         LblClassGradeSheet.Text = "Class Grade Sheet - "
         ' 
-        ' pnlRevisionRequests
+        ' pnlClarificationRequests
         ' 
-        pnlRevisionRequests.Anchor = AnchorStyles.Top Or AnchorStyles.Bottom Or AnchorStyles.Left Or AnchorStyles.Right
-        pnlRevisionRequests.BackColor = Color.White
-        pnlRevisionRequests.Controls.Add(RoundedPanel3)
-        pnlRevisionRequests.Location = New Point(0, 0)
-        pnlRevisionRequests.Margin = New Padding(3, 2, 3, 2)
-        pnlRevisionRequests.Name = "pnlRevisionRequests"
-        pnlRevisionRequests.Size = New Size(1104, 400)
-        pnlRevisionRequests.TabIndex = 9
-        pnlRevisionRequests.Visible = False
+        pnlClarificationRequests.Anchor = AnchorStyles.Top Or AnchorStyles.Bottom Or AnchorStyles.Left Or AnchorStyles.Right
+        pnlClarificationRequests.BackColor = Color.White
+        pnlClarificationRequests.Controls.Add(RoundedPanel3)
+        pnlClarificationRequests.Location = New Point(0, 0)
+        pnlClarificationRequests.Margin = New Padding(3, 2, 3, 2)
+        pnlClarificationRequests.Name = "pnlClarificationRequests"
+        pnlClarificationRequests.Size = New Size(1104, 400)
+        pnlClarificationRequests.TabIndex = 9
+        pnlClarificationRequests.Visible = False
         ' 
         ' RoundedPanel3
         ' 
@@ -993,9 +1024,9 @@ Partial Class frmprof
         Label20.ForeColor = Color.DarkGreen
         Label20.Location = New Point(61, 19)
         Label20.Name = "Label20"
-        Label20.Size = New Size(249, 25)
+        Label20.Size = New Size(282, 25)
         Label20.TabIndex = 6
-        Label20.Text = "Pending Revision Requests"
+        Label20.Text = "Pending Clarification Requests"
         ' 
         ' PictureBox4
         ' 
@@ -1533,37 +1564,6 @@ Partial Class frmprof
         Label59.TabIndex = 6
         Label59.Text = "Audit Log - Recent Changes"
         ' 
-        ' CustomButton6
-        ' 
-        CustomButton6.Anchor = AnchorStyles.Top Or AnchorStyles.Right
-        CustomButton6.BackColor = Color.Green
-        CustomButton6.BorderColor = Color.Black
-        CustomButton6.BorderSize = 2
-        CustomButton6.CornerRadius = 10
-        CustomButton6.FlatStyle = FlatStyle.Flat
-        CustomButton6.Font = New Font("Segoe UI Semibold", 7.8F, FontStyle.Bold)
-        CustomButton6.ForeColor = Color.White
-        CustomButton6.HoverColor = Color.DarkGreen
-        CustomButton6.Location = New Point(783, 11)
-        CustomButton6.Margin = New Padding(3, 2, 3, 2)
-        CustomButton6.Name = "CustomButton6"
-        CustomButton6.NormalColor = Color.Green
-        CustomButton6.Size = New Size(147, 22)
-        CustomButton6.TabIndex = 17
-        CustomButton6.Text = "Add Assessment"
-        CustomButton6.UseVisualStyleBackColor = False
-        ' 
-        ' ComboBox5
-        ' 
-        ComboBox5.FlatStyle = FlatStyle.Flat
-        ComboBox5.FormattingEnabled = True
-        ComboBox5.Items.AddRange(New Object() {"DSA", "OOP"})
-        ComboBox5.Location = New Point(490, 8)
-        ComboBox5.Margin = New Padding(3, 2, 3, 2)
-        ComboBox5.Name = "ComboBox5"
-        ComboBox5.Size = New Size(124, 23)
-        ComboBox5.TabIndex = 6
-        ' 
         ' frmprof
         ' 
         AutoScaleDimensions = New SizeF(7F, 15F)
@@ -1606,7 +1606,7 @@ Partial Class frmprof
         RoundedPanel2.ResumeLayout(False)
         RoundedPanel2.PerformLayout()
         CType(PictureBox3, ComponentModel.ISupportInitialize).EndInit()
-        pnlRevisionRequests.ResumeLayout(False)
+        pnlClarificationRequests.ResumeLayout(False)
         RoundedPanel3.ResumeLayout(False)
         RoundedPanel3.PerformLayout()
         CType(dgvRequests, ComponentModel.ISupportInitialize).EndInit()
@@ -1696,7 +1696,7 @@ Partial Class frmprof
     Friend WithEvents CustomButton4 As CustomButton
     Friend WithEvents dgvClassGrades As DataGridView
     Friend WithEvents CustomButton3 As CustomButton
-    Friend WithEvents pnlRevisionRequests As Panel
+    Friend WithEvents pnlClarificationRequests As Panel
     Friend WithEvents RoundedPanel3 As RoundedPanel
     Friend WithEvents Label20 As Label
     Friend WithEvents PictureBox4 As PictureBox

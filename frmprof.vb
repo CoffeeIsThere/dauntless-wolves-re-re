@@ -30,7 +30,7 @@ Public Class frmprof
         ' Connect buttons to their corresponding panels
         pages.Add(btnRecordScores, pnlRecordScores)
         pages.Add(btnClassGrades, pnlClassGrades)
-        pages.Add(btnRevisionRequests, pnlRevisionRequests)
+        pages.Add(btnRevisionRequests, pnlClarificationRequests)
         pages.Add(btnAnalytics, pnlAnalytics)
         pages.Add(btnAuditLogs, pnlAuditLogs)
 
