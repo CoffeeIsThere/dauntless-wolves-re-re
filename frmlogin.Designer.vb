@@ -58,7 +58,7 @@ Partial Class frmlogin
         ' Label1
         ' 
         Label1.AutoSize = True
-        Label1.Font = New Font("Segoe UI", 9.0F, FontStyle.Bold, GraphicsUnit.Point, CByte(0))
+        Label1.Font = New Font("Segoe UI", 9F, FontStyle.Bold, GraphicsUnit.Point, CByte(0))
         Label1.ForeColor = Color.White
         Label1.Location = New Point(8, 7)
         Label1.Name = "Label1"
@@ -128,13 +128,13 @@ Partial Class frmlogin
         RadioButton2.Name = "RadioButton2"
         RadioButton2.Size = New Size(73, 21)
         RadioButton2.TabIndex = 7
-        RadioButton2.TabStop = True
         RadioButton2.Text = "Teacher"
         RadioButton2.UseVisualStyleBackColor = True
         ' 
         ' RadioButton1
         ' 
         RadioButton1.AutoSize = True
+        RadioButton1.Checked = True
         RadioButton1.Font = New Font("Segoe UI", 9.75F, FontStyle.Bold, GraphicsUnit.Point, CByte(0))
         RadioButton1.ForeColor = Color.DarkGreen
         RadioButton1.Location = New Point(45, 15)
@@ -170,7 +170,7 @@ Partial Class frmlogin
         ' 
         TextBox1.BackColor = Color.White
         TextBox1.BorderStyle = BorderStyle.None
-        TextBox1.Font = New Font("Segoe UI", 12.0F, FontStyle.Regular, GraphicsUnit.Point, CByte(0))
+        TextBox1.Font = New Font("Segoe UI", 12F, FontStyle.Regular, GraphicsUnit.Point, CByte(0))
         TextBox1.Location = New Point(1, 17)
         TextBox1.Name = "TextBox1"
         TextBox1.Size = New Size(302, 22)
@@ -201,7 +201,7 @@ Partial Class frmlogin
         ' 
         boxuser.BackColor = Color.White
         boxuser.BorderStyle = BorderStyle.None
-        boxuser.Font = New Font("Segoe UI", 12.0F, FontStyle.Regular, GraphicsUnit.Point, CByte(0))
+        boxuser.Font = New Font("Segoe UI", 12F, FontStyle.Regular, GraphicsUnit.Point, CByte(0))
         boxuser.Location = New Point(1, 16)
         boxuser.Name = "boxuser"
         boxuser.Size = New Size(302, 22)
@@ -220,7 +220,7 @@ Partial Class frmlogin
         ' 
         ' frmlogin
         ' 
-        AutoScaleDimensions = New SizeF(7.0F, 15.0F)
+        AutoScaleDimensions = New SizeF(7F, 15F)
         AutoScaleMode = AutoScaleMode.Font
         BackgroundImage = My.Resources.Resources.images__1_1
         BackgroundImageLayout = ImageLayout.Stretch

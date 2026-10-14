@@ -1,72 +1,112 @@
-﻿Imports MySql.Data.MySqlClient
-Imports System.Data
+﻿Imports System.Data
 Imports System.IO
+Imports System.Text.Json
+Imports MySql.Data.MySqlClient
 
 Public Class DatabaseHelper
-        Private Shared ConnectionString As String = ""
 
-    Shared Sub New()
-        InitializeConnectionString()
-    End Sub
+    Private Shared _connString As String
+    Private Shared ReadOnly LockObj As New Object()
 
-    Private Shared Sub InitializeConnectionString()
-            Dim server As String = "127.0.0.1"
-            Dim port As String = "3306"
-        Dim dbName As String = "grading_system_test"
-        Dim uid As String = "root"
-            Dim pwd As String = ""
-
-
-        Try
-                Dim configPath As String = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "dbconfig.json")
-            If File.Exists(configPath) Then
-                Dim jsonText As String = File.ReadAllText(configPath)
-
-                If jsonText.Contains("Database") Then
-
+    Private Shared Function GetConnString() As String
+        If _connString Is Nothing Then
+            SyncLock LockObj
+                If _connString Is Nothing Then
+                    _connString = BuildConnString()
                 End If
-            End If
-        Catch ex As Exception
+            End SyncLock
+        End If
+        Return _connString
+    End Function
 
-        End Try
+    Private Shared Function BuildConnString() As String
+        Dim host As String = "127.0.0.1"
+        Dim port As Integer = 3306
+        Dim db As String = "transparent_grading_system"
+        Dim user As String = "root"
+        Dim pass As String = ""
 
-            ConnectionString = $"Server={server};Port={port};Database={dbName};Uid={uid};Pwd={pwd};SslMode=Preferred;AllowZeroDateTime=True;"
-        End Sub
+        Dim configPath As String = Path.Combine(AppContext.BaseDirectory, "dbconfig.json")
+        If File.Exists(configPath) Then
+            Try
+                Using doc As JsonDocument = JsonDocument.Parse(File.ReadAllText(configPath))
+                    Dim root As JsonElement = doc.RootElement
+                    host = ReadText(root, "Host", host)
+                    db = ReadText(root, "Database", db)
+                    user = ReadText(root, "User", user)
+                    pass = ReadText(root, "Password", pass)
 
-        Public Shared Function GetConnection() As MySqlConnection
-            Dim conn As New MySqlConnection(ConnectionString)
-            conn.Open()
-            Return conn
-        End Function
+                    Dim portEl As JsonElement
+                    If root.TryGetProperty("Port", portEl) AndAlso portEl.ValueKind = JsonValueKind.Number Then
+                        port = portEl.GetInt32()
+                    End If
+                End Using
+            Catch ex As JsonException
+                Throw New InvalidOperationException("dbconfig.json is not valid JSON: " & ex.Message)
+            End Try
+        End If
 
-        Public Shared Function ExecuteQuery(sql As String, Optional params As MySqlParameter() = Nothing) As DataTable
-            Dim dt As New DataTable()
-            Using conn As MySqlConnection = GetConnection()
-                Using cmd As New MySqlCommand(sql, conn)
-                    If params IsNot Nothing Then cmd.Parameters.AddRange(params)
-                    Using adapter As New MySqlDataAdapter(cmd)
-                        adapter.Fill(dt)
-                    End Using
+        Dim b As New MySqlConnectionStringBuilder()
+        b.Server = host
+        b.Port = CUInt(port)
+        b.Database = db
+        b.UserID = user
+        b.Password = pass
+        b.SslMode = MySqlSslMode.Preferred
+        b.AllowZeroDateTime = True
+        Return b.ConnectionString
+    End Function
+
+    Private Shared Function ReadText(root As JsonElement, key As String, fallback As String) As String
+        Dim el As JsonElement
+        If root.TryGetProperty(key, el) AndAlso el.ValueKind = JsonValueKind.String Then
+            Return el.GetString()
+        End If
+        Return fallback
+    End Function
+
+    Public Shared Function GetConnection() As MySqlConnection
+        Dim conn As New MySqlConnection(GetConnString())
+        conn.Open()
+        Return conn
+    End Function
+
+
+    Public Shared Function ExecuteQuery(sql As String, ParamArray params As MySqlParameter()) As DataTable
+        Dim dt As New DataTable()
+        Using conn As MySqlConnection = GetConnection()
+            Using cmd As New MySqlCommand(sql, conn)
+                If params IsNot Nothing AndAlso params.Length > 0 Then
+                    cmd.Parameters.AddRange(params)
+                End If
+                Using adapter As New MySqlDataAdapter(cmd)
+                    adapter.Fill(dt)
                 End Using
             End Using
-            Return dt
-        End Function
+        End Using
+        Return dt
+    End Function
 
-        Public Shared Function ExecuteNonQuery(sql As String, Optional params As MySqlParameter() = Nothing) As Integer
-            Using conn As MySqlConnection = GetConnection()
-                Using cmd As New MySqlCommand(sql, conn)
-                    If params IsNot Nothing Then cmd.Parameters.AddRange(params)
-                    Return cmd.ExecuteNonQuery()
-                End Using
+    Public Shared Function ExecuteNonQuery(sql As String, ParamArray params As MySqlParameter()) As Integer
+        Using conn As MySqlConnection = GetConnection()
+            Using cmd As New MySqlCommand(sql, conn)
+                If params IsNot Nothing AndAlso params.Length > 0 Then
+                    cmd.Parameters.AddRange(params)
+                End If
+                Return cmd.ExecuteNonQuery()
             End Using
-        End Function
+        End Using
+    End Function
 
-        Public Shared Function ExecuteScalar(sql As String, Optional params As MySqlParameter() = Nothing) As Object
-            Using conn As MySqlConnection = GetConnection()
-                Using cmd As New MySqlCommand(sql, conn)
-                    If params IsNot Nothing Then cmd.Parameters.AddRange(params)
-                    Return cmd.ExecuteScalar()
-                End Using
+    Public Shared Function ExecuteScalar(sql As String, ParamArray params As MySqlParameter()) As Object
+        Using conn As MySqlConnection = GetConnection()
+            Using cmd As New MySqlCommand(sql, conn)
+                If params IsNot Nothing AndAlso params.Length > 0 Then
+                    cmd.Parameters.AddRange(params)
+                End If
+                Return cmd.ExecuteScalar()
             End Using
-        End Function
-    End Class
+        End Using
+    End Function
+
+End Class

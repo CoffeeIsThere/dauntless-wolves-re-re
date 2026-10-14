@@ -50,6 +50,18 @@ Public Class frmlogin
             Dim user As UserModel = authService.VerifyLogin(username, password)
 
             If user IsNot Nothing Then
+
+                Dim role As String = user.Role.Trim().ToLower()
+                Dim picked As String = If(RadioButton1.Checked, "student", "teacher")
+
+                ' Admins have no radio button, so let them through with either selected
+                If role <> "admin" AndAlso role <> picked Then
+                    MessageBox.Show("This account is not a " & picked & " account. Please select the correct role.",
+                    "Wrong role", MessageBoxButtons.OK, MessageBoxIcon.Warning)
+                    TextBox1.Clear()
+                    Return
+                End If
+
                 ' 3. Save user state in AppSession
                 AppSession.StartSession(user)
 

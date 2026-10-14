@@ -5,57 +5,34 @@ Imports DAUNTLESS_WOLVES_PROF.Models
 
 Public Class AuthService
 
-    Public Function VerifyLogin(inputIdOrEmail As String, rawPassword As String) As UserModel
-        ' CONVERT(... USING utf8mb4) unifies character sets across latin1 and utf8 tables
-        Dim sql As String = "
-            SELECT 'student' AS role, 
-                   CONVERT(student_id USING utf8mb4) AS user_id, 
-                   CONVERT(full_name USING utf8mb4) AS full_name, 
-                   CONVERT(email USING utf8mb4) AS email, 
-                   CONVERT(password_hash USING utf8mb4) AS password_hash 
-            FROM student 
-            WHERE email = @Input OR student_id = @Input
+    Public Function VerifyLogin(login As String, rawPassword As String) As UserModel
+        Dim cleanLogin As String = ValidationHelper.CleanInput(login)
+        If cleanLogin = "" OrElse String.IsNullOrEmpty(rawPassword) Then Return Nothing
 
-            UNION ALL
+        ' Cast IDs to CHAR to prevent MySQL UNION data type mismatch conflicts
+        Dim sql As String =
+            "SELECT 'Admin' AS Role, CAST(admin_id AS CHAR) AS UserId, full_name AS FullName, email, password_hash " &
+            "FROM admin WHERE email = @Login " &
+            "UNION ALL " &
+            "SELECT 'Teacher', CAST(teacher_id AS CHAR), full_name, email, password_hash " &
+            "FROM teacher WHERE (email = @Login OR teacher_id = @Login) AND status = 'Active' " &
+            "UNION ALL " &
+            "SELECT 'Student', CAST(student_id AS CHAR), full_name, email, password_hash " &
+            "FROM student WHERE (email = @Login OR student_id = @Login) AND status = 'Active'"
 
-            SELECT 'teacher' AS role, 
-                   CONVERT(teacher_id USING utf8mb4) AS user_id, 
-                   CONVERT(full_name USING utf8mb4) AS full_name, 
-                   CONVERT(email USING utf8mb4) AS email, 
-                   CONVERT(password_hash USING utf8mb4) AS password_hash 
-            FROM teacher 
-            WHERE email = @Input OR teacher_id = @Input
-
-            UNION ALL
-
-            SELECT 'admin' AS role, 
-                   CONVERT(admin_id USING utf8mb4) AS user_id, 
-                   CONVERT(full_name USING utf8mb4) AS full_name, 
-                   CONVERT(email USING utf8mb4) AS email, 
-                   CONVERT(password_hash USING utf8mb4) AS password_hash 
-            FROM admin 
-            WHERE email = @Input OR admin_id = @Input"
-
-        Dim params As MySqlParameter() = {
-            New MySqlParameter("@Input", inputIdOrEmail)
-        }
-
+        Dim params As MySqlParameter() = {New MySqlParameter("@Login", cleanLogin)}
         Dim dt As DataTable = DatabaseHelper.ExecuteQuery(sql, params)
 
-        If dt IsNot Nothing AndAlso dt.Rows.Count > 0 Then
-            Dim row As DataRow = dt.Rows(0)
-            Dim storedHash As String = row("password_hash").ToString()
-
-            ' Verify password hash
-            If PasswordHasher.VerifyPassword(rawPassword, storedHash) Then
-                Return New UserModel() With {
-                    .UserId = row("user_id").ToString(),
-                    .FullName = row("full_name").ToString(),
+        For Each row As DataRow In dt.Rows
+            If SecurityHelper.VerifyPassword(rawPassword, row("password_hash").ToString()) Then
+                Return New UserModel With {
+                    .UserId = row("UserId").ToString(),
+                    .FullName = row("FullName").ToString(),
                     .Email = row("email").ToString(),
-                    .Role = row("role").ToString()
+                    .Role = row("Role").ToString()
                 }
             End If
-        End If
+        Next
 
         Return Nothing
     End Function

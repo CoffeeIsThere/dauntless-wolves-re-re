@@ -6,10 +6,8 @@
         Public Property Role As String
         Public Property DepartmentOrProgram As String
 
-
         Public Sub New()
         End Sub
-
 
         Public Sub New(id As String, fullName As String, email As String, role As String, Optional deptOrProg As String = "")
             Me.UserId = id
