@@ -1,4 +1,4 @@
-﻿Imports DAUNTLESS_WOLVES_PROF.Core
+﻿
 Public Class frmStudent
 
     Private ReadOnly pages As New Dictionary(Of Button, Panel)

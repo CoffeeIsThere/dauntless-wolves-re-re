@@ -1,5 +1,11 @@
-﻿Imports DAUNTLESS_WOLVES_PROF.Core
+﻿
 Public Class frmprof
+
+    Private ReadOnly _gradeService As New GradeService()
+    Private ReadOnly _revisionService As New RevisionRequestService()
+    Private ReadOnly _auditService As New AuditService()
+
+    Private _currentTeacherId As String = "TCH001"
 
     ' Maps each tab button to the panel it should show
     Private ReadOnly pages As New Dictionary(Of Button, Panel)
@@ -24,8 +30,9 @@ Public Class frmprof
             Return
         End If
 
-        ' (Optional) Display professor name on a label
-        ' lblProfName.Text = $"Welcome, {AppSession.CurrentUser.FullName}"
+        If AppSession.CurrentUser IsNot Nothing Then
+            _currentTeacherId = AppSession.CurrentUser.UserId
+        End If
 
         ' Connect buttons to their corresponding panels
         pages.Add(btnRecordScores, pnlRecordScores)
@@ -295,13 +302,36 @@ Public Class frmprof
     End Sub
 
     Private Sub LoadRequests()
+        ' 1. Fetch live pending requests from MySQL
+        Dim dtDb As DataTable = _revisionService.GetPendingRequestsByTeacher(_currentTeacherId)
+
+        ' 2. Build the DataTable structure expected by dgvRequests
         Dim dt As New DataTable()
-        For Each c In {"Student", "Assessment", "CurrentGrade", "Requested", "Reason", "Status", "Action"}
-            dt.Columns.Add(c)
+        For Each col In {"RequestId", "EnrollmentId", "AssessmentId", "RequestedPointsVal",
+                     "Student", "Assessment", "CurrentGrade", "Requested", "Reason", "Status", "Action"}
+            dt.Columns.Add(col)
         Next
-        dt.Rows.Add("Lalata, Carl Jade", "Quiz#1", "18/20", "+2pts", "Misread Answer", "Pending", "Approve")
-        dt.Rows.Add("Condes, Hope Gian", "Final Exam", "--", "Recheck", "Item 7 correct", "Pending", "Approve")
-        dt.Rows.Add("Mariano, Geoff Andrei", "Activity#2", "43/50", "+5pts", "Late Submission", "Approved", "Closed")
+
+        ' 3. Populate rows from database query results
+        For Each row As DataRow In dtDb.Rows
+            Dim reqId As Integer = Convert.ToInt32(row("request_id"))
+            Dim enrolId As Integer = Convert.ToInt32(row("enrollment_id"))
+            Dim assessId As Integer = Convert.ToInt32(row("assessment_id"))
+            Dim studentName As String = row("student_name").ToString()
+            Dim assessTitle As String = row("assessment_title").ToString()
+
+            Dim currScore As String = If(IsDBNull(row("current_score")), "--",
+                                     row("current_score").ToString() & "/" & row("total_score").ToString())
+
+            Dim reqPtsVal As Double = If(IsDBNull(row("requested_points")), 0, Convert.ToDouble(row("requested_points")))
+            Dim reqPtsStr As String = "+" & reqPtsVal.ToString() & "pts"
+
+            Dim reason As String = row("reason").ToString()
+            Dim status As String = row("status").ToString()
+            Dim action As String = If(status.Equals("Pending", StringComparison.OrdinalIgnoreCase), "Approve", "Closed")
+
+            dt.Rows.Add(reqId, enrolId, assessId, reqPtsVal, studentName, assessTitle, currScore, reqPtsStr, reason, status, action)
+        Next
 
         dgvRequests.DataSource = dt
         dgvRequests.ClearSelection()
@@ -340,7 +370,7 @@ Public Class frmprof
 
     ' Approve button click
     Private Sub dgvRequests_CellContentClick(sender As Object, e As DataGridViewCellEventArgs) _
-        Handles dgvRequests.CellContentClick
+    Handles dgvRequests.CellContentClick
 
         If e.RowIndex < 0 Then Exit Sub
         If dgvRequests.Columns(e.ColumnIndex).Name <> "Action" Then Exit Sub
@@ -348,11 +378,32 @@ Public Class frmprof
         Dim row As DataGridViewRow = dgvRequests.Rows(e.RowIndex)
         If row.Cells("Action").Value.ToString() <> "Approve" Then Exit Sub
 
-        If MessageBox.Show("Approve this revision request?", "Confirm",
-                           MessageBoxButtons.YesNo, MessageBoxIcon.Question) = DialogResult.Yes Then
-            ' later: run an UPDATE on the MariaDB table here
-            row.Cells("Status").Value = "Approved"
-            row.Cells("Action").Value = "Closed"
+        If MessageBox.Show("Approve this revision request and update the student's grade?", "Confirm Revision Approval",
+                       MessageBoxButtons.YesNo, MessageBoxIcon.Question) = DialogResult.Yes Then
+
+            ' Retrieve bound database IDs from the row DataRowView
+            Dim drv As DataRowView = DirectCast(row.DataBoundItem, DataRowView)
+            If drv Is Nothing Then Exit Sub
+
+            Dim requestId As Integer = Convert.ToInt32(drv("RequestId"))
+            Dim enrollmentId As Integer = Convert.ToInt32(drv("EnrollmentId"))
+            Dim assessmentId As Integer = Convert.ToInt32(drv("AssessmentId"))
+            Dim newScore As Double = Convert.ToDouble(drv("RequestedPointsVal"))
+
+            ' Execute transaction: approves request, updates student score, recalculates running grade, and creates audit log
+            Dim result As OperationResult = _revisionService.ApproveAndApplyRevision(
+            requestId, enrollmentId, assessmentId, newScore, _currentTeacherId, "Approved via Professor Dashboard"
+        )
+
+            If result.Success Then
+                MessageBox.Show(result.Message, "Request Approved", MessageBoxButtons.OK, MessageBoxIcon.Information)
+
+                ' Refresh grids to display updated database scores and request status
+                LoadRequests()
+                LoadClassGrades()
+            Else
+                MessageBox.Show(result.Message, "Approval Failed", MessageBoxButtons.OK, MessageBoxIcon.Error)
+            End If
         End If
     End Sub
 
@@ -602,7 +653,7 @@ Public Class frmprof
     End Sub
 
     Private Sub CustomButton4_Click(sender As Object, e As EventArgs) Handles CustomButton4.Click
-        frmGradebook.Show
+        frmGradebook.Show()
     End Sub
 
 

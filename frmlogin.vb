@@ -1,6 +1,6 @@
-﻿Imports DAUNTLESS_WOLVES_PROF.Core
+﻿
 Imports DAUNTLESS_WOLVES_PROF.Models
-Imports DAUNTLESS_WOLVES_PROF.Services
+
 
 
 Public Class frmlogin

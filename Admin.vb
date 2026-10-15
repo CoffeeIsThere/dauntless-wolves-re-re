@@ -1,6 +1,12 @@
 ﻿Imports System.Drawing.Drawing2D
-Imports DAUNTLESS_WOLVES_PROF.Core
+
 Public Class Admin
+
+    ' Instantiate backend service
+    Private ReadOnly _userService As New UserService()
+
+    ' Store logged-in admin ID
+    Private _currentAdminId As String = "ADM001"
 
     Private tabButtons As Button()
 
@@ -71,7 +77,7 @@ Public Class Admin
         cboDeptProf.Items.AddRange({"All", "CCS", "CAS", "CHTM", "CHS", "CED", "COE", "COA", "CON"})
         cboDeptProf.SelectedIndex = 0
 
-        LoadSampleProfs()
+        LoadProfsFromDb()
         ApplyProfFilter()
     End Sub
 
@@ -152,20 +158,25 @@ Public Class Admin
         End With
     End Sub
 
-    Private Sub LoadSampleProfs()
+    Private Sub LoadProfsFromDb()
         allProfs.Clear()
-        Dim names = {"Santos", "San Juan", "Cruz", "Jonathan", "DelaCruz", "Mariano",
-                     "Lalata", "Albert", "San Jose", "Robles", "Francisco"}
-        Dim depts = {"CCS", "CCS", "CCS", "CAS", "CHTM", "CHS", "CED", "COE", "COA", "CON", "COE"}
-        Dim cls = {4, 6, 4, 2, 3, 4, 6, 3, 2, 5, 6}
-        For i As Integer = 0 To names.Length - 1
+
+        ' Fetch real teacher records from MySQL via UserService
+        Dim dt As DataTable = _userService.GetAllTeachers()
+
+        ' Convert database rows into your existing ProfessorInfo list
+        For Each row As DataRow In dt.Rows
             allProfs.Add(New ProfessorInfo With {
-                .Name = "Prof." & names(i),
-                .EmployeeID = "P" & (i + 1).ToString("000"),
-                .Department = depts(i),
-                .Classes = cls(i),
-                .Status = "Active"})
+            .Name = row("full_name").ToString(),
+            .EmployeeID = row("teacher_id").ToString(),
+            .Department = row("department").ToString(),
+            .Classes = If(IsDBNull(row("class_count")), 0, Convert.ToInt32(row("class_count"))),
+            .Status = row("status").ToString()
+        })
         Next
+
+        ' Send real data into your existing pagination/filter pipeline
+        ApplyProfFilter()
     End Sub
 
     Private Sub ApplyProfFilter()
@@ -375,7 +386,7 @@ Public Class Admin
     Private Sub SetupStudentGrid()
         Dim headerColor As Color = Color.FromArgb(224, 247, 250)
 
-        With dgvStudents
+        With dgvstudents
             .AllowUserToAddRows = False
             .AllowUserToDeleteRows = False
             .AllowUserToResizeRows = False
@@ -491,20 +502,20 @@ Public Class Admin
     End Sub
 
     Private Sub ShowStudentPage()
-        dgvStudents.Rows.Clear()
+        dgvstudents.Rows.Clear()
         For Each s In filteredStudents.Skip((studentPage - 1) * StudentPageSize).Take(StudentPageSize)
-            dgvStudents.Rows.Add(False, s.StudentID, s.FullName, s.YearLevel,
+            dgvstudents.Rows.Add(False, s.StudentID, s.FullName, s.YearLevel,
                                  s.Section, s.Program, s.Status, "")
         Next
-        lblTotalStudents.Text = "Total Students: " & filteredStudents.Count
-        dgvStudents.ClearSelection()
+        lbltotalstudents.Text = "Total Students: " & filteredStudents.Count
+        dgvstudents.ClearSelection()
         BuildStudentPager()
     End Sub
 
     ' Same pager logic as the professor page: always 5 number buttons
     Private Sub BuildStudentPager()
-        flowStudentPager.SuspendLayout()
-        flowStudentPager.Controls.Clear()
+        flowstudentpager.SuspendLayout()
+        flowstudentpager.Controls.Clear()
 
         Const MinButtons As Integer = 5
         Dim totalPages As Integer = Math.Max(1, CInt(Math.Ceiling(filteredStudents.Count / StudentPageSize)))
@@ -516,16 +527,16 @@ Public Class Admin
             startPage = 1
         End If
 
-        flowStudentPager.Controls.Add(MakeStudentPagerButton("<", Math.Max(1, studentPage - 1), False, studentPage > 1))
+        flowstudentpager.Controls.Add(MakeStudentPagerButton("<", Math.Max(1, studentPage - 1), False, studentPage > 1))
         For i As Integer = 0 To MinButtons - 1
             Dim pageNo As Integer = startPage + i
-            flowStudentPager.Controls.Add(MakeStudentPagerButton(pageNo.ToString(), pageNo, pageNo = studentPage, pageNo <= totalPages))
+            flowstudentpager.Controls.Add(MakeStudentPagerButton(pageNo.ToString(), pageNo, pageNo = studentPage, pageNo <= totalPages))
         Next
-        flowStudentPager.Controls.Add(MakeStudentPagerButton(">", Math.Min(totalPages, studentPage + 1), False, studentPage < totalPages))
+        flowstudentpager.Controls.Add(MakeStudentPagerButton(">", Math.Min(totalPages, studentPage + 1), False, studentPage < totalPages))
 
-        flowStudentPager.AutoSize = False
-        flowStudentPager.Width = flowStudentPager.Controls.Count * 32 + 8
-        flowStudentPager.ResumeLayout()
+        flowstudentpager.AutoSize = False
+        flowstudentpager.Width = flowstudentpager.Controls.Count * 32 + 8
+        flowstudentpager.ResumeLayout()
     End Sub
 
     Private Function MakeStudentPagerButton(text As String, page As Integer, active As Boolean, enabled As Boolean) As Button
@@ -571,14 +582,14 @@ Public Class Admin
         ApplyStudentFilter()
     End Sub
 
-    Private Sub btnAddStudent_Click(sender As Object, e As EventArgs) Handles btnAddStudent.Click
+    Private Sub btnAddStudent_Click(sender As Object, e As EventArgs) Handles btnaddstudent.Click
         MessageBox.Show("Open Add Student form here")
     End Sub
 
     ' ----- pills for Status and Actions (reuses DrawPill and ActionRects) -----
-    Private Sub dgvStudents_CellPainting(sender As Object, e As DataGridViewCellPaintingEventArgs) Handles dgvStudents.CellPainting
+    Private Sub dgvStudents_CellPainting(sender As Object, e As DataGridViewCellPaintingEventArgs) Handles dgvstudents.CellPainting
         If e.RowIndex < 0 Then Return
-        Dim col As String = dgvStudents.Columns(e.ColumnIndex).Name
+        Dim col As String = dgvstudents.Columns(e.ColumnIndex).Name
         If col <> "colStatus" AndAlso col <> "colActions" Then Return
 
         e.PaintBackground(e.ClipBounds, False)
@@ -602,13 +613,13 @@ Public Class Admin
         e.Handled = True
     End Sub
 
-    Private Sub dgvStudents_CellMouseClick(sender As Object, e As DataGridViewCellMouseEventArgs) Handles dgvStudents.CellMouseClick
+    Private Sub dgvStudents_CellMouseClick(sender As Object, e As DataGridViewCellMouseEventArgs) Handles dgvstudents.CellMouseClick
         If e.RowIndex < 0 Then Return
-        If dgvStudents.Columns(e.ColumnIndex).Name <> "colActions" Then Return
+        If dgvstudents.Columns(e.ColumnIndex).Name <> "colActions" Then Return
 
-        Dim size = dgvStudents.GetCellDisplayRectangle(e.ColumnIndex, e.RowIndex, False).Size
+        Dim size = dgvstudents.GetCellDisplayRectangle(e.ColumnIndex, e.RowIndex, False).Size
         Dim rects = ActionRects(New Rectangle(0, 0, size.Width, size.Height))
-        Dim id As String = dgvStudents.Rows(e.RowIndex).Cells("colStudentId").Value.ToString()
+        Dim id As String = dgvstudents.Rows(e.RowIndex).Cells("colStudentId").Value.ToString()
 
         If rects(0).Contains(e.Location) Then
             MessageBox.Show("Edit " & id)                 ' open your edit form here
@@ -659,7 +670,7 @@ Public Class Admin
     End Sub
 
     Private Sub SetupUpdatesGrid()
-        With dgvUpdates
+        With dgvupdates
             .Columns.Clear()
             .AllowUserToAddRows = False
             .AllowUserToDeleteRows = False
@@ -693,12 +704,12 @@ Public Class Admin
         lblStatPending.Text = "12"
 
         ' Sample data. Replace with the latest rows from the audit log.
-        dgvUpdates.Rows.Clear()
-        dgvUpdates.Rows.Add("Updated Lalata, Carl Jade's Quiz #1", "-Prof. Jhun")
-        dgvUpdates.Rows.Add("Updated Condes, Hope Gian's SW #2", "-Prof. Becca")
-        dgvUpdates.Rows.Add("Student added- Mariano, Geoff Andreii", "-DBMS2")
-        dgvUpdates.Rows.Add("Professor added- Ramos, Aldrich Andreii", "-IT101")
-        dgvUpdates.ClearSelection()
+        dgvupdates.Rows.Clear()
+        dgvupdates.Rows.Add("Updated Lalata, Carl Jade's Quiz #1", "-Prof. Jhun")
+        dgvupdates.Rows.Add("Updated Condes, Hope Gian's SW #2", "-Prof. Becca")
+        dgvupdates.Rows.Add("Student added- Mariano, Geoff Andreii", "-DBMS2")
+        dgvupdates.Rows.Add("Professor added- Ramos, Aldrich Andreii", "-IT101")
+        dgvupdates.ClearSelection()
     End Sub
 
     Private Sub btnUpdatesFilter_Click(sender As Object, e As EventArgs) Handles btnupdatesfilter.Click

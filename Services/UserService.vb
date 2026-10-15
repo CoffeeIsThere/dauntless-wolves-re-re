@@ -1,6 +1,6 @@
 ﻿Imports MySql.Data.MySqlClient
 Imports System.Data
-Imports DAUNTLESS_WOLVES_PROF.Core
+
 
 Public Class UserService
 
@@ -58,14 +58,103 @@ Public Class UserService
         End Try
     End Function
 
-    Public Function GetAllTeachers() As DataTable
-        Dim sql As String = "SELECT teacher_id, full_name, email, department, status, created_at FROM teacher ORDER BY full_name ASC"
-        Return DatabaseHelper.ExecuteQuery(sql)
+    Public Function GetAllTeachers(Optional searchQuery As String = "", Optional department As String = "All") As DataTable
+        Dim sql As String = "SELECT teacher_id, full_name, email, department, status, " &
+                            "(SELECT COUNT(*) FROM class c WHERE c.teacher_id = t.teacher_id) AS class_count " &
+                            "FROM teacher t WHERE 1=1"
+
+        Dim params As New List(Of MySqlParameter)()
+
+        If Not String.IsNullOrWhiteSpace(searchQuery) Then
+            sql &= " AND (full_name LIKE @Search OR LOWER(teacher_id) LIKE @Search OR LOWER(email) LIKE @Search)"
+            params.Add(New MySqlParameter("@Search", "%" & searchQuery.Trim().ToLower() & "%"))
+        End If
+
+        If Not String.IsNullOrWhiteSpace(department) AndAlso Not department.Equals("All", StringComparison.OrdinalIgnoreCase) Then
+            sql &= " AND department = @Dept"
+            params.Add(New MySqlParameter("@Dept", department.Trim()))
+        End If
+
+        sql &= " ORDER BY full_name ASC"
+        Return DatabaseHelper.ExecuteQuery(sql, params.ToArray())
     End Function
 
-    Public Function GetAllStudents() As DataTable
-        Dim sql As String = "SELECT student_id, full_name, email, program, year_level, section, status, created_at FROM student ORDER BY full_name ASC"
-        Return DatabaseHelper.ExecuteQuery(sql)
+    Public Function GetAllStudents(Optional searchQuery As String = "", Optional yearLevel As String = "All", Optional section As String = "All") As DataTable
+        Dim sql As String = "SELECT student_id, full_name, email, program, year_level, section, status FROM student WHERE 1=1"
+        Dim params As New List(Of MySqlParameter)()
+
+        If Not String.IsNullOrWhiteSpace(searchQuery) Then
+            sql &= " AND (LOWER(full_name) LIKE @Search OR LOWER(student_id) LIKE @Search OR LOWER(email) LIKE @Search)"
+            params.Add(New MySqlParameter("@Search", "%" & searchQuery.Trim().ToLower() & "%"))
+        End If
+
+        If Not String.IsNullOrWhiteSpace(yearLevel) AndAlso Not yearLevel.Equals("All", StringComparison.OrdinalIgnoreCase) Then
+            Dim yr As Integer
+            If Integer.TryParse(yearLevel, yr) Then
+                sql &= " AND year_level = @Yr"
+                params.Add(New MySqlParameter("@Yr", yr))
+                Return DatabaseHelper.ExecuteQuery(sql)
+            End If
+        End If
+
+        If Not String.IsNullOrWhiteSpace(section) AndAlso Not section.Equals("All", StringComparison.OrdinalIgnoreCase) Then
+            sql &= " AND section = @Sec"
+            params.Add(New MySqlParameter("@Sec", section.Trim()))
+        End If
+
+        sql &= " ORDER BY full_name ASC"
+        Return DatabaseHelper.ExecuteQuery(sql, params.ToArray())
+    End Function
+
+    Public Function UpdateTeacher(teacherId As String, fullName As String, email As String, department As String, adminId As String) As Boolean
+        Dim sql As String = "UPDATE teacher SET full_name = @FullName, email = @Email, department = @Department WHERE teacher_id = @TeacherId"
+        Dim params As MySqlParameter() = {
+            New MySqlParameter("@FullName", ValidationHelper.SanitizeInput(fullName)),
+            New MySqlParameter("@Email", ValidationHelper.SanitizeInput(email)),
+            New MySqlParameter("@Department", ValidationHelper.SanitizeInput(department)),
+            New MySqlParameter("@TeacherId", teacherId)
+        }
+
+        If DatabaseHelper.ExecuteNonQuery(sql, params) > 0 Then
+            AuditService.LogAction("Admin", adminId, "UPDATE_TEACHER", "teacher", teacherId, details:=$"Updated details for {teacherId}")
+            Return True
+        End If
+        Return False
+    End Function
+
+    Public Function UpdateStudent(studentId As String, fullName As String, email As String, program As String, yearLevel As Integer, section As String, adminId As String) As Boolean
+        Dim sql As String = "UPDATE student SET full_name = @FullName, email = @Email, program = @Program, year_level = @YearLevel, section = @Section WHERE student_id = @StudentId"
+        Dim params As MySqlParameter() = {
+            New MySqlParameter("@FullName", ValidationHelper.SanitizeInput(fullName)),
+            New MySqlParameter("@Email", ValidationHelper.SanitizeInput(email)),
+            New MySqlParameter("@Program", ValidationHelper.SanitizeInput(program)),
+            New MySqlParameter("@YearLevel", yearLevel),
+            New MySqlParameter("@Section", ValidationHelper.SanitizeInput(section)),
+            New MySqlParameter("@StudentId", studentId)
+        }
+
+        If DatabaseHelper.ExecuteNonQuery(sql, params) > 0 Then
+            AuditService.LogAction("Admin", adminId, "UPDATE_STUDENT", "student", studentId, details:=$"Updated details for {studentId}")
+            Return True
+        End If
+        Return False
+    End Function
+
+    Public Function SetUserStatus(userRole As String, userId As String, newStatus As String, adminId As String) As Boolean
+        Dim tableName As String = If(userRole.Equals("Teacher", StringComparison.OrdinalIgnoreCase), "teacher", "student")
+        Dim idColumn As String = If(userRole.Equals("Teacher", StringComparison.OrdinalIgnoreCase), "teacher_id", "student_id")
+
+        Dim sql As String = $"UPDATE {tableName} SET status = @Status WHERE {idColumn} = @UserId"
+        Dim params As MySqlParameter() = {
+            New MySqlParameter("@Status", newStatus),
+            New MySqlParameter("@UserId", userId)
+        }
+
+        If DatabaseHelper.ExecuteNonQuery(sql, params) > 0 Then
+            AuditService.LogAction("Admin", adminId, $"SET_{userRole.ToUpper()}_STATUS", tableName, userId, details:=$"Status set to {newStatus}")
+            Return True
+        End If
+        Return False
     End Function
 
     Public Function ToggleUserStatus(role As String, userId As String, newStatus As String, adminId As String) As Boolean

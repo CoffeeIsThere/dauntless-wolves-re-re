@@ -1,6 +1,5 @@
 ﻿Imports MySql.Data.MySqlClient
 Imports System.Data
-Imports DAUNTLESS_WOLVES_PROF.Core
 Imports DAUNTLESS_WOLVES_PROF.Models
 
 Public Class AuthService
