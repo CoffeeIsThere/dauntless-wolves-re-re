@@ -148,7 +148,7 @@ Partial Class frmlogin
         ' Label3
         ' 
         Label3.AutoSize = True
-        Label3.Location = New Point(49, 275)
+        Label3.Location = New Point(49, 271)
         Label3.Name = "Label3"
         Label3.Size = New Size(57, 15)
         Label3.TabIndex = 5
@@ -179,7 +179,7 @@ Partial Class frmlogin
         ' Label2
         ' 
         Label2.AutoSize = True
-        Label2.Location = New Point(50, 187)
+        Label2.Location = New Point(50, 182)
         Label2.Name = "Label2"
         Label2.Size = New Size(182, 15)
         Label2.TabIndex = 3

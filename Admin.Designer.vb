@@ -615,7 +615,7 @@ Partial Class Admin
         Label9.FlatStyle = FlatStyle.Flat
         Label9.Font = New Font("Segoe UI", 12.0F, FontStyle.Bold, GraphicsUnit.Point, CByte(0))
         Label9.ForeColor = Color.DarkGreen
-        Label9.Location = New Point(53, 73)
+        Label9.Location = New Point(53, 70)
         Label9.Name = "Label9"
         Label9.Size = New Size(146, 21)
         Label9.TabIndex = 3
@@ -655,7 +655,7 @@ Partial Class Admin
         Label8.FlatStyle = FlatStyle.Flat
         Label8.Font = New Font("Segoe UI", 12.0F, FontStyle.Bold, GraphicsUnit.Point, CByte(0))
         Label8.ForeColor = Color.DarkGreen
-        Label8.Location = New Point(69, 73)
+        Label8.Location = New Point(69, 70)
         Label8.Name = "Label8"
         Label8.Size = New Size(116, 21)
         Label8.TabIndex = 3
@@ -695,7 +695,7 @@ Partial Class Admin
         Label7.FlatStyle = FlatStyle.Flat
         Label7.Font = New Font("Segoe UI", 12.0F, FontStyle.Bold, GraphicsUnit.Point, CByte(0))
         Label7.ForeColor = Color.DarkGreen
-        Label7.Location = New Point(79, 74)
+        Label7.Location = New Point(79, 71)
         Label7.Name = "Label7"
         Label7.Size = New Size(88, 21)
         Label7.TabIndex = 3
@@ -735,7 +735,7 @@ Partial Class Admin
         Label6.FlatStyle = FlatStyle.Flat
         Label6.Font = New Font("Segoe UI", 12.0F, FontStyle.Bold, GraphicsUnit.Point, CByte(0))
         Label6.ForeColor = Color.DarkGreen
-        Label6.Location = New Point(60, 73)
+        Label6.Location = New Point(60, 70)
         Label6.Name = "Label6"
         Label6.Size = New Size(119, 21)
         Label6.TabIndex = 2

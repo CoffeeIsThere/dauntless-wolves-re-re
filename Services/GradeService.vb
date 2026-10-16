@@ -5,9 +5,9 @@ Imports MySql.Data.MySqlClient
 
 Public Class GradeService
 
-    ' =========================================================
-    '  RECORD SCORE (one transaction: score + running grade + audit row)
-    ' =========================================================
+
+    '  RECORD SCORE
+
 
     Public Function RecordScore(enrollmentId As Integer, assessmentId As Integer,
                                 newScore As Double, teacherId As String,
@@ -31,14 +31,13 @@ Public Class GradeService
         End Try
     End Function
 
-    ' Same logic inside a transaction somebody else owns (the clarification approval will reuse this).
-    ' It never commits or rolls back by itself.
+
     Public Function RecordScoreTx(conn As MySqlConnection, tx As MySqlTransaction,
                                   enrollmentId As Integer, assessmentId As Integer,
                                   newScore As Double, teacherId As String,
                                   Optional reason As String = Nothing) As OperationResult
 
-        ' 1) Who owns this class, and how many points is the assessment worth?
+
         Dim totalScore As Double = 0
         Dim title As String = ""
         Dim ownerId As String = ""
@@ -73,7 +72,7 @@ Public Class GradeService
             Return OperationResult.Fail("Score must be between 0 and " & Fmt(totalScore) & ".")
         End If
 
-        ' 2) Lock the current row and read the old score (NULL = not graded yet)
+
         Dim oldScore As Double? = Nothing
         Dim lockSql As String = "SELECT score FROM studentgrade WHERE enrollment_id = @EnrollmentId AND assessment_id = @AssessmentId FOR UPDATE"
         Using cmd As New MySqlCommand(lockSql, conn, tx)
@@ -86,7 +85,7 @@ Public Class GradeService
             Return OperationResult.Ok("Score unchanged.")
         End If
 
-        ' 3) Save the score (the row usually exists already; insert if it does not)
+
         Dim upsertSql As String =
             "INSERT INTO studentgrade (enrollment_id, assessment_id, score, remarks) " &
             "VALUES (@EnrollmentId, @AssessmentId, @Score, @Remarks) " &
@@ -99,10 +98,8 @@ Public Class GradeService
             cmd.ExecuteNonQuery()
         End Using
 
-        ' 4) Refresh the cached running grade on the enrollment
         RefreshRunningGrade(conn, tx, enrollmentId)
 
-        ' 5) Audit row (same transaction, so it rolls back with the score)
         Dim gradeId As String
         Using cmd As New MySqlCommand("SELECT grade_id FROM studentgrade WHERE enrollment_id = @EnrollmentId AND assessment_id = @AssessmentId", conn, tx)
             cmd.Parameters.AddWithValue("@EnrollmentId", enrollmentId)
@@ -154,7 +151,6 @@ Public Class GradeService
         Return running
     End Function
 
-    ' One-time helper: fills running_grade for every enrollment (the seed data has them all NULL)
     Public Function RecalculateAllRunningGrades() As Integer
         Using conn As MySqlConnection = DatabaseHelper.GetConnection()
             Using tx As MySqlTransaction = conn.BeginTransaction()
@@ -177,11 +173,8 @@ Public Class GradeService
         End Using
     End Function
 
-    ' =========================================================
-    '  READ QUERIES (every one checks who is asking)
-    ' =========================================================
+    '  READ QUERIES
 
-    ' Teacher's class dropdown
     Public Function GetClassesByTeacher(teacherId As String) As DataTable
         Dim sql As String =
             "SELECT c.class_id, c.course_code, co.course_name, c.section, c.semester, c.academic_year, " &
@@ -195,7 +188,7 @@ Public Class GradeService
         Return DatabaseHelper.ExecuteQuery(sql, {New MySqlParameter("@TeacherId", teacherId)})
     End Function
 
-    ' Students in one of the teacher's classes
+
     Public Function GetEnrollmentsByClass(classId As Integer, teacherId As String) As DataTable
         Dim sql As String =
             "SELECT e.enrollment_id, s.student_id, s.full_name, e.running_grade " &
@@ -207,7 +200,6 @@ Public Class GradeService
         Return DatabaseHelper.ExecuteQuery(sql, {New MySqlParameter("@ClassId", classId), New MySqlParameter("@TeacherId", teacherId)})
     End Function
 
-    ' Student's own classes (for the course dropdown on My Grades)
     Public Function GetEnrollmentsByStudent(studentId As String) As DataTable
         Dim sql As String =
             "SELECT e.enrollment_id, c.class_id, c.course_code, co.course_name, c.section, e.running_grade " &
@@ -219,7 +211,6 @@ Public Class GradeService
         Return DatabaseHelper.ExecuteQuery(sql, {New MySqlParameter("@StudentId", studentId)})
     End Function
 
-    ' Student's own grades for one enrollment (the student id check blocks peeking at others)
     Public Function GetGradesForStudent(enrollmentId As Integer, studentId As String) As DataTable
         Dim sql As String =
             "SELECT sg.grade_id, a.term, a.title, a.type, sg.score, a.total_score, a.weight, sg.remarks, sg.updated_at " &
@@ -231,7 +222,6 @@ Public Class GradeService
         Return DatabaseHelper.ExecuteQuery(sql, {New MySqlParameter("@EnrollmentId", enrollmentId), New MySqlParameter("@StudentId", studentId)})
     End Function
 
-    ' Grade History screen: reads score changes from auditlog
     Public Function GetGradeHistoryForStudent(studentId As String) As DataTable
         Dim sql As String =
             "SELECT al.timestamp AS changed_at, a.title AS assessment, al.old_value, al.new_value, " &
@@ -246,16 +236,13 @@ Public Class GradeService
         Return DatabaseHelper.ExecuteQuery(sql, {New MySqlParameter("@StudentId", studentId)})
     End Function
 
-    ' Class Grades table: one row per student, one column per assessment.
-    ' term = "All", "Midterm" or "Finals" ("Midterms" is accepted too).
-    ' Assessment columns are named "A<assessment_id>" and the title is in the column Caption.
+
     Public Function GetClassGradeSheet(classId As Integer, teacherId As String,
                                        Optional term As String = "All") As DataTable
         If term = "Midterms" Then term = "Midterm"
         Dim filterTerm As Boolean = Not String.IsNullOrEmpty(term) AndAlso
                                     Not term.Equals("All", StringComparison.OrdinalIgnoreCase)
 
-        ' Assessment columns (empty if this teacher does not own the class)
         Dim aSql As String =
             "SELECT a.assessment_id, a.title FROM assessment a " &
             "JOIN class c ON a.class_id = c.class_id " &
@@ -331,9 +318,9 @@ Public Class GradeService
         Return sheet
     End Function
 
-    ' =========================================================
-    '  CSV IMPORT (reuses RecordScore, so every row is checked and audited)
-    ' =========================================================
+
+    '  CSV IMPORT
+
 
     Public Function BulkImportGradesFromCSV(classId As Integer, assessmentId As Integer,
                                             filePath As String, teacherId As String) As (SuccessCount As Integer, FailCount As Integer)
@@ -344,7 +331,6 @@ Public Class GradeService
 
         Dim lines() As String = File.ReadAllLines(filePath)
 
-        ' Row 0 is the header
         For i As Integer = 1 To lines.Length - 1
             Dim line As String = lines(i).Trim()
             If String.IsNullOrWhiteSpace(line) Then Continue For
@@ -388,16 +374,12 @@ Public Class GradeService
         Return 0
     End Function
 
-    ' =========================================================
-    '  SMALL HELPERS
-    ' =========================================================
 
     Private Shared Function ToNullableDouble(o As Object) As Double?
         If o Is Nothing OrElse Convert.IsDBNull(o) Then Return Nothing
         Return Convert.ToDouble(o)
     End Function
 
-    ' 18 -> "18", 92.5 -> "92.5"
     Private Shared Function Fmt(value As Double) As String
         Return value.ToString("0.##", CultureInfo.InvariantCulture)
     End Function
