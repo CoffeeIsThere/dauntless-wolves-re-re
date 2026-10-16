@@ -110,8 +110,10 @@ Public Class RevisionRequestService
     End Function
 
     Public Function GetPendingRequestsByTeacher(teacherId As String) As DataTable
-        Dim sql As String = "SELECT r.request_id, r.grade_id, s.full_name AS student_name, a.title AS assessment_title, " &
-                            "sg.score AS current_score, r.requested_points, r.reason, r.status, r.requested_at " &
+        Dim sql As String = "SELECT r.request_id, r.grade_id, sg.enrollment_id, sg.assessment_id, " &
+                            "s.full_name AS student_name, a.title AS assessment_title, " &
+                            "sg.score AS current_score, a.total_score, r.requested_points, " &
+                            "r.reason, r.status, r.requested_at " &
                             "FROM revisionrequest r " &
                             "JOIN studentgrade sg ON r.grade_id = sg.grade_id " &
                             "JOIN enrollment e ON sg.enrollment_id = e.enrollment_id " &
