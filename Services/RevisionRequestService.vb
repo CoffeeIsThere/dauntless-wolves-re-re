@@ -89,7 +89,7 @@ Public Class RevisionRequestService
 
     Public Function RejectRequest(requestId As Integer, teacherId As String, Optional reason As String = "") As Boolean
         Dim sql As String = "UPDATE revisionrequest " &
-                            "SET status = 'Rejected', reviewed_at = NOW(), reviewed_by = @TeacherId " &
+                            "SET status = 'Closed', reviewed_at = NOW(), reviewed_by = @TeacherId " &
                             "WHERE request_id = @RequestId"
 
         Dim params As MySqlParameter() = {

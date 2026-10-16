@@ -222,7 +222,7 @@ Public Class GradeService
     ' Student's own grades for one enrollment (the student id check blocks peeking at others)
     Public Function GetGradesForStudent(enrollmentId As Integer, studentId As String) As DataTable
         Dim sql As String =
-            "SELECT sg.grade_id, a.term, a.title, a.type, sg.score, a.total_score, a.weight, sg.remarks, sg.updated_at " &
+            "SELECT sg.grade_id, a.term, a.title, a.assessment_type AS type, sg.score, a.total_score, a.weight, sg.remarks, sg.updated_at " &
             "FROM studentgrade sg " &
             "JOIN assessment a ON sg.assessment_id = a.assessment_id " &
             "JOIN enrollment e ON sg.enrollment_id = e.enrollment_id " &
@@ -234,7 +234,7 @@ Public Class GradeService
     ' Grade History screen: reads score changes from auditlog
     Public Function GetGradeHistoryForStudent(studentId As String) As DataTable
         Dim sql As String =
-            "SELECT al.timestamp AS changed_at, a.title AS assessment, al.old_value, al.new_value, " &
+            "SELECT al.logged_at AS changed_at, a.title AS assessment, al.old_value, al.new_value, " &
             "       COALESCE(t.full_name, al.teacher_id) AS changed_by, al.details AS reason " &
             "FROM auditlog al " &
             "JOIN studentgrade sg ON sg.grade_id = CAST(al.entity_id AS UNSIGNED) " &
@@ -242,7 +242,7 @@ Public Class GradeService
             "JOIN assessment a ON sg.assessment_id = a.assessment_id " &
             "LEFT JOIN teacher t ON al.teacher_id = t.teacher_id " &
             "WHERE al.entity_type = 'StudentGrade' AND e.student_id = @StudentId " &
-            "ORDER BY al.timestamp DESC, al.log_id DESC"
+            "ORDER BY al.logged_at DESC, al.log_id DESC"
         Return DatabaseHelper.ExecuteQuery(sql, {New MySqlParameter("@StudentId", studentId)})
     End Function
 

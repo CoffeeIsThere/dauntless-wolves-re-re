@@ -1,7 +1,7 @@
-   {
-     "Host": "127.0.0.1",
-     "Port": 3306,
-     "Database": "transparent_grading_system",
-     "User": "root",
-     "Password": ""
-   }
+{
+  "Host": "127.0.0.1",
+  "Port": 3306,
+  "Database": "centralized_and_transparent_grading_system",
+  "User": "root",
+  "Password": ""
+}

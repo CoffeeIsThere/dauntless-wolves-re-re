@@ -656,5 +656,6 @@ Public Class frmprof
         frmGradebook.Show()
     End Sub
 
-
+    Private Sub CustomButton6_Click(sender As Object, e As EventArgs) Handles CustomButton6.Click
+    End Sub
 End Class

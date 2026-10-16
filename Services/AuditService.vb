@@ -91,8 +91,8 @@ Public Class AuditService
         End Select
 
         Dim sql As String =
-            "SELECT log_id, student_id, teacher_id, admin_id, action, entity_type, entity_id, old_value, new_value, timestamp, details " &
-            "FROM auditlog WHERE " & col & " = @ActorId ORDER BY timestamp DESC"
+            "SELECT log_id, student_id, teacher_id, admin_id, action, entity_type, entity_id, old_value, new_value, logged_at, details " &
+            "FROM auditlog WHERE " & col & " = @ActorId ORDER BY logged_at DESC"
 
         Return DatabaseHelper.ExecuteQuery(sql, {New MySqlParameter("@ActorId", actorUserId)})
     End Function

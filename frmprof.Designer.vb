@@ -42,6 +42,11 @@ Partial Class frmprof
         btnRecordScores = New Button()
         pnlFooter = New Panel()
         pnlContent = New Panel()
+        pnlClarificationRequests = New Panel()
+        RoundedPanel3 = New RoundedPanel()
+        dgvRequests = New DataGridView()
+        Label20 = New Label()
+        PictureBox4 = New PictureBox()
         pnlAnalytics = New Panel()
         RoundedPanel5 = New RoundedPanel()
         CustomProgressBar4 = New CustomProgressBar()
@@ -82,11 +87,6 @@ Partial Class frmprof
         Label13 = New Label()
         PictureBox3 = New PictureBox()
         LblClassGradeSheet = New Label()
-        pnlClarificationRequests = New Panel()
-        RoundedPanel3 = New RoundedPanel()
-        dgvRequests = New DataGridView()
-        Label20 = New Label()
-        PictureBox4 = New PictureBox()
         pnlRecordScores = New Panel()
         TableLayoutPanel1 = New TableLayoutPanel()
         RoundedPanel12 = New RoundedPanel()
@@ -135,6 +135,10 @@ Partial Class frmprof
         CType(PictureBox1, ComponentModel.ISupportInitialize).BeginInit()
         pnl2ndtab.SuspendLayout()
         pnlContent.SuspendLayout()
+        pnlClarificationRequests.SuspendLayout()
+        RoundedPanel3.SuspendLayout()
+        CType(dgvRequests, ComponentModel.ISupportInitialize).BeginInit()
+        CType(PictureBox4, ComponentModel.ISupportInitialize).BeginInit()
         pnlAnalytics.SuspendLayout()
         RoundedPanel5.SuspendLayout()
         RoundedPanel4.SuspendLayout()
@@ -147,10 +151,6 @@ Partial Class frmprof
         CType(dgvClassGrades, ComponentModel.ISupportInitialize).BeginInit()
         RoundedPanel2.SuspendLayout()
         CType(PictureBox3, ComponentModel.ISupportInitialize).BeginInit()
-        pnlClarificationRequests.SuspendLayout()
-        RoundedPanel3.SuspendLayout()
-        CType(dgvRequests, ComponentModel.ISupportInitialize).BeginInit()
-        CType(PictureBox4, ComponentModel.ISupportInitialize).BeginInit()
         pnlRecordScores.SuspendLayout()
         TableLayoutPanel1.SuspendLayout()
         RoundedPanel12.SuspendLayout()
@@ -260,10 +260,8 @@ Partial Class frmprof
         lblProfName.ForeColor = Color.DarkGreen
         lblProfName.Location = New Point(69, 11)
         lblProfName.Name = "lblProfName"
-        lblProfName.Size = New Size(101, 15)
+        lblProfName.Size = New Size(0, 15)
         lblProfName.TabIndex = 1
-        lblProfName.Text = AppSession.CurrentUser.FullName
-
         ' 
         ' PictureBox1
         ' 
@@ -431,6 +429,67 @@ Partial Class frmprof
         pnlContent.Name = "pnlContent"
         pnlContent.Size = New Size(1104, 400)
         pnlContent.TabIndex = 5
+        ' 
+        ' pnlClarificationRequests
+        ' 
+        pnlClarificationRequests.Anchor = AnchorStyles.Top Or AnchorStyles.Bottom Or AnchorStyles.Left Or AnchorStyles.Right
+        pnlClarificationRequests.BackColor = Color.White
+        pnlClarificationRequests.Controls.Add(RoundedPanel3)
+        pnlClarificationRequests.Location = New Point(0, 0)
+        pnlClarificationRequests.Margin = New Padding(3, 2, 3, 2)
+        pnlClarificationRequests.Name = "pnlClarificationRequests"
+        pnlClarificationRequests.Size = New Size(1104, 400)
+        pnlClarificationRequests.TabIndex = 9
+        pnlClarificationRequests.Visible = False
+        ' 
+        ' RoundedPanel3
+        ' 
+        RoundedPanel3.Anchor = AnchorStyles.Top Or AnchorStyles.Bottom Or AnchorStyles.Left Or AnchorStyles.Right
+        RoundedPanel3.BackColor = Color.White
+        RoundedPanel3.BorderColor = Color.DarkGreen
+        RoundedPanel3.BorderThickness = 2
+        RoundedPanel3.Controls.Add(dgvRequests)
+        RoundedPanel3.Controls.Add(Label20)
+        RoundedPanel3.Controls.Add(PictureBox4)
+        RoundedPanel3.CornerRadius = 20
+        RoundedPanel3.Location = New Point(26, 24)
+        RoundedPanel3.Margin = New Padding(3, 2, 3, 2)
+        RoundedPanel3.Name = "RoundedPanel3"
+        RoundedPanel3.Size = New Size(1059, 352)
+        RoundedPanel3.TabIndex = 0
+        ' 
+        ' dgvRequests
+        ' 
+        dgvRequests.Anchor = AnchorStyles.Top Or AnchorStyles.Bottom Or AnchorStyles.Left Or AnchorStyles.Right
+        dgvRequests.ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.AutoSize
+        dgvRequests.Location = New Point(13, 58)
+        dgvRequests.Margin = New Padding(3, 2, 3, 2)
+        dgvRequests.Name = "dgvRequests"
+        dgvRequests.RowHeadersWidth = 51
+        dgvRequests.Size = New Size(1028, 284)
+        dgvRequests.TabIndex = 7
+        ' 
+        ' Label20
+        ' 
+        Label20.AutoSize = True
+        Label20.Font = New Font("Segoe UI", 13.8F, FontStyle.Bold)
+        Label20.ForeColor = Color.DarkGreen
+        Label20.Location = New Point(61, 19)
+        Label20.Name = "Label20"
+        Label20.Size = New Size(282, 25)
+        Label20.TabIndex = 6
+        Label20.Text = "Pending Clarification Requests"
+        ' 
+        ' PictureBox4
+        ' 
+        PictureBox4.Image = CType(resources.GetObject("PictureBox4.Image"), Image)
+        PictureBox4.Location = New Point(18, 13)
+        PictureBox4.Margin = New Padding(3, 2, 3, 2)
+        PictureBox4.Name = "PictureBox4"
+        PictureBox4.Size = New Size(38, 35)
+        PictureBox4.SizeMode = PictureBoxSizeMode.StretchImage
+        PictureBox4.TabIndex = 5
+        PictureBox4.TabStop = False
         ' 
         ' pnlAnalytics
         ' 
@@ -979,67 +1038,6 @@ Partial Class frmprof
         LblClassGradeSheet.TabIndex = 0
         LblClassGradeSheet.Text = "Class Grade Sheet - "
         ' 
-        ' pnlClarificationRequests
-        ' 
-        pnlClarificationRequests.Anchor = AnchorStyles.Top Or AnchorStyles.Bottom Or AnchorStyles.Left Or AnchorStyles.Right
-        pnlClarificationRequests.BackColor = Color.White
-        pnlClarificationRequests.Controls.Add(RoundedPanel3)
-        pnlClarificationRequests.Location = New Point(0, 0)
-        pnlClarificationRequests.Margin = New Padding(3, 2, 3, 2)
-        pnlClarificationRequests.Name = "pnlClarificationRequests"
-        pnlClarificationRequests.Size = New Size(1104, 400)
-        pnlClarificationRequests.TabIndex = 9
-        pnlClarificationRequests.Visible = False
-        ' 
-        ' RoundedPanel3
-        ' 
-        RoundedPanel3.Anchor = AnchorStyles.Top Or AnchorStyles.Bottom Or AnchorStyles.Left Or AnchorStyles.Right
-        RoundedPanel3.BackColor = Color.White
-        RoundedPanel3.BorderColor = Color.DarkGreen
-        RoundedPanel3.BorderThickness = 2
-        RoundedPanel3.Controls.Add(dgvRequests)
-        RoundedPanel3.Controls.Add(Label20)
-        RoundedPanel3.Controls.Add(PictureBox4)
-        RoundedPanel3.CornerRadius = 20
-        RoundedPanel3.Location = New Point(26, 24)
-        RoundedPanel3.Margin = New Padding(3, 2, 3, 2)
-        RoundedPanel3.Name = "RoundedPanel3"
-        RoundedPanel3.Size = New Size(1059, 352)
-        RoundedPanel3.TabIndex = 0
-        ' 
-        ' dgvRequests
-        ' 
-        dgvRequests.Anchor = AnchorStyles.Top Or AnchorStyles.Bottom Or AnchorStyles.Left Or AnchorStyles.Right
-        dgvRequests.ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.AutoSize
-        dgvRequests.Location = New Point(13, 58)
-        dgvRequests.Margin = New Padding(3, 2, 3, 2)
-        dgvRequests.Name = "dgvRequests"
-        dgvRequests.RowHeadersWidth = 51
-        dgvRequests.Size = New Size(1028, 284)
-        dgvRequests.TabIndex = 7
-        ' 
-        ' Label20
-        ' 
-        Label20.AutoSize = True
-        Label20.Font = New Font("Segoe UI", 13.8F, FontStyle.Bold)
-        Label20.ForeColor = Color.DarkGreen
-        Label20.Location = New Point(61, 19)
-        Label20.Name = "Label20"
-        Label20.Size = New Size(282, 25)
-        Label20.TabIndex = 6
-        Label20.Text = "Pending Clarification Requests"
-        ' 
-        ' PictureBox4
-        ' 
-        PictureBox4.Image = CType(resources.GetObject("PictureBox4.Image"), Image)
-        PictureBox4.Location = New Point(18, 13)
-        PictureBox4.Margin = New Padding(3, 2, 3, 2)
-        PictureBox4.Name = "PictureBox4"
-        PictureBox4.Size = New Size(38, 35)
-        PictureBox4.SizeMode = PictureBoxSizeMode.StretchImage
-        PictureBox4.TabIndex = 5
-        PictureBox4.TabStop = False
-        ' 
         ' pnlRecordScores
         ' 
         pnlRecordScores.Anchor = AnchorStyles.Top Or AnchorStyles.Bottom Or AnchorStyles.Left Or AnchorStyles.Right
@@ -1587,6 +1585,11 @@ Partial Class frmprof
         CType(PictureBox1, ComponentModel.ISupportInitialize).EndInit()
         pnl2ndtab.ResumeLayout(False)
         pnlContent.ResumeLayout(False)
+        pnlClarificationRequests.ResumeLayout(False)
+        RoundedPanel3.ResumeLayout(False)
+        RoundedPanel3.PerformLayout()
+        CType(dgvRequests, ComponentModel.ISupportInitialize).EndInit()
+        CType(PictureBox4, ComponentModel.ISupportInitialize).EndInit()
         pnlAnalytics.ResumeLayout(False)
         RoundedPanel5.ResumeLayout(False)
         RoundedPanel5.PerformLayout()
@@ -1607,11 +1610,6 @@ Partial Class frmprof
         RoundedPanel2.ResumeLayout(False)
         RoundedPanel2.PerformLayout()
         CType(PictureBox3, ComponentModel.ISupportInitialize).EndInit()
-        pnlClarificationRequests.ResumeLayout(False)
-        RoundedPanel3.ResumeLayout(False)
-        RoundedPanel3.PerformLayout()
-        CType(dgvRequests, ComponentModel.ISupportInitialize).EndInit()
-        CType(PictureBox4, ComponentModel.ISupportInitialize).EndInit()
         pnlRecordScores.ResumeLayout(False)
         TableLayoutPanel1.ResumeLayout(False)
         RoundedPanel12.ResumeLayout(False)
