@@ -216,6 +216,8 @@ Partial Class Admin
         lblAdminName.Name = "lblAdminName"
         lblAdminName.Size = New Size(0, 19)
         lblAdminName.TabIndex = 0
+        lblAdminName.Text = AppSession.CurrentUser.FullName
+
         ' 
         ' pnlTabs
         ' 
