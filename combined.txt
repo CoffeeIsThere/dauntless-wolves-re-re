@@ -1,0 +1,4099 @@
+﻿
+' ===== Admin.vb =====
+
+Imports System.Drawing.Drawing2D
+Imports DAUNTLESS_WOLVES_PROF.Core
+Public Class Admin
+
+    Private tabButtons As Button()
+
+
+    Private Sub Admin_Load(sender As Object, e As EventArgs) Handles MyBase.Load
+
+        If AppSession.CurrentUser Is Nothing Then
+            MessageBox.Show("Please log in to access this page.", "Access Denied", MessageBoxButtons.OK, MessageBoxIcon.Warning)
+
+            Dim loginForm As New frmlogin()
+            loginForm.Show()
+            Me.Close()
+            Return
+        End If
+
+        tabButtons = {btnDashboard, btnStudents, btnProfessors}
+        ShowPanel(pnlDashboard, btnDashboard)   ' page shown first
+        InitProfessorPage()
+        InitStudentPage()
+        InitDashboardPage()
+
+
+
+        ' (Optional) Display user name on a label on your form
+        ' lblAdminName.Text = $"Logged in as: {AppSession.CurrentUser.FullName}"
+    End Sub
+
+
+    Private Sub ShowPanel(p As Panel, activeBtn As Button)
+        pnlDashboard.Visible = False
+        pnlStudents.Visible = False
+        pnlProfessors.Visible = False
+
+        p.Visible = True
+        p.BringToFront()
+
+        ' highlight the active tab
+        For Each b As Button In tabButtons
+            Dim isActive As Boolean = (b Is activeBtn)
+            b.BackColor = If(isActive, Color.White, Color.FromArgb(200, 215, 205))
+            b.Font = New Font(b.Font, If(isActive, FontStyle.Bold, FontStyle.Regular))
+        Next
+    End Sub
+
+    Private Sub btnDashboard_Click(sender As Object, e As EventArgs) Handles btnDashboard.Click
+        ShowPanel(pnlDashboard, btnDashboard)
+    End Sub
+
+    Private Sub btnStudents_Click(sender As Object, e As EventArgs) Handles btnStudents.Click
+        ShowPanel(pnlStudents, btnStudents)
+    End Sub
+
+    Private Sub btnProfessors_Click(sender As Object, e As EventArgs) Handles btnProfessors.Click
+        ShowPanel(pnlProfessors, btnProfessors)
+    End Sub
+
+    ' ===== PROFESSOR PAGE =====
+    Private allProfs As New List(Of ProfessorInfo)
+    Private filteredProfs As New List(Of ProfessorInfo)
+    Private profPage As Integer = 1
+    Private Const ProfPageSize As Integer = 11
+    Private ReadOnly pillFont As New Font("Segoe UI", 8.5F, FontStyle.Bold)
+
+    Private Sub InitProfessorPage()
+        SetupProfGrid()
+
+        cboDeptProf.Items.Clear()
+        cboDeptProf.Items.AddRange({"All", "CCS", "CAS", "CHTM", "CHS", "CED", "COE", "COA", "CON"})
+        cboDeptProf.SelectedIndex = 0
+
+        LoadSampleProfs()
+        ApplyProfFilter()
+    End Sub
+
+    Private Sub SetupProfGrid()
+        Dim headerColor As Color = Color.FromArgb(224, 247, 250)
+
+        With dgvProf
+            .AllowUserToAddRows = False
+            .AllowUserToDeleteRows = False
+            .AllowUserToResizeRows = False
+            .RowHeadersVisible = False
+            .BackgroundColor = Color.White
+            .BorderStyle = BorderStyle.None
+            .CellBorderStyle = DataGridViewCellBorderStyle.SingleHorizontal
+            .GridColor = Color.Gainsboro
+            .SelectionMode = DataGridViewSelectionMode.FullRowSelect
+            .AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill
+            .RowTemplate.Height = 36
+
+            .EnableHeadersVisualStyles = False
+            .ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.DisableResizing
+            .ColumnHeadersHeight = 32
+            .ColumnHeadersBorderStyle = DataGridViewHeaderBorderStyle.None
+            With .ColumnHeadersDefaultCellStyle
+                .BackColor = headerColor
+                .ForeColor = Color.FromArgb(0, 80, 0)
+                .Font = New Font("Segoe UI", 9, FontStyle.Bold)
+                .SelectionBackColor = headerColor
+                .SelectionForeColor = Color.FromArgb(0, 80, 0)
+            End With
+
+            With .DefaultCellStyle
+                .BackColor = Color.White
+                .ForeColor = Color.Black
+                .Font = New Font("Segoe UI", 9, FontStyle.Bold)
+                .SelectionBackColor = Color.FromArgb(235, 250, 240)
+                .SelectionForeColor = Color.Black
+            End With
+
+            .Columns.Clear()
+
+            Dim chk As New DataGridViewCheckBoxColumn()
+            chk.Name = "colCheck" : chk.HeaderText = ""
+            .Columns.Add(chk)
+
+            .Columns.Add("colName", "Name")
+            .Columns.Add("colEmpId", "Employee ID")
+            .Columns.Add("colDept", "Department")
+            .Columns.Add("colClasses", "Assigned Class")
+            .Columns.Add("colStatus", "Status")
+            .Columns.Add("colActions", "Actions")
+
+            ' Fixed-width columns (never get squeezed)
+            For Each item In {("colCheck", 45), ("colStatus", 110), ("colActions", 130)}
+                With .Columns(item.Item1)
+                    .AutoSizeMode = DataGridViewAutoSizeColumnMode.None
+                    .Width = item.Item2
+                    .Resizable = DataGridViewTriState.False
+                End With
+            Next
+
+            ' Stretching columns (share the leftover space)
+            .Columns("colName").FillWeight = 30
+            .Columns("colEmpId").FillWeight = 18
+            .Columns("colDept").FillWeight = 18
+            .Columns("colClasses").FillWeight = 22
+            For Each n In {"colName", "colEmpId", "colDept", "colClasses"}
+                .Columns(n).MinimumWidth = 110
+            Next
+
+            .Columns("colStatus").HeaderCell.Style.Alignment = DataGridViewContentAlignment.MiddleCenter
+            .Columns("colActions").HeaderCell.Style.Alignment = DataGridViewContentAlignment.MiddleCenter
+
+            For Each c As DataGridViewColumn In .Columns
+                If c.Name <> "colCheck" Then c.ReadOnly = True
+                c.SortMode = DataGridViewColumnSortMode.NotSortable
+            Next
+        End With
+    End Sub
+
+    Private Sub LoadSampleProfs()
+        allProfs.Clear()
+        Dim names = {"Santos", "San Juan", "Cruz", "Jonathan", "DelaCruz", "Mariano",
+                     "Lalata", "Albert", "San Jose", "Robles", "Francisco"}
+        Dim depts = {"CCS", "CCS", "CCS", "CAS", "CHTM", "CHS", "CED", "COE", "COA", "CON", "COE"}
+        Dim cls = {4, 6, 4, 2, 3, 4, 6, 3, 2, 5, 6}
+        For i As Integer = 0 To names.Length - 1
+            allProfs.Add(New ProfessorInfo With {
+                .Name = "Prof." & names(i),
+                .EmployeeID = "P" & (i + 1).ToString("000"),
+                .Department = depts(i),
+                .Classes = cls(i),
+                .Status = "Active"})
+        Next
+    End Sub
+
+    Private Sub ApplyProfFilter()
+        Dim q As String = txtSearchProf.Text.Trim().ToLower()
+        Dim dept As String = If(cboDeptProf.SelectedItem Is Nothing, "All", cboDeptProf.SelectedItem.ToString())
+
+        filteredProfs = allProfs.Where(Function(p) _
+            (q = "" OrElse p.Name.ToLower().Contains(q) OrElse p.EmployeeID.ToLower().Contains(q)) AndAlso
+            (dept = "All" OrElse p.Department = dept)).ToList()
+
+        profPage = 1
+        ShowProfPage()
+    End Sub
+
+    Private Sub ShowProfPage()
+        dgvProf.Rows.Clear()
+        For Each p In filteredProfs.Skip((profPage - 1) * ProfPageSize).Take(ProfPageSize)
+            dgvProf.Rows.Add(False, p.Name, p.EmployeeID, p.Department, p.Classes & " classes", p.Status, "")
+        Next
+        lblTotalProf.Text = "Total Professors: " & filteredProfs.Count
+        dgvProf.ClearSelection()
+        BuildProfPager()
+    End Sub
+
+    ' Always shows at least 5 page buttons; slides a window of 5 when there are more pages
+    Private Sub BuildProfPager()
+        flowProfPager.SuspendLayout()
+        flowProfPager.Controls.Clear()
+
+        Const MinButtons As Integer = 5
+        Dim totalPages As Integer = Math.Max(1, CInt(Math.Ceiling(filteredProfs.Count / ProfPageSize)))
+
+        Dim startPage As Integer = Math.Max(1, profPage - 2)
+        If totalPages > MinButtons Then
+            startPage = Math.Min(startPage, totalPages - MinButtons + 1)
+        Else
+            startPage = 1
+        End If
+
+        ' Previous
+        flowProfPager.Controls.Add(MakePagerButton("<", Math.Max(1, profPage - 1), False, profPage > 1))
+
+        ' Number buttons (pages that don't exist are shown disabled)
+        For i As Integer = 0 To MinButtons - 1
+            Dim pageNo As Integer = startPage + i
+            Dim exists As Boolean = pageNo <= totalPages
+            flowProfPager.Controls.Add(MakePagerButton(pageNo.ToString(), pageNo, pageNo = profPage, exists))
+        Next
+
+        ' Next
+        flowProfPager.Controls.Add(MakePagerButton(">", Math.Min(totalPages, profPage + 1), False, profPage < totalPages))
+
+        ' Make sure all buttons fit (fixes the clipped pager)
+        flowProfPager.AutoSize = False
+        flowProfPager.Width = flowProfPager.Controls.Count * 32 + 8
+
+        flowProfPager.ResumeLayout()
+    End Sub
+
+    Private Function MakePagerButton(text As String, page As Integer, active As Boolean, enabled As Boolean) As Button
+        Dim b As New Button()
+        b.Text = text
+        b.Size = New Size(28, 28)
+        b.Margin = New Padding(2)
+        b.FlatStyle = FlatStyle.Flat
+        b.FlatAppearance.BorderColor = If(enabled, Color.FromArgb(0, 100, 0), Color.Silver)
+        b.BackColor = If(active, Color.FromArgb(0, 100, 0), Color.White)
+        b.ForeColor = If(active, Color.White, If(enabled, Color.Black, Color.Silver))
+        b.Enabled = enabled
+
+        If enabled Then
+            AddHandler b.Click, Sub()
+                                    profPage = page
+                                    ShowProfPage()
+                                End Sub
+        End If
+        Return b
+    End Function
+
+    Private Sub txtSearchProf_TextChanged(sender As Object, e As EventArgs) Handles txtSearchProf.TextChanged
+        ApplyProfFilter()
+    End Sub
+
+    Private Sub cboDeptProf_SelectedIndexChanged(sender As Object, e As EventArgs) Handles cboDeptProf.SelectedIndexChanged
+        If allProfs.Count > 0 Then ApplyProfFilter()
+    End Sub
+
+    ' ---------- drawing helpers ----------
+    Private Function RoundedRect(r As Rectangle, radius As Integer) As GraphicsPath
+        Dim gp As New GraphicsPath()
+        Dim d As Integer = radius * 2
+        gp.AddArc(r.X, r.Y, d, d, 180, 90)
+        gp.AddArc(r.Right - d, r.Y, d, d, 270, 90)
+        gp.AddArc(r.Right - d, r.Bottom - d, d, d, 0, 90)
+        gp.AddArc(r.X, r.Bottom - d, d, d, 90, 90)
+        gp.CloseFigure()
+        Return gp
+    End Function
+
+    Private Sub DrawPill(g As Graphics, r As Rectangle, back As Color, fore As Color, text As String)
+        Using path = RoundedRect(r, 8), br As New SolidBrush(back), tb As New SolidBrush(fore)
+            g.FillPath(br, path)
+            Dim sf As New StringFormat() With {.Alignment = StringAlignment.Center, .LineAlignment = StringAlignment.Center}
+            g.DrawString(text, pillFont, tb, r, sf)
+        End Using
+    End Sub
+
+    ' Edit / Delete rectangles inside a cell
+    Private Function ActionRects(cell As Rectangle) As Rectangle()
+        Const w As Integer = 52, h As Integer = 24, gap As Integer = 6
+        Dim startX As Integer = cell.X + (cell.Width - (w * 2 + gap)) \ 2
+        Dim y As Integer = cell.Y + (cell.Height - h) \ 2
+        Return {New Rectangle(startX, y, w, h), New Rectangle(startX + w + gap, y, w, h)}
+    End Function
+
+    Private Sub dgvProf_CellPainting(sender As Object, e As DataGridViewCellPaintingEventArgs) Handles dgvProf.CellPainting
+        If e.RowIndex < 0 Then Return
+        Dim col As String = dgvProf.Columns(e.ColumnIndex).Name
+        If col <> "colStatus" AndAlso col <> "colActions" Then Return
+
+        e.PaintBackground(e.ClipBounds, False)
+        e.Graphics.SmoothingMode = SmoothingMode.AntiAlias
+
+        If col = "colStatus" Then
+            Dim status As String = Convert.ToString(e.Value)
+            Dim r As New Rectangle(e.CellBounds.X + (e.CellBounds.Width - 80) \ 2,
+                                   e.CellBounds.Y + (e.CellBounds.Height - 24) \ 2, 80, 24)
+            If status = "Active" Then
+                DrawPill(e.Graphics, r, Color.FromArgb(198, 240, 214), Color.FromArgb(0, 100, 0), "Active")
+            Else
+                DrawPill(e.Graphics, r, Color.FromArgb(250, 190, 190), Color.FromArgb(180, 0, 0), "Inactive")
+            End If
+        Else
+            Dim rects = ActionRects(e.CellBounds)
+            DrawPill(e.Graphics, rects(0), Color.FromArgb(198, 240, 214), Color.FromArgb(0, 100, 0), "Edit")
+            DrawPill(e.Graphics, rects(1), Color.FromArgb(250, 190, 190), Color.FromArgb(180, 0, 0), "Delete")
+        End If
+
+        e.Handled = True
+    End Sub
+
+    Private Sub dgvProf_CellMouseClick(sender As Object, e As DataGridViewCellMouseEventArgs) Handles dgvProf.CellMouseClick
+        If e.RowIndex < 0 Then Return
+        If dgvProf.Columns(e.ColumnIndex).Name <> "colActions" Then Return
+
+        Dim size = dgvProf.GetCellDisplayRectangle(e.ColumnIndex, e.RowIndex, False).Size
+        Dim rects = ActionRects(New Rectangle(0, 0, size.Width, size.Height))
+        Dim empId As String = dgvProf.Rows(e.RowIndex).Cells("colEmpId").Value.ToString()
+
+        If rects(0).Contains(e.Location) Then
+            MessageBox.Show("Edit " & empId)             ' open your edit form here
+        ElseIf rects(1).Contains(e.Location) Then
+            If MessageBox.Show("Delete " & empId & "?", "Confirm", MessageBoxButtons.YesNo) = DialogResult.Yes Then
+                allProfs.RemoveAll(Function(p) p.EmployeeID = empId)
+                ApplyProfFilter()
+            End If
+        End If
+    End Sub
+
+    Private Sub btnAddProf_Click(sender As Object, e As EventArgs) Handles btnAddProf.Click
+        MessageBox.Show("Open Add Professor form here")
+    End Sub
+
+    Private Sub pnlStudents_Paint(sender As Object, e As PaintEventArgs) Handles pnlStudents.Paint
+
+    End Sub
+
+
+
+    Private Sub Label3_Click(sender As Object, e As EventArgs) Handles Label3.Click
+
+    End Sub
+
+
+    Private Sub CustomButton3_Click(sender As Object, e As EventArgs) Handles btnaddstudent.Click
+
+    End Sub
+    ' ===== STUDENT PAGE =====
+    Private allStudents As New List(Of StudentInfo)
+    Private filteredStudents As New List(Of StudentInfo)
+    Private studentPage As Integer = 1
+    Private Const StudentPageSize As Integer = 10
+
+    Private Sub InitStudentPage()
+        SetupStudentGrid()
+        LoadSampleStudents()
+
+        cboYearLevel.DropDownStyle = ComboBoxStyle.DropDownList
+        cboSection.DropDownStyle = ComboBoxStyle.DropDownList
+
+        cboYearLevel.Items.Clear()
+        cboYearLevel.Items.AddRange({"All", "1", "2", "3", "4"})
+        cboYearLevel.SelectedIndex = 0
+
+        cboSection.Items.Clear()
+        cboSection.Items.Add("All")
+        For Each s In allStudents.Select(Function(x) x.Section).Distinct().OrderBy(Function(x) x)
+            cboSection.Items.Add(s)
+        Next
+        cboSection.SelectedIndex = 0
+
+        ApplyStudentFilter()
+
+
+    End Sub
+
+    Private Sub SetupStudentGrid()
+        Dim headerColor As Color = Color.FromArgb(224, 247, 250)
+
+        With dgvStudents
+            .AllowUserToAddRows = False
+            .AllowUserToDeleteRows = False
+            .AllowUserToResizeRows = False
+            .RowHeadersVisible = False
+            .BackgroundColor = Color.White
+            .BorderStyle = BorderStyle.None
+            .CellBorderStyle = DataGridViewCellBorderStyle.SingleHorizontal
+            .GridColor = Color.Gainsboro
+            .SelectionMode = DataGridViewSelectionMode.FullRowSelect
+            .AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill
+            .RowTemplate.Height = 36
+
+            .EnableHeadersVisualStyles = False
+            .ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.DisableResizing
+            .ColumnHeadersHeight = 32
+            .ColumnHeadersBorderStyle = DataGridViewHeaderBorderStyle.None
+            With .ColumnHeadersDefaultCellStyle
+                .BackColor = headerColor
+                .ForeColor = Color.FromArgb(0, 80, 0)
+                .Font = New Font("Segoe UI", 9, FontStyle.Bold)
+                .SelectionBackColor = headerColor
+                .SelectionForeColor = Color.FromArgb(0, 80, 0)
+            End With
+
+            With .DefaultCellStyle
+                .BackColor = Color.White
+                .ForeColor = Color.Black
+                .Font = New Font("Segoe UI", 9, FontStyle.Bold)
+                .SelectionBackColor = Color.FromArgb(235, 250, 240)
+                .SelectionForeColor = Color.Black
+            End With
+
+            .Columns.Clear()
+
+            Dim chk As New DataGridViewCheckBoxColumn()
+            chk.Name = "colCheck" : chk.HeaderText = ""
+            .Columns.Add(chk)
+
+            .Columns.Add("colStudentId", "Student ID")
+            .Columns.Add("colFullName", "Full Name")
+            .Columns.Add("colYear", "Year Level")
+            .Columns.Add("colSection", "Section")
+            .Columns.Add("colProgram", "Program")
+            .Columns.Add("colStatus", "Status")
+            .Columns.Add("colActions", "Actions")
+
+            ' Fixed-width columns
+            For Each item In {("colCheck", 45), ("colYear", 90), ("colSection", 100),
+                              ("colStatus", 110), ("colActions", 130)}
+                With .Columns(item.Item1)
+                    .AutoSizeMode = DataGridViewAutoSizeColumnMode.None
+                    .Width = item.Item2
+                    .Resizable = DataGridViewTriState.False
+                End With
+            Next
+
+            ' Stretching columns
+            .Columns("colStudentId").FillWeight = 20
+            .Columns("colFullName").FillWeight = 40
+            .Columns("colProgram").FillWeight = 40
+            For Each n In {"colStudentId", "colFullName", "colProgram"}
+                .Columns(n).MinimumWidth = 110
+            Next
+
+            For Each n In {"colYear", "colSection", "colStatus", "colActions"}
+                .Columns(n).HeaderCell.Style.Alignment = DataGridViewContentAlignment.MiddleCenter
+            Next
+            .Columns("colYear").DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter
+            .Columns("colSection").DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter
+
+            For Each c As DataGridViewColumn In .Columns
+                If c.Name <> "colCheck" Then c.ReadOnly = True
+                c.SortMode = DataGridViewColumnSortMode.NotSortable
+            Next
+        End With
+    End Sub
+
+    Private Sub LoadSampleStudents()
+        ' Sample data. Replace with MySQL later.
+        allStudents.Clear()
+        Dim rows = {
+            ("25-00839", "Mariano, Geoff Andreil", 2, "BSCS-2A", "BS Computer Science", "Active"),
+            ("23-00239", "Condes, Hope Gian D.", 4, "BSIT-4B", "BS Information Management", "Active"),
+            ("24-00934", "Lalata, Carl Jade", 3, "BSHM-3B", "BS Hospitality Management", "Inactive"),
+            ("25-00902", "Santos, Maria Angelica", 2, "BSCS-2A", "BS Computer Science", "Inactive"),
+            ("26-00783", "Oropilla, Charles", 1, "BSCS-2A", "BS Computer Science", "Active"),
+            ("26-00273", "Puyat, Ron Jacob", 1, "BSCS-1A", "BS Computer Science", "Active"),
+            ("25-00749", "Buluran, Family I.", 2, "BSCS-2A", "BS Computer Science", "Inactive"),
+            ("23-00111", "Rodas, Rodas P.", 4, "BSCS-4A", "BS Computer Science", "Active"),
+            ("23-06767", "Ramos, Reago W.", 4, "BSCS-4A", "BS Computer Science", "Inactive"),
+            ("25-08392", "Salceda, Poknat X.", 2, "BSA 2A", "BS Accountancy", "Active")}
+        For Each r In rows
+            allStudents.Add(New StudentInfo With {
+                .StudentID = r.Item1, .FullName = r.Item2, .YearLevel = r.Item3,
+                .Section = r.Item4, .Program = r.Item5, .Status = r.Item6})
+        Next
+    End Sub
+
+    Private Sub ApplyStudentFilter()
+        If cboYearLevel.SelectedItem Is Nothing OrElse cboSection.SelectedItem Is Nothing Then Return
+
+        Dim q As String = txtStudentSearch.Text.Trim().ToLower()
+        Dim yr As String = cboYearLevel.SelectedItem.ToString()
+        Dim sec As String = cboSection.SelectedItem.ToString()
+
+        filteredStudents = allStudents.Where(Function(s) _
+            (q = "" OrElse s.FullName.ToLower().Contains(q) OrElse s.StudentID.ToLower().Contains(q)) AndAlso
+            (yr = "All" OrElse s.YearLevel.ToString() = yr) AndAlso
+            (sec = "All" OrElse s.Section = sec)).ToList()
+
+        studentPage = 1
+        ShowStudentPage()
+    End Sub
+
+    Private Sub ShowStudentPage()
+        dgvStudents.Rows.Clear()
+        For Each s In filteredStudents.Skip((studentPage - 1) * StudentPageSize).Take(StudentPageSize)
+            dgvStudents.Rows.Add(False, s.StudentID, s.FullName, s.YearLevel,
+                                 s.Section, s.Program, s.Status, "")
+        Next
+        lblTotalStudents.Text = "Total Students: " & filteredStudents.Count
+        dgvStudents.ClearSelection()
+        BuildStudentPager()
+    End Sub
+
+    ' Same pager logic as the professor page: always 5 number buttons
+    Private Sub BuildStudentPager()
+        flowStudentPager.SuspendLayout()
+        flowStudentPager.Controls.Clear()
+
+        Const MinButtons As Integer = 5
+        Dim totalPages As Integer = Math.Max(1, CInt(Math.Ceiling(filteredStudents.Count / StudentPageSize)))
+
+        Dim startPage As Integer = Math.Max(1, studentPage - 2)
+        If totalPages > MinButtons Then
+            startPage = Math.Min(startPage, totalPages - MinButtons + 1)
+        Else
+            startPage = 1
+        End If
+
+        flowStudentPager.Controls.Add(MakeStudentPagerButton("<", Math.Max(1, studentPage - 1), False, studentPage > 1))
+        For i As Integer = 0 To MinButtons - 1
+            Dim pageNo As Integer = startPage + i
+            flowStudentPager.Controls.Add(MakeStudentPagerButton(pageNo.ToString(), pageNo, pageNo = studentPage, pageNo <= totalPages))
+        Next
+        flowStudentPager.Controls.Add(MakeStudentPagerButton(">", Math.Min(totalPages, studentPage + 1), False, studentPage < totalPages))
+
+        flowStudentPager.AutoSize = False
+        flowStudentPager.Width = flowStudentPager.Controls.Count * 32 + 8
+        flowStudentPager.ResumeLayout()
+    End Sub
+
+    Private Function MakeStudentPagerButton(text As String, page As Integer, active As Boolean, enabled As Boolean) As Button
+        Dim b As New Button()
+        b.Text = text
+        b.Size = New Size(28, 28)
+        b.Margin = New Padding(2)
+        b.FlatStyle = FlatStyle.Flat
+        b.FlatAppearance.BorderColor = If(enabled, Color.FromArgb(0, 100, 0), Color.Silver)
+        b.BackColor = If(active, Color.FromArgb(0, 100, 0), Color.White)
+        b.ForeColor = If(active, Color.White, If(enabled, Color.Black, Color.Silver))
+        b.Enabled = enabled
+        If enabled Then
+            AddHandler b.Click, Sub()
+                                    studentPage = page
+                                    ShowStudentPage()
+                                End Sub
+        End If
+        Return b
+    End Function
+
+    ' ----- search / filter / reset -----
+    Private Sub txtStudentSearch_TextChanged(sender As Object, e As EventArgs) Handles txtStudentSearch.TextChanged
+        ApplyStudentFilter()
+    End Sub
+
+    Private Sub cboYearLevel_SelectedIndexChanged(sender As Object, e As EventArgs) Handles cboYearLevel.SelectedIndexChanged
+        If allStudents.Count > 0 Then ApplyStudentFilter()
+    End Sub
+
+    Private Sub cboSection_SelectedIndexChanged(sender As Object, e As EventArgs) Handles cboSection.SelectedIndexChanged
+        If allStudents.Count > 0 Then ApplyStudentFilter()
+    End Sub
+
+    Private Sub btnStudentFilter_Click(sender As Object, e As EventArgs) Handles btnStudentFilter.Click
+        ApplyStudentFilter()
+    End Sub
+
+    Private Sub btnStudentReset_Click(sender As Object, e As EventArgs) Handles btnStudentReset.Click
+        txtStudentSearch.Clear()
+        cboYearLevel.SelectedIndex = 0
+        cboSection.SelectedIndex = 0
+        ApplyStudentFilter()
+    End Sub
+
+    Private Sub btnAddStudent_Click(sender As Object, e As EventArgs) Handles btnAddStudent.Click
+        MessageBox.Show("Open Add Student form here")
+    End Sub
+
+    ' ----- pills for Status and Actions (reuses DrawPill and ActionRects) -----
+    Private Sub dgvStudents_CellPainting(sender As Object, e As DataGridViewCellPaintingEventArgs) Handles dgvStudents.CellPainting
+        If e.RowIndex < 0 Then Return
+        Dim col As String = dgvStudents.Columns(e.ColumnIndex).Name
+        If col <> "colStatus" AndAlso col <> "colActions" Then Return
+
+        e.PaintBackground(e.ClipBounds, False)
+        e.Graphics.SmoothingMode = SmoothingMode.AntiAlias
+
+        If col = "colStatus" Then
+            Dim status As String = Convert.ToString(e.Value)
+            Dim r As New Rectangle(e.CellBounds.X + (e.CellBounds.Width - 80) \ 2,
+                                   e.CellBounds.Y + (e.CellBounds.Height - 24) \ 2, 80, 24)
+            If status = "Active" Then
+                DrawPill(e.Graphics, r, Color.FromArgb(198, 240, 214), Color.FromArgb(0, 100, 0), "Active")
+            Else
+                DrawPill(e.Graphics, r, Color.FromArgb(250, 190, 190), Color.FromArgb(180, 0, 0), "Inactive")
+            End If
+        Else
+            Dim rects = ActionRects(e.CellBounds)
+            DrawPill(e.Graphics, rects(0), Color.FromArgb(198, 240, 214), Color.FromArgb(0, 100, 0), "Edit")
+            DrawPill(e.Graphics, rects(1), Color.FromArgb(250, 190, 190), Color.FromArgb(180, 0, 0), "Delete")
+        End If
+
+        e.Handled = True
+    End Sub
+
+    Private Sub dgvStudents_CellMouseClick(sender As Object, e As DataGridViewCellMouseEventArgs) Handles dgvStudents.CellMouseClick
+        If e.RowIndex < 0 Then Return
+        If dgvStudents.Columns(e.ColumnIndex).Name <> "colActions" Then Return
+
+        Dim size = dgvStudents.GetCellDisplayRectangle(e.ColumnIndex, e.RowIndex, False).Size
+        Dim rects = ActionRects(New Rectangle(0, 0, size.Width, size.Height))
+        Dim id As String = dgvStudents.Rows(e.RowIndex).Cells("colStudentId").Value.ToString()
+
+        If rects(0).Contains(e.Location) Then
+            MessageBox.Show("Edit " & id)                 ' open your edit form here
+        ElseIf rects(1).Contains(e.Location) Then
+            If MessageBox.Show("Delete " & id & "?", "Confirm", MessageBoxButtons.YesNo) = DialogResult.Yes Then
+                allStudents.RemoveAll(Function(s) s.StudentID = id)
+                ApplyStudentFilter()
+            End If
+        End If
+    End Sub
+
+    Private Sub Label5_Click(sender As Object, e As EventArgs) Handles lbltotalstudents.Click
+
+    End Sub
+
+    Private Sub pnlDashboard_Paint(sender As Object, e As PaintEventArgs) Handles pnlDashboard.Paint
+
+    End Sub
+
+    Private Sub Label7_Click(sender As Object, e As EventArgs)
+
+    End Sub
+
+    Private Sub Label7_Click_1(sender As Object, e As EventArgs) Handles Label7.Click
+
+    End Sub
+
+    Private Sub Label12_Click(sender As Object, e As EventArgs) Handles lblStatClasses.Click
+
+    End Sub
+
+
+
+    Private Sub Label11_Click(sender As Object, e As EventArgs) Handles Label11.Click
+
+    End Sub
+
+    Private Sub PictureBox4_Click(sender As Object, e As EventArgs) Handles PictureBox4.Click
+
+    End Sub
+
+
+    ' ===== DASHBOARD PAGE =====
+
+    Private Sub InitDashboardPage()
+        SetupUpdatesGrid()
+        LoadDashboard()
+    End Sub
+
+    Private Sub SetupUpdatesGrid()
+        With dgvUpdates
+            .Columns.Clear()
+            .AllowUserToAddRows = False
+            .AllowUserToDeleteRows = False
+            .AllowUserToResizeRows = False
+            .ReadOnly = True
+            .RowHeadersVisible = False
+            .ColumnHeadersVisible = False
+            .BorderStyle = BorderStyle.None
+            .BackgroundColor = Color.White
+            .CellBorderStyle = DataGridViewCellBorderStyle.None
+            .AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill
+            .RowTemplate.Height = 26
+            .DefaultCellStyle.Font = New Font("Consolas", 9)
+            .DefaultCellStyle.ForeColor = Color.FromArgb(0, 100, 50)
+            .DefaultCellStyle.BackColor = Color.White
+            .DefaultCellStyle.SelectionBackColor = Color.White
+            .DefaultCellStyle.SelectionForeColor = Color.FromArgb(0, 100, 50)
+            .Columns.Add("colUpdate", "Update")
+            .Columns.Add("colBy", "By")
+            .Columns("colUpdate").FillWeight = 70
+            .Columns("colBy").FillWeight = 30
+        End With
+    End Sub
+
+    Private Sub LoadDashboard()
+        ' Counts come from the student and professor lists already loaded.
+        ' Active classes and pending requests are sample values. Replace with MySQL later.
+        lblStatStudents.Text = allStudents.Count.ToString("N0")
+        lblStatProfs.Text = allProfs.Count.ToString("N0")
+        lblStatClasses.Text = "142"
+        lblStatPending.Text = "12"
+
+        ' Sample data. Replace with the latest rows from the audit log.
+        dgvUpdates.Rows.Clear()
+        dgvUpdates.Rows.Add("Updated Lalata, Carl Jade's Quiz #1", "-Prof. Jhun")
+        dgvUpdates.Rows.Add("Updated Condes, Hope Gian's SW #2", "-Prof. Becca")
+        dgvUpdates.Rows.Add("Student added- Mariano, Geoff Andreii", "-DBMS2")
+        dgvUpdates.Rows.Add("Professor added- Ramos, Aldrich Andreii", "-IT101")
+        dgvUpdates.ClearSelection()
+    End Sub
+
+    Private Sub btnUpdatesFilter_Click(sender As Object, e As EventArgs) Handles btnupdatesfilter.Click
+        MessageBox.Show("Updates filter goes here")
+    End Sub
+
+    ' Quick Actions (placeholders until the dialogs are built)
+    Private Sub btnAddClass_Click(sender As Object, e As EventArgs) Handles btnAddClass.Click
+        Using dlg As New frmAddClass()
+            dlg.LoadProfessors(allProfs.Select(Function(p) p.Name))
+            If dlg.ShowDialog(Me) = DialogResult.OK Then
+                ' Sample behaviour: bump the Active Classes count.
+                ' Replace with a database reload later.
+                Dim n As Integer = CInt(lblStatClasses.Text.Replace(",", "")) + 1
+                lblStatClasses.Text = n.ToString("N0")
+                dgvupdates.Rows.Insert(0, "Class added- " & dlg.SubjectName, "-" & dlg.SectionName)
+                dgvupdates.ClearSelection()
+            End If
+        End Using
+    End Sub
+
+    ' One shared dialog for Enter Grades, View Requests and Audit Logs
+    Private ReadOnly quickForm As New quickactions()
+
+    Private Sub OpenQuickAction(mode As quickactions.FormMode)
+        quickForm.ShowMode(mode)
+        quickForm.ShowDialog(Me)
+    End Sub
+
+    Private Sub btnEnterGrades_Click(sender As Object, e As EventArgs) Handles btnEnterGrades.Click
+        OpenQuickAction(quickactions.FormMode.EnterGrades)
+    End Sub
+
+    Private Sub btnViewRequests_Click(sender As Object, e As EventArgs) Handles btnViewRequests.Click
+        OpenQuickAction(quickactions.FormMode.ViewRequests)
+    End Sub
+
+    Private Sub btnViewLogs_Click(sender As Object, e As EventArgs) Handles btnViewLogs.Click
+        OpenQuickAction(quickactions.FormMode.ViewAuditLogs)
+    End Sub
+
+
+    Private Sub Admin_FormClosed(sender As Object, e As FormClosedEventArgs) Handles MyBase.FormClosed
+        quickForm.Dispose()
+    End Sub
+
+    ' Add to Admin.vb, frmprof.vb, and frmstudent.vb
+    Private Sub btnLogout_Click(sender As Object, e As EventArgs) Handles btnLogout.Click
+        ' 1. Clear active global session
+        AppSession.ClearSession()
+
+        ' 2. Re-open login form and close current dashboard
+        Dim loginForm As New frmlogin()
+        loginForm.Show()
+        Me.Close()
+    End Sub
+End Class
+
+' ===== ApplicationEvents.vb =====
+
+Imports Microsoft.VisualBasic.ApplicationServices
+
+Namespace My
+    ' The following events are available for MyApplication:
+    ' Startup: Raised when the application starts, before the startup form is created.
+    ' Shutdown: Raised after all application forms are closed.  This event is not raised if the application terminates abnormally.
+    ' UnhandledException: Raised if the application encounters an unhandled exception.
+    ' StartupNextInstance: Raised when launching a single-instance application and the application is already active. 
+    ' NetworkAvailabilityChanged: Raised when the network connection is connected or disconnected.
+
+    ' **NEW** ApplyApplicationDefaults: Raised when the application queries default values to be set for the application.
+
+    ' Example:
+    ' Private Sub MyApplication_ApplyApplicationDefaults(sender As Object, e As ApplyApplicationDefaultsEventArgs) Handles Me.ApplyApplicationDefaults
+    '
+    '   ' Setting the application-wide default Font:
+    '   e.Font = New Font(FontFamily.GenericSansSerif, 12, FontStyle.Regular)
+    '
+    '   ' Setting the HighDpiMode for the Application:
+    '   e.HighDpiMode = HighDpiMode.PerMonitorV2
+    '
+    '   ' If a splash dialog is used, this sets the minimum display time:
+    '   e.MinimumSplashScreenDisplayTime = 4000
+    ' End Sub
+
+    Partial Friend Class MyApplication
+
+    End Class
+End Namespace
+
+' ===== Class1.vb =====
+
+Public Class Class1
+
+End Class
+
+' ===== CustomButton.vb =====
+
+Imports System.Drawing
+Imports System.Windows.Forms
+Imports System.ComponentModel
+Imports System.Drawing.Drawing2D
+
+Public Class CustomButton
+    Inherits Button
+
+    Private _borderColor As Color = Color.Black
+    Private _borderSize As Integer = 2
+    Private _cornerRadius As Integer = 10
+    Private _hoverColor As Color = Color.LightGray
+    Private _normalColor As Color = Color.LightBlue
+
+    <Category("Appearance"), Description("Border color of the button.")>
+    Public Property BorderColor As Color
+        Get
+            Return _borderColor
+        End Get
+        Set(value As Color)
+            _borderColor = value
+            Me.Invalidate()
+        End Set
+    End Property
+
+    <Category("Appearance"), Description("Border thickness of the button.")>
+    Public Property BorderSize As Integer
+        Get
+            Return _borderSize
+        End Get
+        Set(value As Integer)
+            _borderSize = value
+            Me.Invalidate()
+        End Set
+    End Property
+
+    <Category("Appearance"), Description("Corner radius for rounded edges.")>
+    Public Property CornerRadius As Integer
+        Get
+            Return _cornerRadius
+        End Get
+        Set(value As Integer)
+            _cornerRadius = value
+            Me.Invalidate()
+        End Set
+    End Property
+
+    <Category("Appearance"), Description("Background color when hovered.")>
+    Public Property HoverColor As Color
+        Get
+            Return _hoverColor
+        End Get
+        Set(value As Color)
+            _hoverColor = value
+        End Set
+    End Property
+
+    <Category("Appearance"), Description("Normal background color.")>
+    Public Property NormalColor As Color
+        Get
+            Return _normalColor
+        End Get
+        Set(value As Color)
+            _normalColor = value
+            Me.BackColor = value
+            Me.Invalidate()
+        End Set
+    End Property
+
+    Protected Overrides Sub OnPaint(pevent As PaintEventArgs)
+        Dim g As Graphics = pevent.Graphics
+        g.SmoothingMode = SmoothingMode.AntiAlias
+
+        Dim rect As Rectangle = Me.ClientRectangle
+        Using path As GraphicsPath = GetRoundedRectPath(rect, _cornerRadius)
+            Me.Region = New Region(path)
+
+            ' Fill background
+            Using brush As New SolidBrush(Me.BackColor)
+                g.FillPath(brush, path)
+            End Using
+
+            ' Draw border
+            Using pen As New Pen(_borderColor, _borderSize)
+                g.DrawPath(pen, path)
+            End Using
+        End Using
+
+        ' Draw text centered
+        Dim sf As New StringFormat() With {
+            .Alignment = StringAlignment.Center,
+            .LineAlignment = StringAlignment.Center
+        }
+        Using textBrush As New SolidBrush(Me.ForeColor)
+            g.DrawString(Me.Text, Me.Font, textBrush, rect, sf)
+        End Using
+    End Sub
+
+    Protected Overrides Sub OnMouseEnter(e As EventArgs)
+        MyBase.OnMouseEnter(e)
+        Me.BackColor = _hoverColor
+    End Sub
+
+    Protected Overrides Sub OnMouseLeave(e As EventArgs)
+        MyBase.OnMouseLeave(e)
+        Me.BackColor = _normalColor
+    End Sub
+
+    Private Function GetRoundedRectPath(rect As Rectangle, radius As Integer) As GraphicsPath
+        Dim path As New GraphicsPath()
+        path.AddArc(rect.X, rect.Y, radius, radius, 180, 90)
+        path.AddArc(rect.Right - radius, rect.Y, radius, radius, 270, 90)
+        path.AddArc(rect.Right - radius, rect.Bottom - radius, radius, radius, 0, 90)
+        path.AddArc(rect.X, rect.Bottom - radius, radius, radius, 90, 90)
+        path.CloseFigure()
+        Return path
+    End Function
+End Class
+
+' ===== CustomPanel.vb =====
+
+Imports System.ComponentModel
+Imports System.Drawing.Drawing2D
+
+Public Class CustomPanel
+    Inherits Panel
+
+    Private _cornerRadius As Integer = 20
+    Private _borderColor As Color = Color.FromArgb(0, 85, 0)
+    Private _borderThickness As Integer = 2
+
+    <Category("Appearance"), DefaultValue(20)>
+    Public Property CornerRadius As Integer
+        Get
+            Return _cornerRadius
+        End Get
+        Set(value As Integer)
+            _cornerRadius = Math.Max(0, value)
+            Invalidate()
+        End Set
+    End Property
+
+    <Category("Appearance")>
+    Public Property BorderColor As Color
+        Get
+            Return _borderColor
+        End Get
+        Set(value As Color)
+            _borderColor = value
+            Invalidate()
+        End Set
+    End Property
+
+    <Category("Appearance"), DefaultValue(2)>
+    Public Property BorderThickness As Integer
+        Get
+            Return _borderThickness
+        End Get
+        Set(value As Integer)
+            _borderThickness = Math.Max(0, value)
+            Invalidate()
+        End Set
+    End Property
+
+    Private _clipCorners As Boolean = False
+
+    <Category("Appearance"), DefaultValue(False)>
+    Public Property ClipCorners As Boolean
+        Get
+            Return _clipCorners
+        End Get
+        Set(value As Boolean)
+            _clipCorners = value
+            UpdateRegion()
+            Invalidate()
+        End Set
+    End Property
+
+    Protected Overrides Sub OnResize(e As EventArgs)
+        MyBase.OnResize(e)
+        UpdateRegion()
+    End Sub
+
+    Private Sub UpdateRegion()
+        If _clipCorners AndAlso Width > 0 AndAlso Height > 0 Then
+            Using path As GraphicsPath = RoundedRect(New Rectangle(0, 0, Width, Height), _cornerRadius)
+                Region = New Region(path)
+            End Using
+        Else
+            Region = Nothing
+        End If
+    End Sub
+
+    Public Sub New()
+        SetStyle(ControlStyles.AllPaintingInWmPaint Or
+                 ControlStyles.OptimizedDoubleBuffer Or
+                 ControlStyles.ResizeRedraw Or
+                 ControlStyles.UserPaint, True)
+        BackColor = Color.White
+    End Sub
+
+    ' Paint the corners with the parent's color so they look transparent
+    Protected Overrides Sub OnPaintBackground(e As PaintEventArgs)
+        Dim c As Color = If(Parent IsNot Nothing, Parent.BackColor, SystemColors.Control)
+        e.Graphics.Clear(c)
+    End Sub
+
+    Protected Overrides Sub OnPaint(e As PaintEventArgs)
+        MyBase.OnPaint(e)
+        e.Graphics.SmoothingMode = SmoothingMode.AntiAlias
+
+        Dim half As Integer = _borderThickness \ 2
+        Dim rect As New Rectangle(half, half,
+                                  Width - _borderThickness - 1,
+                                  Height - _borderThickness - 1)
+
+        Using path As GraphicsPath = RoundedRect(rect, _cornerRadius)
+            Using fill As New SolidBrush(BackColor)
+                e.Graphics.FillPath(fill, path)
+            End Using
+            If _borderThickness > 0 Then
+                Using pen As New Pen(_borderColor, _borderThickness)
+                    e.Graphics.DrawPath(pen, path)
+                End Using
+            End If
+        End Using
+    End Sub
+
+    Public Shared Function RoundedRect(r As Rectangle, radius As Integer) As GraphicsPath
+        Dim path As New GraphicsPath()
+        If radius <= 0 Then
+            path.AddRectangle(r)
+            Return path
+        End If
+        Dim d As Integer = radius * 2
+        path.AddArc(r.X, r.Y, d, d, 180, 90)
+        path.AddArc(r.Right - d, r.Y, d, d, 270, 90)
+        path.AddArc(r.Right - d, r.Bottom - d, d, d, 0, 90)
+        path.AddArc(r.X, r.Bottom - d, d, d, 90, 90)
+        path.CloseFigure()
+        Return path
+    End Function
+
+End Class
+
+' ===== CustomProgressBar.vb =====
+
+Imports System.Drawing
+Imports System.Windows.Forms
+Imports System.ComponentModel
+Imports System.Drawing.Drawing2D
+
+Public Class CustomProgressBar
+    Inherits Control
+
+    Private _value As Integer = 0
+    Private _maximum As Integer = 100
+    Private _barColor As Color = Color.LightGreen
+    Private _borderColor As Color = Color.Black
+    Private _cornerRadius As Integer = 10
+    Private _showText As Boolean = True
+    Private _textColor As Color = Color.Black
+    Private _textAlign As ContentAlignment = ContentAlignment.MiddleCenter
+
+    <Category("Behavior"), Description("Current progress value.")>
+    Public Property Value As Integer
+        Get
+            Return _value
+        End Get
+        Set(v As Integer)
+            If v < 0 Then v = 0
+            If v > _maximum Then v = _maximum
+            _value = v
+            Me.Invalidate()
+        End Set
+    End Property
+
+    <Category("Behavior"), Description("Maximum progress value.")>
+    Public Property Maximum As Integer
+        Get
+            Return _maximum
+        End Get
+        Set(v As Integer)
+            If v <= 0 Then v = 1
+            _maximum = v
+            If _value > _maximum Then _value = _maximum
+            Me.Invalidate()
+        End Set
+    End Property
+
+    <Category("Appearance"), Description("Fill color of the progress bar.")>
+    Public Property BarColor As Color
+        Get
+            Return _barColor
+        End Get
+        Set(v As Color)
+            _barColor = v
+            Me.Invalidate()
+        End Set
+    End Property
+
+    <Category("Appearance"), Description("Border color of the progress bar.")>
+    Public Property BorderColor As Color
+        Get
+            Return _borderColor
+        End Get
+        Set(v As Color)
+            _borderColor = v
+            Me.Invalidate()
+        End Set
+    End Property
+
+    <Category("Appearance"), Description("Corner radius for rounded edges.")>
+    Public Property CornerRadius As Integer
+        Get
+            Return _cornerRadius
+        End Get
+        Set(v As Integer)
+            _cornerRadius = v
+            Me.Invalidate()
+        End Set
+    End Property
+
+    <Category("Appearance"), Description("Show percentage text inside the bar.")>
+    Public Property ShowText As Boolean
+        Get
+            Return _showText
+        End Get
+        Set(v As Boolean)
+            _showText = v
+            Me.Invalidate()
+        End Set
+    End Property
+
+    <Category("Appearance"), Description("Color of the percentage text.")>
+    Public Property TextColor As Color
+        Get
+            Return _textColor
+        End Get
+        Set(v As Color)
+            _textColor = v
+            Me.Invalidate()
+        End Set
+    End Property
+
+    <Category("Appearance"), Description("Alignment of the percentage text.")>
+    Public Property TextAlign As ContentAlignment
+        Get
+            Return _textAlign
+        End Get
+        Set(v As ContentAlignment)
+            _textAlign = v
+            Me.Invalidate()
+        End Set
+    End Property
+
+    Protected Overrides Sub OnPaint(e As PaintEventArgs)
+        MyBase.OnPaint(e)
+
+        Dim g As Graphics = e.Graphics
+        g.SmoothingMode = SmoothingMode.AntiAlias
+        Dim rect As Rectangle = Me.ClientRectangle
+
+        ' Border
+        Using borderPen As New Pen(_borderColor, 2)
+            Using borderPath As GraphicsPath = GetRoundedRectPath(rect, _cornerRadius)
+                g.DrawPath(borderPen, borderPath)
+            End Using
+        End Using
+
+        ' Progress fill
+        Dim progressWidth As Integer = CInt((rect.Width - 4) * (_value / _maximum))
+        If progressWidth > 0 Then
+            Dim progressRect As New Rectangle(rect.X + 2, rect.Y + 2, progressWidth, rect.Height - 4)
+            Using brush As New SolidBrush(_barColor)
+                g.FillRectangle(brush, progressRect)
+            End Using
+        End If
+
+        ' Text
+        If _showText Then
+            Dim percent As Integer = CInt((_value / _maximum) * 100)
+            Dim text As String = percent.ToString() & "%"
+            Dim format As New StringFormat()
+
+            Select Case _textAlign
+                Case ContentAlignment.TopLeft
+                    format.Alignment = StringAlignment.Near
+                    format.LineAlignment = StringAlignment.Near
+                Case ContentAlignment.TopCenter
+                    format.Alignment = StringAlignment.Center
+                    format.LineAlignment = StringAlignment.Near
+                Case ContentAlignment.TopRight
+                    format.Alignment = StringAlignment.Far
+                    format.LineAlignment = StringAlignment.Near
+                Case ContentAlignment.MiddleLeft
+                    format.Alignment = StringAlignment.Near
+                    format.LineAlignment = StringAlignment.Center
+                Case ContentAlignment.MiddleCenter
+                    format.Alignment = StringAlignment.Center
+                    format.LineAlignment = StringAlignment.Center
+                Case ContentAlignment.MiddleRight
+                    format.Alignment = StringAlignment.Far
+                    format.LineAlignment = StringAlignment.Center
+                Case ContentAlignment.BottomLeft
+                    format.Alignment = StringAlignment.Near
+                    format.LineAlignment = StringAlignment.Far
+                Case ContentAlignment.BottomCenter
+                    format.Alignment = StringAlignment.Center
+                    format.LineAlignment = StringAlignment.Far
+                Case ContentAlignment.BottomRight
+                    format.Alignment = StringAlignment.Far
+                    format.LineAlignment = StringAlignment.Far
+            End Select
+
+            Using textBrush As New SolidBrush(_textColor)
+                g.DrawString(text, Me.Font, textBrush, rect, format)
+            End Using
+        End If
+    End Sub
+
+    Private Function GetRoundedRectPath(rect As Rectangle, radius As Integer) As GraphicsPath
+        Dim path As New GraphicsPath()
+        path.AddArc(rect.X, rect.Y, radius, radius, 180, 90)
+        path.AddArc(rect.Right - radius, rect.Y, radius, radius, 270, 90)
+        path.AddArc(rect.Right - radius, rect.Bottom - radius, radius, radius, 0, 90)
+        path.AddArc(rect.X, rect.Bottom - radius, radius, radius, 90, 90)
+        path.CloseFigure()
+        Return path
+    End Function
+End Class
+
+' ===== frmAddClass.vb =====
+
+Public Class frmAddClass
+    Private Sub Label2_Click(sender As Object, e As EventArgs) Handles Label2.Click
+
+    End Sub
+
+    Private Sub Button1_Click(sender As Object, e As EventArgs)
+
+    End Sub
+
+    Private Sub TextBox1_TextChanged(sender As Object, e As EventArgs) Handles txtCode.TextChanged
+
+    End Sub
+
+    Private Sub TextBox3_TextChanged(sender As Object, e As EventArgs) Handles txtSection.TextChanged
+
+    End Sub
+
+    Private Sub TextBox2_TextChanged(sender As Object, e As EventArgs) Handles txtName.TextChanged
+
+    End Sub
+
+    Private Sub Label4_Click(sender As Object, e As EventArgs) Handles lblrpof.Click
+
+    End Sub
+
+
+
+    ' Values the dashboard reads after the dialog returns OK
+    Public Property SubjectCode As String
+    Public Property SubjectName As String
+    Public Property SectionName As String
+    Public Property ProfessorName As String
+
+    ' Called by the Admin form before ShowDialog
+    Public Sub LoadProfessors(names As IEnumerable(Of String))
+        cboProfessor.Items.Clear()
+        For Each n In names
+            cboProfessor.Items.Add(n)
+        Next
+    End Sub
+
+    Private Sub btnSave_Click(sender As Object, e As EventArgs) Handles btnsave.Click
+        lblerror.Visible = False
+
+        If String.IsNullOrWhiteSpace(txtCode.Text) OrElse
+           String.IsNullOrWhiteSpace(txtName.Text) OrElse
+           String.IsNullOrWhiteSpace(txtSection.Text) Then
+            ShowError("Please fill in the subject code, name and section.")
+            Return
+        End If
+
+        If cboProfessor.SelectedIndex = -1 Then
+            ShowError("Please choose a professor.")
+            Return
+        End If
+
+        SubjectCode = txtCode.Text.Trim().ToUpper()
+        SubjectName = txtName.Text.Trim()
+        SectionName = txtSection.Text.Trim().ToUpper()
+        ProfessorName = cboProfessor.Text
+
+        ' Later: INSERT the class into MySQL here, and write an audit log row.
+        Me.DialogResult = DialogResult.OK
+    End Sub
+
+    Private Sub ShowError(msg As String)
+        lblerror.Text = msg
+        lblerror.Visible = True
+    End Sub
+
+    Private Sub lblerror_Click(sender As Object, e As EventArgs) Handles lblerror.Click
+
+    End Sub
+End Class
+
+' ===== frmGradebook.vb =====
+
+Public Class frmGradebook
+
+    Private Sub frmGradebook_Load(sender As Object, e As EventArgs) Handles MyBase.Load
+        Me.BackColor = Color.White
+        SetupGrid()
+
+        ' Test row (delete later when you load real data)
+        dgvGrades.Rows.Add("25-06767", "Lalata, Carl Jade", 18, 18, 18, "", "", "", "", "", "")
+    End Sub
+
+    Private Sub frmGradebook_Shown(sender As Object, e As EventArgs) Handles Me.Shown
+        FillEmptyRows()
+        dgvGrades.ClearSelection()
+    End Sub
+
+    Private Sub SetupGrid()
+        Dim green As Color = Color.FromArgb(0, 191, 99)
+
+        With dgvGrades
+            .AllowUserToAddRows = False
+            .AllowUserToDeleteRows = False
+            .AllowUserToResizeRows = False
+            .AllowUserToResizeColumns = False
+            .ReadOnly = True
+            .RowHeadersVisible = False
+            .BackgroundColor = Color.White
+            .BorderStyle = BorderStyle.None
+            .SelectionMode = DataGridViewSelectionMode.FullRowSelect
+            .AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill
+
+            ' Grid lines
+            .CellBorderStyle = DataGridViewCellBorderStyle.Single
+            .GridColor = green
+
+            ' Header style
+            .EnableHeadersVisualStyles = False
+            .ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.DisableResizing
+            .ColumnHeadersHeight = 32
+            .ColumnHeadersBorderStyle = DataGridViewHeaderBorderStyle.Single
+            With .ColumnHeadersDefaultCellStyle
+                .BackColor = green
+                .ForeColor = Color.Black
+                .Font = New Font("Consolas", 8.0F, FontStyle.Bold)
+                .Alignment = DataGridViewContentAlignment.MiddleCenter
+                .WrapMode = DataGridViewTriState.False      ' no two-line headers
+                .SelectionBackColor = green
+                .SelectionForeColor = Color.Black
+            End With
+
+            ' Cell style (selection looks the same as normal, so no light-green row)
+            .RowTemplate.Height = 32
+            With .DefaultCellStyle
+                .BackColor = Color.White
+                .ForeColor = Color.Black
+                .Alignment = DataGridViewContentAlignment.MiddleCenter
+                .SelectionBackColor = Color.White
+                .SelectionForeColor = Color.Black
+            End With
+
+            ' Columns
+            .Columns.Clear()
+            For Each name As String In {"Student No.", "Student Name", "SW1", "SW2",
+                                        "Quiz1", "Quiz2", "Homework 1", "Homework 2",
+                                        "Exam", "Attendance", "Average"}
+                .Columns.Add(name.Replace(" ", "").Replace(".", ""), name)
+            Next
+        End With
+    End Sub
+
+    ' Adds blank bordered rows so the grid looks full even with no data
+    Private Sub FillEmptyRows()
+        Dim totalRows As Integer = (dgvGrades.Height - dgvGrades.ColumnHeadersHeight) \ dgvGrades.RowTemplate.Height
+        Dim missing As Integer = totalRows - dgvGrades.Rows.Count
+        For i As Integer = 1 To missing
+            dgvGrades.Rows.Add()
+        Next
+    End Sub
+
+End Class
+
+' ===== frmlogin.vb =====
+
+Imports DAUNTLESS_WOLVES_PROF.Core
+Imports DAUNTLESS_WOLVES_PROF.Models
+Imports DAUNTLESS_WOLVES_PROF.Services
+
+
+Public Class frmlogin
+
+    Private ReadOnly authService As New AuthService()
+
+    Private Sub frmLogin_Load(sender As Object, e As EventArgs) Handles MyBase.Load
+        ' Mask password characters in TextBox1
+        TextBox1.UseSystemPasswordChar = True
+
+        ' Apply background opacity effect
+        If Me.BackgroundImage IsNot Nothing Then
+            Dim original As Image = Me.BackgroundImage
+            Me.BackgroundImage = FadeImage(original, 0.5F)
+        End If
+    End Sub
+
+    ' Opacity helper
+    Private Function FadeImage(src As Image, opacity As Single) As Image
+        Dim bmp As New Bitmap(src.Width, src.Height)
+        Using g As Graphics = Graphics.FromImage(bmp)
+            g.Clear(Color.White)
+            Dim cm As New Imaging.ColorMatrix() With {.Matrix33 = opacity}
+            Using ia As New Imaging.ImageAttributes()
+                ia.SetColorMatrix(cm)
+                g.DrawImage(src, New Rectangle(0, 0, bmp.Width, bmp.Height),
+                        0, 0, src.Width, src.Height, GraphicsUnit.Pixel, ia)
+            End Using
+        End Using
+        Return bmp
+    End Function
+
+    ' LOG IN BUTTON CLICK (Button1)
+    Private Sub Button1_Click(sender As Object, e As EventArgs) Handles Button1.Click
+        Dim username As String = ValidationHelper.SanitizeInput(boxuser.Text)
+        Dim password As String = TextBox1.Text.Trim()
+
+
+        If Not ValidationHelper.IsRequired(username) OrElse Not ValidationHelper.IsRequired(password) Then
+            MessageBox.Show("Please enter both your Username/ID and Password.", "Validation Error", MessageBoxButtons.OK, MessageBoxIcon.Warning)
+            boxuser.Focus()
+            Return
+        End If
+
+        Try
+            ' 2. Authenticate user against database via UserService
+            Dim user As UserModel = authService.VerifyLogin(username, password)
+
+            If user IsNot Nothing Then
+
+                Dim role As String = user.Role.Trim().ToLower()
+                Dim picked As String = If(RadioButton1.Checked, "student", "teacher")
+
+                ' Admins have no radio button, so let them through with either selected
+                If role <> "admin" AndAlso role <> picked Then
+                    MessageBox.Show("This account is not a " & picked & " account. Please select the correct role.",
+                    "Wrong role", MessageBoxButtons.OK, MessageBoxIcon.Warning)
+                    TextBox1.Clear()
+                    Return
+                End If
+
+                ' 3. Save user state in AppSession
+                AppSession.StartSession(user)
+
+                ' 4. Route to designated form based on database user role
+                Me.Hide()
+
+                Select Case user.Role.Trim().ToLower()
+                    Case "admin"
+                        Dim adminForm As New Admin()
+                        adminForm.Show()
+
+                    Case "teacher", "professor", "prof"
+                        Dim profForm As New frmprof()
+                        profForm.Show()
+
+                    Case "student"
+                        Dim studentForm As New frmstudent()
+                        studentForm.Show()
+
+                    Case Else
+                        MessageBox.Show("Unrecognized user role assigned.", "Access Denied", MessageBoxButtons.OK, MessageBoxIcon.Error)
+                        AppSession.ClearSession()
+                        Me.Show()
+                End Select
+            Else
+                MessageBox.Show("Invalid Username/ID or Password.", "Login Failed", MessageBoxButtons.OK, MessageBoxIcon.Error)
+                TextBox1.Clear()
+                TextBox1.Focus()
+            End If
+
+        Catch ex As Exception
+            MessageBox.Show($"Database connection error: {ex.Message}", "System Error", MessageBoxButtons.OK, MessageBoxIcon.Error)
+        End Try
+    End Sub
+
+End Class
+
+' ===== frmprof.vb =====
+
+Imports DAUNTLESS_WOLVES_PROF.Core
+Public Class frmprof
+
+    ' Maps each tab button to the panel it should show
+    Private ReadOnly pages As New Dictionary(Of Button, Panel)
+
+    Private ReadOnly boldFont As New Font("Segoe UI", 9.5F, FontStyle.Bold)
+    Private ReadOnly normalFont As New Font("Segoe UI", 9.5F, FontStyle.Regular)
+    Private isLoading As Boolean = True
+
+    ' Analytics tile value labels (created in code)
+    Private lblClassAvg As Label
+    Private lblPassing As Label
+    Private lblAtRisk As Label
+    Private lblTopScore As Label
+
+    Private Sub frmprof_Load(sender As Object, e As EventArgs) Handles MyBase.Load
+        If AppSession.CurrentUser Is Nothing Then
+            MessageBox.Show("Please log in to access this page.", "Access Denied", MessageBoxButtons.OK, MessageBoxIcon.Warning)
+
+            Dim loginForm As New frmlogin()
+            loginForm.Show()
+            Me.Close()
+            Return
+        End If
+
+        ' (Optional) Display professor name on a label
+        ' lblProfName.Text = $"Welcome, {AppSession.CurrentUser.FullName}"
+
+        ' Connect buttons to their corresponding panels
+        pages.Add(btnRecordScores, pnlRecordScores)
+        pages.Add(btnClassGrades, pnlClassGrades)
+        pages.Add(btnRevisionRequests, pnlClarificationRequests)
+        pages.Add(btnAnalytics, pnlAnalytics)
+        pages.Add(btnAuditLogs, pnlAuditLogs)
+
+        ' Add the same Click event to all buttons
+        For Each b As Button In pages.Keys
+            AddHandler b.Click, AddressOf Tab_Click
+        Next
+
+        ' Show Record Scores by default
+        ShowPage(btnRecordScores)
+
+        ' Select the first item in all ComboBoxes (including inside panels)
+        SetAllComboBoxes(Me)
+
+        isLoading = False
+        ConfigureGrid()
+        ConfigureRequestsGrid()
+        ConfigureAuditGrid()
+        BuildAnalyticsLabels()
+    End Sub
+
+    ' Helper function: loops through all controls, including nested ones
+    Private Sub SetAllComboBoxes(parent As Control)
+        For Each ctrl As Control In parent.Controls
+            If TypeOf ctrl Is ComboBox Then
+                Dim cb As ComboBox = DirectCast(ctrl, ComboBox)
+                If cb.Items.Count > 0 Then
+                    cb.SelectedIndex = 0
+                End If
+            End If
+
+            ' If the control contains children (Panel, GroupBox, TabPage, etc.), check inside too
+            If ctrl.HasChildren Then
+                SetAllComboBoxes(ctrl)
+            End If
+        Next
+    End Sub
+
+    Private Sub Tab_Click(sender As Object, e As EventArgs)
+        Dim clickedButton As Button = DirectCast(sender, Button)
+        ShowPage(clickedButton)
+    End Sub
+
+    Private Sub ShowPage(activeTab As Button)
+        For Each kvp In pages
+            Dim isActive As Boolean = (kvp.Key Is activeTab)
+
+            ' Show/hide the corresponding panel
+            kvp.Value.Visible = isActive
+
+            ' Change button font
+            kvp.Key.Font = If(isActive, boldFont, normalFont)
+
+            ' Change button background
+            kvp.Key.BackColor = If(isActive, Color.White, Color.FromArgb(208, 216, 224))
+        Next
+
+        ' Put the selected panel in front
+        pages(activeTab).BringToFront()
+
+        ' Load data for tabs that have data
+        If Not isLoading Then
+            If activeTab Is btnClassGrades Then LoadClassGrades()
+            If activeTab Is btnRevisionRequests Then LoadRequests()
+            If activeTab Is btnAuditLogs Then LoadAuditLogs()
+            If activeTab Is btnAnalytics Then
+                LayoutAnalytics()
+                LoadAnalytics()
+            End If
+        End If
+    End Sub
+
+    ' =====================================================
+    '  CLASS GRADES
+    ' =====================================================
+
+    Private Sub ConfigureGrid()
+        With dgvClassGrades
+            .AllowUserToAddRows = False
+            .AllowUserToDeleteRows = False
+            .AllowUserToResizeRows = False
+            .AllowUserToResizeColumns = False
+            .ReadOnly = True
+            .RowHeadersVisible = False
+            .ColumnHeadersVisible = False          ' the green bar is the header
+            .BackgroundColor = Color.White
+            .BorderStyle = BorderStyle.None
+            .CellBorderStyle = DataGridViewCellBorderStyle.SingleHorizontal
+            .SelectionMode = DataGridViewSelectionMode.FullRowSelect
+            .RowTemplate.Height = 55
+            .AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.None
+            .DefaultCellStyle.SelectionBackColor = Color.White
+            .DefaultCellStyle.SelectionForeColor = Color.Black
+            .ScrollBars = ScrollBars.Vertical
+        End With
+    End Sub
+
+    Private Sub LoadClassGrades()
+        Dim dt As New DataTable()
+        For Each c In {"Student", "SW1", "HW1", "Quiz1", "Act4", "Act5", "Act6",
+                       "Midterms", "Running Grade", "Status"}
+            dt.Columns.Add(c)
+        Next
+
+        dt.Rows.Add("Oropilla, Charles", "20/20", "45/50", "96/100", "–", "–", "–", "95/100", "94.2", "Passed")
+        dt.Rows.Add("Puyat, Ron Jacob", "19/20", "47/50", "94/100", "–", "–", "–", "92/100", "91.8", "Passed")
+        dt.Rows.Add("Lalata, Carl Jade", "18/20", "46/50", "90/100", "–", "–", "–", "90/100", "88.5", "Passed")
+        dt.Rows.Add("Mariano, Geoff Andrei", "17/20", "44/50", "88/100", "–", "–", "–", "88/100", "86.0", "Passed")
+        dt.Rows.Add("Condes, Hope Gian", "18/20", "45/50", "88/100", "–", "–", "–", "88/100", "84.2", "Passed")
+        dt.Rows.Add("Dela Cruz, Juan", "12/20", "32/50", "70/100", "–", "–", "–", "70/100", "68.5", "At risk")
+
+        dgvClassGrades.DataSource = dt
+        AlignGridToHeader()
+    End Sub
+
+    Private Function HeaderCenterX(ctrl As Control) As Integer
+        Dim screenPt As Point = ctrl.Parent.PointToScreen(
+            New Point(ctrl.Left + ctrl.Width \ 2, 0))
+        Return dgvClassGrades.PointToClient(screenPt).X
+    End Function
+
+    Private Sub AlignGridToHeader()
+        If dgvClassGrades.Columns.Count = 0 Then Exit Sub
+
+        Dim cSW1 As Integer = HeaderCenterX(cboSW1)
+        Dim cHW1 As Integer = HeaderCenterX(cboHW1)
+        Dim cQuiz As Integer = HeaderCenterX(cboQuiz1)
+        Dim cMid As Integer = HeaderCenterX(lblMidterms)
+        Dim cRun As Integer = HeaderCenterX(lblRunningGrade)
+        Dim cStat As Integer = HeaderCenterX(lblStatus)
+        Dim gap As Double = (cMid - cQuiz) / 4
+
+        Dim names() As String = {"Student", "SW1", "HW1", "Quiz1", "Act4", "Act5", "Act6",
+                                 "Midterms", "Running Grade", "Status"}
+        Dim centers() As Double = {0, cSW1, cHW1, cQuiz,
+                                   cQuiz + gap, cQuiz + 2 * gap, cQuiz + 3 * gap,
+                                   cMid, cRun, cStat}
+
+        Dim startX As Double = 0
+        For i As Integer = 0 To names.Length - 2          ' every column except Status
+            Dim endX As Double
+            If i = 0 Then
+                endX = cSW1 - 55                          ' Student column width
+            Else
+                endX = (centers(i) + centers(i + 1)) / 2
+            End If
+
+            With dgvClassGrades.Columns(names(i))
+                .AutoSizeMode = DataGridViewAutoSizeColumnMode.None
+                .Width = CInt(Math.Max(endX - startX, 40))
+                .DefaultCellStyle.Alignment = If(i = 0,
+                    DataGridViewContentAlignment.MiddleLeft,
+                    DataGridViewContentAlignment.MiddleCenter)
+            End With
+            startX = endX
+        Next
+
+        ' Status takes whatever space is left, so no horizontal scrollbar
+        With dgvClassGrades.Columns("Status")
+            .AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill
+            .DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter
+        End With
+    End Sub
+
+    Private Sub dgvClassGrades_CellFormatting(sender As Object, e As DataGridViewCellFormattingEventArgs) _
+        Handles dgvClassGrades.CellFormatting
+
+        If e.Value Is Nothing OrElse e.ColumnIndex < 0 Then Exit Sub
+        Dim colName As String = dgvClassGrades.Columns(e.ColumnIndex).Name
+
+        If colName = "Status" Then
+            If e.Value.ToString() = "At risk" Then
+                e.CellStyle.BackColor = Color.FromArgb(248, 200, 200)
+                e.CellStyle.ForeColor = Color.DarkRed
+            Else
+                e.CellStyle.BackColor = Color.FromArgb(190, 235, 200)
+                e.CellStyle.ForeColor = Color.DarkGreen
+            End If
+            e.CellStyle.SelectionBackColor = e.CellStyle.BackColor
+            e.CellStyle.SelectionForeColor = e.CellStyle.ForeColor
+
+        ElseIf colName = "Running Grade" Then
+            Dim g As Double
+            If Double.TryParse(e.Value.ToString(), g) Then
+                e.CellStyle.BackColor = If(g < 75, Color.FromArgb(255, 240, 170), Color.FromArgb(190, 235, 200))
+                e.CellStyle.SelectionBackColor = e.CellStyle.BackColor
+            End If
+        End If
+    End Sub
+
+    ' Clears the default selection every time data is bound
+    Private Sub dgvClassGrades_DataBindingComplete(sender As Object, e As DataGridViewBindingCompleteEventArgs) _
+        Handles dgvClassGrades.DataBindingComplete
+        dgvClassGrades.ClearSelection()
+        dgvClassGrades.CurrentCell = Nothing
+    End Sub
+
+    ' =====================================================
+    '  REVISION REQUESTS
+    ' =====================================================
+
+    Private Sub ConfigureRequestsGrid()
+        With dgvRequests
+            .AutoGenerateColumns = False
+            .AllowUserToAddRows = False
+            .AllowUserToDeleteRows = False
+            .AllowUserToResizeRows = False
+            .RowHeadersVisible = False
+            .BackgroundColor = Color.White
+            .BorderStyle = BorderStyle.None
+            .CellBorderStyle = DataGridViewCellBorderStyle.SingleHorizontal
+            .GridColor = Color.Gray
+            .SelectionMode = DataGridViewSelectionMode.FullRowSelect
+            .RowTemplate.Height = 45
+            .AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill
+            .DefaultCellStyle.ForeColor = Color.FromArgb(0, 100, 0)
+            .DefaultCellStyle.SelectionBackColor = Color.White
+            .DefaultCellStyle.SelectionForeColor = Color.FromArgb(0, 100, 0)
+
+            ' header (replaces your old label row)
+            .EnableHeadersVisualStyles = False
+            .ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.DisableResizing
+            .ColumnHeadersHeight = 45
+            .ColumnHeadersBorderStyle = DataGridViewHeaderBorderStyle.Single
+            With .ColumnHeadersDefaultCellStyle
+                .BackColor = Color.White
+                .ForeColor = Color.FromArgb(0, 100, 0)
+                .Font = New Font("Segoe UI", 9.5F, FontStyle.Bold)
+                .Alignment = DataGridViewContentAlignment.MiddleLeft
+                .SelectionBackColor = Color.White
+                .SelectionForeColor = Color.FromArgb(0, 100, 0)
+            End With
+
+            .Columns.Clear()
+            AddReqColumn("Student", "Student", 22)
+            AddReqColumn("Assessment", "Assessment", 13)
+            AddReqColumn("CurrentGrade", "Current Grade", 12)
+            AddReqColumn("Requested", "Requested", 11)
+            AddReqColumn("Reason", "Reason", 18)
+            AddReqColumn("Status", "Status", 12)
+
+            Dim btnCol As New DataGridViewButtonColumn()
+            btnCol.Name = "Action"
+            btnCol.DataPropertyName = "Action"
+            btnCol.HeaderText = "Action"
+            btnCol.FillWeight = 12
+            btnCol.FlatStyle = FlatStyle.Flat
+            btnCol.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter
+            .Columns.Add(btnCol)
+
+            .Columns("Status").DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter
+        End With
+    End Sub
+
+    Private Sub AddReqColumn(name As String, header As String, weight As Single)
+        Dim c As New DataGridViewTextBoxColumn()
+        c.Name = name
+        c.DataPropertyName = name
+        c.HeaderText = header
+        c.FillWeight = weight
+        dgvRequests.Columns.Add(c)
+    End Sub
+
+    Private Sub LoadRequests()
+        Dim dt As New DataTable()
+        For Each c In {"Student", "Assessment", "CurrentGrade", "Requested", "Reason", "Status", "Action"}
+            dt.Columns.Add(c)
+        Next
+        dt.Rows.Add("Lalata, Carl Jade", "Quiz#1", "18/20", "+2pts", "Misread Answer", "Pending", "Approve")
+        dt.Rows.Add("Condes, Hope Gian", "Final Exam", "--", "Recheck", "Item 7 correct", "Pending", "Approve")
+        dt.Rows.Add("Mariano, Geoff Andrei", "Activity#2", "43/50", "+5pts", "Late Submission", "Approved", "Closed")
+
+        dgvRequests.DataSource = dt
+        dgvRequests.ClearSelection()
+    End Sub
+
+    ' Pending = yellow, Approved = green, Approve button = gray, Closed = dark gray
+    Private Sub dgvRequests_CellFormatting(sender As Object, e As DataGridViewCellFormattingEventArgs) _
+        Handles dgvRequests.CellFormatting
+
+        If e.Value Is Nothing OrElse e.ColumnIndex < 0 Then Exit Sub
+        Dim colName As String = dgvRequests.Columns(e.ColumnIndex).Name
+
+        If colName = "Status" Then
+            If e.Value.ToString() = "Approved" Then
+                e.CellStyle.BackColor = Color.FromArgb(0, 128, 0)
+                e.CellStyle.ForeColor = Color.White
+            Else
+                e.CellStyle.BackColor = Color.FromArgb(255, 248, 200)
+                e.CellStyle.ForeColor = Color.FromArgb(90, 80, 0)
+            End If
+            e.CellStyle.SelectionBackColor = e.CellStyle.BackColor
+            e.CellStyle.SelectionForeColor = e.CellStyle.ForeColor
+
+        ElseIf colName = "Action" Then
+            If e.Value.ToString() = "Closed" Then
+                e.CellStyle.BackColor = Color.FromArgb(120, 120, 120)
+                e.CellStyle.ForeColor = Color.White
+            Else
+                e.CellStyle.BackColor = Color.FromArgb(225, 225, 225)
+                e.CellStyle.ForeColor = Color.Black
+            End If
+            e.CellStyle.SelectionBackColor = e.CellStyle.BackColor
+            e.CellStyle.SelectionForeColor = e.CellStyle.ForeColor
+        End If
+    End Sub
+
+    ' Approve button click
+    Private Sub dgvRequests_CellContentClick(sender As Object, e As DataGridViewCellEventArgs) _
+        Handles dgvRequests.CellContentClick
+
+        If e.RowIndex < 0 Then Exit Sub
+        If dgvRequests.Columns(e.ColumnIndex).Name <> "Action" Then Exit Sub
+
+        Dim row As DataGridViewRow = dgvRequests.Rows(e.RowIndex)
+        If row.Cells("Action").Value.ToString() <> "Approve" Then Exit Sub
+
+        If MessageBox.Show("Approve this revision request?", "Confirm",
+                           MessageBoxButtons.YesNo, MessageBoxIcon.Question) = DialogResult.Yes Then
+            ' later: run an UPDATE on the MariaDB table here
+            row.Cells("Status").Value = "Approved"
+            row.Cells("Action").Value = "Closed"
+        End If
+    End Sub
+
+    ' =====================================================
+    '  AUDIT LOGS
+    ' =====================================================
+
+    Private Sub ConfigureAuditGrid()
+        With dgvAuditLogs
+            .AutoGenerateColumns = False
+            .AllowUserToAddRows = False
+            .AllowUserToDeleteRows = False
+            .AllowUserToResizeRows = False
+            .ReadOnly = True
+            .RowHeadersVisible = False
+            .BackgroundColor = Color.White
+            .BorderStyle = BorderStyle.None
+            .CellBorderStyle = DataGridViewCellBorderStyle.SingleHorizontal
+            .GridColor = Color.Gray
+            .SelectionMode = DataGridViewSelectionMode.FullRowSelect
+            .RowTemplate.Height = 45
+            .AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill
+            .DefaultCellStyle.ForeColor = Color.FromArgb(0, 100, 0)
+            .DefaultCellStyle.SelectionBackColor = Color.White
+            .DefaultCellStyle.SelectionForeColor = Color.FromArgb(0, 100, 0)
+
+            .EnableHeadersVisualStyles = False
+            .ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.DisableResizing
+            .ColumnHeadersHeight = 40
+            .ColumnHeadersBorderStyle = DataGridViewHeaderBorderStyle.Single
+            With .ColumnHeadersDefaultCellStyle
+                .BackColor = Color.White
+                .ForeColor = Color.FromArgb(0, 100, 0)
+                .Font = New Font("Segoe UI", 9.5F, FontStyle.Bold)
+                .Alignment = DataGridViewContentAlignment.MiddleLeft
+                .SelectionBackColor = Color.White
+                .SelectionForeColor = Color.FromArgb(0, 100, 0)
+            End With
+
+            .Columns.Clear()
+            AddAuditColumn("Action", "Action", 18)
+            AddAuditColumn("Student", "Student", 22)
+            AddAuditColumn("Item", "Item", 16)
+            AddAuditColumn("DateTime", "Date & Time", 20)
+            AddAuditColumn("ChangedBy", "Changed By", 20)
+        End With
+    End Sub
+
+    Private Sub AddAuditColumn(name As String, header As String, weight As Single)
+        Dim c As New DataGridViewTextBoxColumn()
+        c.Name = name
+        c.DataPropertyName = name
+        c.HeaderText = header
+        c.FillWeight = weight
+        dgvAuditLogs.Columns.Add(c)
+    End Sub
+
+    Private Sub LoadAuditLogs()
+        Dim dt As New DataTable()
+        For Each c In {"Action", "Student", "Item", "DateTime", "ChangedBy"}
+            dt.Columns.Add(c)
+        Next
+
+        ' newest first
+        dt.Rows.Add("Grades Updated", "Condes, Hope Gian", "Midterms", "2026-08-24 09:14", "Prof. Jhun")
+        dt.Rows.Add("Revision Approved", "Mariano, Geoff Andrei", "Activity#2", "2026-08-23 15:40", "Prof. Jhun")
+        dt.Rows.Add("Grades Updated", "Lalata, Carl Jade", "Quiz#1", "2026-08-22 11:05", "Prof. Jhun")
+        dt.Rows.Add("Score Recorded", "Dela Cruz, Juan", "SW1", "2026-08-21 10:30", "Prof. Jhun")
+
+        dgvAuditLogs.DataSource = dt
+        dgvAuditLogs.ClearSelection()
+    End Sub
+
+    Private Sub dgvAuditLogs_DataBindingComplete(sender As Object, e As DataGridViewBindingCompleteEventArgs) _
+        Handles dgvAuditLogs.DataBindingComplete
+        dgvAuditLogs.ClearSelection()
+        dgvAuditLogs.CurrentCell = Nothing
+    End Sub
+
+    ' =====================================================
+    '  ANALYTICS
+    ' =====================================================
+
+    ' Sizes the two cards to fill the page and spreads the four tiles in one row
+    Private Sub LayoutAnalytics()
+        Const margin As Integer = 20
+        Const gap As Integer = 20
+        Const minCardH As Integer = 400        ' never shorter than this (normal window size)
+        Const maxHeightRatio As Double = 0.5   ' 0.5 = cards end at the middle of the page
+
+        ' visible height = bottom of the screen's working area minus where the form's client area starts
+        Dim clientTopOnScreen As Integer = Me.PointToScreen(Point.Empty).Y
+        Dim visibleH As Integer = Math.Min(Me.ClientSize.Height,
+            Screen.FromControl(Me).WorkingArea.Bottom - clientTopOnScreen)
+
+        pnlAnalytics.SetBounds(pnlAnalytics.Left, pnlAnalytics.Top,
+                               Me.ClientSize.Width - pnlAnalytics.Left,
+                               visibleH - pnlAnalytics.Top)
+
+        Dim cardW As Integer = (pnlAnalytics.ClientSize.Width - 2 * margin - gap) \ 2
+
+        ' height: stop at the middle of the page, but never below minCardH
+        ' and never taller than the space that is actually available
+        Dim availH As Integer = pnlAnalytics.ClientSize.Height - RoundedPanel4.Top - margin
+        Dim cardH As Integer = CInt(pnlAnalytics.ClientSize.Height * maxHeightRatio) - RoundedPanel4.Top
+        cardH = Math.Min(Math.Max(cardH, minCardH), availH)
+
+        If cardW < 300 OrElse cardH < 200 Then Exit Sub
+
+        RoundedPanel4.SetBounds(margin, RoundedPanel4.Top, cardW, cardH)
+        RoundedPanel5.SetBounds(margin + cardW + gap, RoundedPanel4.Top, cardW, cardH)
+
+        ' four tiles in one row inside the left card
+        Const tMargin As Integer = 12
+        Const tGap As Integer = 12
+        Dim tiles() As Control = {RoundedPanel6, RoundedPanel7, RoundedPanel8, RoundedPanel9}
+        Dim tileW As Integer = (RoundedPanel4.ClientSize.Width - 2 * tMargin - 3 * tGap) \ 4
+        If tileW < 80 Then Exit Sub
+
+        Dim tileTop As Integer = RoundedPanel6.Top
+        Dim tileH As Integer = RoundedPanel6.Height
+        For i As Integer = 0 To tiles.Length - 1
+            tiles(i).SetBounds(tMargin + i * (tileW + tGap), tileTop, tileW, tileH)
+        Next
+    End Sub
+
+    ' Creates one big number label inside a tile
+    Private Function AddValueLabel(tile As Control, textColor As Color) As Label
+        Dim l As New Label()
+        l.AutoSize = False
+        l.BackColor = Color.Transparent
+        l.ForeColor = textColor
+        l.Font = New Font("Segoe UI", 20.0F, FontStyle.Bold)
+        l.TextAlign = ContentAlignment.MiddleCenter
+        l.SetBounds(0, 10, tile.Width, 55)
+        l.Anchor = AnchorStyles.Top Or AnchorStyles.Left Or AnchorStyles.Right
+        tile.Controls.Add(l)
+        l.BringToFront()
+        Return l
+    End Function
+
+    Private Sub BuildAnalyticsLabels()
+        Dim green As Color = Color.FromArgb(0, 100, 0)
+        lblClassAvg = AddValueLabel(RoundedPanel6, green)
+        lblPassing = AddValueLabel(RoundedPanel7, green)
+        lblAtRisk = AddValueLabel(RoundedPanel8, Color.DarkRed)
+        lblTopScore = AddValueLabel(RoundedPanel9, green)
+
+        ' make each tile's caption (CLASS AVERAGE, PASSING, ...) fit and stay centered
+        Dim tiles() As Control = {RoundedPanel6, RoundedPanel7, RoundedPanel8, RoundedPanel9}
+        Dim valueLabels() As Label = {lblClassAvg, lblPassing, lblAtRisk, lblTopScore}
+        For i As Integer = 0 To tiles.Length - 1
+            For Each c As Control In tiles(i).Controls
+                If TypeOf c Is Label AndAlso c IsNot valueLabels(i) Then
+                    Dim cap As Label = DirectCast(c, Label)
+                    cap.AutoSize = False
+                    cap.Dock = DockStyle.Bottom
+                    cap.Height = 30
+                    cap.TextAlign = ContentAlignment.MiddleCenter
+                    cap.BackColor = Color.Transparent
+                End If
+            Next
+        Next
+    End Sub
+
+    Private Sub LoadAnalytics()
+        ' sample data for now (matches the six students in Class Grades)
+        lblClassAvg.Text = "85.5"
+        lblPassing.Text = "5"
+        lblAtRisk.Text = "1"
+        lblTopScore.Text = "94.2"
+    End Sub
+
+    ' =====================================================
+    '  GENERAL
+    ' =====================================================
+
+    Private Sub btnLogout_Click(sender As Object, e As EventArgs) Handles btnLogout.Click
+        AppSession.ClearSession()
+
+        ' 2. Re-open login form and close current dashboard
+        Dim loginForm As New frmlogin()
+        loginForm.Show()
+        Me.Close()
+    End Sub
+
+    Private Sub frmprof_Resize(sender As Object, e As EventArgs) Handles MyBase.Resize
+        If isLoading Then Exit Sub
+        If dgvClassGrades.Columns.Count > 0 Then AlignGridToHeader()
+        LayoutAnalytics()
+    End Sub
+
+    ' =====================================================
+    '  Designer-generated stubs (safe to leave as they are)
+    ' =====================================================
+
+    Private Sub ComboBox1_SelectedIndexChanged(sender As Object, e As EventArgs) Handles ComboBox1.SelectedIndexChanged
+        ' Optional: add logic here if you want something to happen when selection changes
+    End Sub
+
+    Private Sub lblEntryTitle_Click(sender As Object, e As EventArgs)
+
+    End Sub
+
+    Private Sub Label2_Click(sender As Object, e As EventArgs)
+
+    End Sub
+
+    Private Sub cboStudent_SelectedIndexChanged(sender As Object, e As EventArgs)
+
+    End Sub
+
+    Private Sub Label18_Click(sender As Object, e As EventArgs)
+
+    End Sub
+
+    Private Sub Label26_Click(sender As Object, e As EventArgs)
+
+    End Sub
+
+    Private Sub Label47_Click(sender As Object, e As EventArgs) Handles Label47.Click
+
+    End Sub
+
+    Private Sub Label55_Click(sender As Object, e As EventArgs) Handles Label55.Click
+
+    End Sub
+
+    Private Sub AssesmentTypetxt_Click(sender As Object, e As EventArgs)
+
+    End Sub
+
+    Private Sub Cmbo_BoxSW_SelectedIndexChanged(sender As Object, e As EventArgs) Handles cboSW1.SelectedIndexChanged
+
+    End Sub
+
+    Private Sub Label16_Click(sender As Object, e As EventArgs)
+
+    End Sub
+
+    Private Sub RoundedPanel1_Paint(sender As Object, e As PaintEventArgs) Handles RoundedPanel1.Paint
+
+    End Sub
+
+    Private Sub Label19_Click(sender As Object, e As EventArgs) Handles Label19.Click
+
+    End Sub
+
+    Private Sub CustomButton4_Click(sender As Object, e As EventArgs) Handles CustomButton4.Click
+        frmGradebook.Show
+    End Sub
+
+
+End Class
+
+' ===== frmstudent.vb =====
+
+Imports DAUNTLESS_WOLVES_PROF.Core
+Public Class frmStudent
+
+    Private ReadOnly pages As New Dictionary(Of Button, Panel)
+    Private ReadOnly boldFont As New Font("Segoe UI", 9.5F, FontStyle.Bold)
+    Private ReadOnly normalFont As New Font("Segoe UI", 9.5F, FontStyle.Regular)
+
+    ' Sample data: assessment -> current score. Replace with a MySQL query later.
+    Private ReadOnly assessmentScores As New Dictionary(Of String, String)
+
+    ' My Performance bar values (0-100)
+    Private quizPct, activityPct, examPct, projectPct As Integer
+
+    Private Sub frmStudent_Load(sender As Object, e As EventArgs) Handles MyBase.Load
+        If AppSession.CurrentUser Is Nothing Then
+            MessageBox.Show("Please log in to access this page.", "Access Denied", MessageBoxButtons.OK, MessageBoxIcon.Warning)
+
+            Dim loginForm As New frmlogin()
+            loginForm.Show()
+            Me.Close()
+            Return
+        End If
+
+        pages.Add(btnMyGrades, pnlMyGrades)
+        pages.Add(btnGradeHistory, pnlGradeHistory)
+        pages.Add(btnRequestRevision, pnlRequestRevision)
+        pages.Add(btnMyPerformance, pnlMyPerformance)
+
+        For Each b As Button In pages.Keys
+            AddHandler b.Click, AddressOf Tab_Click
+        Next
+
+        ' My Grades
+        cboCourse.Items.Clear()
+        cboCourse.Items.Add("CS 103 - Object Oriented Programming")
+        cboCourse.SelectedIndex = 0
+
+        StyleGrid(dgvgrades)
+        LoadGrades()
+
+        ' Grade History
+        StyleGrid(dgvHistory)
+        LoadHistory()
+
+        ' Request Revision
+        StyleGrid(dgvRequests)
+        LoadRequests()
+        LoadAssessments()
+
+        ' My Performance
+        LoadPerformance()
+
+        ShowPage(btnMyGrades)   ' keep this last
+    End Sub
+
+    ' Grids select their first cell when first displayed, so clear it here
+    Private Sub frmStudent_Shown(sender As Object, e As EventArgs) Handles MyBase.Shown
+        dgvgrades.ClearSelection()
+        dgvHistory.ClearSelection()
+        dgvRequests.ClearSelection()
+    End Sub
+
+    Private Sub Tab_Click(sender As Object, e As EventArgs)
+        ShowPage(DirectCast(sender, Button))
+    End Sub
+
+    Private Sub ShowPage(activeTab As Button)
+        For Each kvp In pages
+            Dim isActive As Boolean = (kvp.Key Is activeTab)
+            kvp.Value.Visible = isActive
+            kvp.Key.Font = If(isActive, boldFont, normalFont)
+            kvp.Key.BackColor = If(isActive, Color.White, Color.FromArgb(208, 216, 224))
+        Next
+        pages(activeTab).BringToFront()
+
+        ' Measure the bars once the Performance page is actually visible
+        If activeTab Is btnMyPerformance Then UpdateBars()
+    End Sub
+
+    Private Sub btnLogout_Click(sender As Object, e As EventArgs) Handles btnLogout.Click
+        AppSession.ClearSession()
+
+        ' 2. Re-open login form and close current dashboard
+        Dim loginForm As New frmlogin()
+        loginForm.Show()
+        Me.Close()
+    End Sub
+
+    ' ---------- SHARED GRID STYLE ----------
+
+    Private Sub StyleGrid(grid As DataGridView)
+        With grid
+            .AllowUserToAddRows = False
+            .AllowUserToDeleteRows = False
+            .ReadOnly = True
+            .RowHeadersVisible = False
+            .BorderStyle = BorderStyle.None
+            .BackgroundColor = Color.White
+            .EnableHeadersVisualStyles = False
+            .ColumnHeadersDefaultCellStyle.BackColor = Color.FromArgb(208, 216, 224)
+            .ColumnHeadersDefaultCellStyle.ForeColor = Color.FromArgb(0, 85, 0)
+            .ColumnHeadersDefaultCellStyle.Font = New Font("Segoe UI", 10, FontStyle.Bold)
+            .ColumnHeadersDefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter
+            .DefaultCellStyle.ForeColor = Color.FromArgb(0, 85, 0)
+            .DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter
+            .DefaultCellStyle.SelectionBackColor = Color.FromArgb(220, 232, 224)
+            .DefaultCellStyle.SelectionForeColor = Color.FromArgb(0, 85, 0)
+            .AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill
+            .RowTemplate.Height = 40
+            .ColumnHeadersHeight = 40
+            .ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.DisableResizing
+            .AllowUserToResizeRows = False
+            .CellBorderStyle = DataGridViewCellBorderStyle.SingleHorizontal
+            .GridColor = Color.FromArgb(85, 85, 85)
+        End With
+    End Sub
+
+    ' ---------- MY GRADES ----------
+
+    Private Sub LoadGrades()
+        dgvgrades.Rows.Clear()
+        If dgvgrades.Columns.Count = 0 Then
+            For Each h In {"Assessment", "Score", "Weight", "Running Grade", "Status"}
+                dgvgrades.Columns.Add(h, h)
+            Next
+        End If
+        ' Sample data. Replace with MySQL later.
+        dgvgrades.Rows.Add("Quiz 1", "18/20", "10%", "90.0", "Passed")
+        dgvgrades.Rows.Add("Activity 2", "45/50", "15%", "90.0", "Passed")
+        dgvgrades.Rows.Add("Midterm Exam", "82/100", "25%", "82", "Passed")
+        dgvgrades.Rows.Add("Project Draft", "82/100", "20%", "85.6", "Passed")
+        dgvgrades.Rows.Add("Final Exam", "---", "30%", "Pending", "Not Yet")
+
+        dgvgrades.ClearSelection()
+        UpdateStanding()
+    End Sub
+
+    ' Weighted average of graded items only
+    Private Sub UpdateStanding()
+        Dim total As Double = 0
+        Dim weights As Double = 0
+
+        For Each row As DataGridViewRow In dgvgrades.Rows
+            Dim parts = Convert.ToString(row.Cells(1).Value).Split("/"c)
+            If parts.Length <> 2 Then Continue For   ' skips ungraded rows like "---"
+
+            Dim score, maxScore, weight As Double
+            If Double.TryParse(parts(0), score) AndAlso
+               Double.TryParse(parts(1), maxScore) AndAlso maxScore > 0 AndAlso
+               Double.TryParse(Convert.ToString(row.Cells(2).Value).TrimEnd("%"c), weight) Then
+                total += score / maxScore * 100 * weight
+                weights += weight
+            End If
+        Next
+
+        If weights > 0 Then
+            Dim pct As Double = Math.Round(total / weights, 1)
+            ' 75 is an assumed passing mark. Use your school's.
+            lblstanding.Text = "Current Standing: " & pct & "% " & If(pct >= 75, "(Passing)", "(Failing)")
+        End If
+    End Sub
+
+    Private Sub dgvGrades_CellFormatting(sender As Object, e As DataGridViewCellFormattingEventArgs) Handles dgvgrades.CellFormatting
+        If e.ColumnIndex >= 3 AndAlso e.Value IsNot Nothing Then
+            Dim t = e.Value.ToString()
+            If t = "Passed" OrElse IsNumeric(t) Then
+                e.CellStyle.BackColor = Color.FromArgb(153, 190, 165)
+            ElseIf t = "Pending" OrElse t = "Not Yet" Then
+                e.CellStyle.BackColor = Color.FromArgb(238, 220, 170)
+            End If
+        End If
+    End Sub
+
+    ' ---------- GRADE HISTORY ----------
+
+    Private Sub LoadHistory()
+        dgvHistory.Rows.Clear()
+        If dgvHistory.Columns.Count = 0 Then
+            For Each h In {"Date", "Assessment", "Old Score", "New Score", "Changed by", "Reason"}
+                dgvHistory.Columns.Add(h, h)
+            Next
+        End If
+        ' Sample data. Replace with MySQL later.
+        dgvHistory.Rows.Add("2026-08-18", "Quiz 1", "16/20", "18/20", "Prof. Cruz", "Correction of misread answer")
+        dgvHistory.Rows.Add("2026-08-15", "Activity 2", "43/50", "45/50", "Prof. Cruz", "Late submission accepted")
+        dgvHistory.Rows.Add("2026-08-20", "Midterm Exam", "78/100", "82/100", "Prof. Cruz", "Recheck of Items")
+        dgvHistory.Rows.Add("2026-08-10", "Project Draft", "---", "82/100", "Prof. Cruz", "Initial Entry")
+
+        dgvHistory.ClearSelection()
+    End Sub
+
+    ' ---------- REQUEST REVISION ----------
+
+    Private Sub LoadAssessments()
+        assessmentScores.Clear()
+        assessmentScores.Add("Quiz 1", "18/20")
+        assessmentScores.Add("Activity 2", "45/50")
+        assessmentScores.Add("Midterm Exam", "82/100")
+        assessmentScores.Add("Project Draft", "82/100")
+        ' Final Exam is left out because it has no score yet
+
+        cboAssessment.Items.Clear()
+        For Each assessmentName In assessmentScores.Keys
+            cboAssessment.Items.Add(assessmentName)
+        Next
+        cboAssessment.SelectedIndex = -1
+        txtCurrentGrade.Clear()
+    End Sub
+
+    Private Sub cboAssessment_SelectedIndexChanged(sender As Object, e As EventArgs) Handles cboAssessment.SelectedIndexChanged
+        Dim score As String = ""
+        If cboAssessment.SelectedIndex <> -1 AndAlso
+           assessmentScores.TryGetValue(cboAssessment.Text, score) Then
+            txtCurrentGrade.Text = score
+        Else
+            txtCurrentGrade.Clear()
+        End If
+    End Sub
+
+    Private Sub LoadRequests()
+        dgvRequests.Rows.Clear()
+        If dgvRequests.Columns.Count = 0 Then
+            For Each h In {"Assessment", "Requested", "Status"}
+                dgvRequests.Columns.Add(h, h)
+            Next
+        End If
+        ' Sample data. Replace with MySQL later.
+        dgvRequests.Rows.Add("Quiz 1", "+2 pts", "Pending")
+        dgvRequests.Rows.Add("Activity 2", "+5 pts", "Approved")
+        dgvRequests.Rows.Add("Midterm Exam", "Re-check", "Under Review")
+
+        dgvRequests.ClearSelection()
+    End Sub
+
+    Private Sub btnSubmitRequest_Click(sender As Object, e As EventArgs) Handles btnSubmitRequest.Click
+        If cboAssessment.SelectedIndex = -1 Then
+            MessageBox.Show("Please select an assessment.", "Missing info",
+                            MessageBoxButtons.OK, MessageBoxIcon.Warning)
+            Return
+        End If
+
+        If String.IsNullOrWhiteSpace(txtReason.Text) Then
+            MessageBox.Show("Please enter a reason for your request.", "Missing info",
+                            MessageBoxButtons.OK, MessageBoxIcon.Warning)
+            txtReason.Focus()
+            Return
+        End If
+
+        ' Block duplicate open requests for the same assessment
+        For Each row As DataGridViewRow In dgvRequests.Rows
+            Dim status = row.Cells(2).Value.ToString()
+            If row.Cells(0).Value.ToString() = cboAssessment.Text AndAlso
+               (status = "Pending" OrElse status = "Under Review") Then
+                MessageBox.Show("You already have an open request for this assessment.",
+                                "Duplicate request", MessageBoxButtons.OK, MessageBoxIcon.Information)
+                Return
+            End If
+        Next
+
+        ' Later: INSERT into the requests table here, then call LoadRequests()
+        dgvRequests.Rows.Add(cboAssessment.Text, "Re-check", "Pending")
+        dgvRequests.ClearSelection()
+
+        cboAssessment.SelectedIndex = -1
+        txtReason.Clear()
+        MessageBox.Show("Request submitted!", "Success",
+                        MessageBoxButtons.OK, MessageBoxIcon.Information)
+    End Sub
+
+    Private Sub dgvRequests_CellFormatting(sender As Object, e As DataGridViewCellFormattingEventArgs) Handles dgvRequests.CellFormatting
+        If e.ColumnIndex = 2 AndAlso e.Value IsNot Nothing Then
+            Select Case e.Value.ToString()
+                Case "Pending"
+                    e.CellStyle.BackColor = Color.FromArgb(238, 220, 170)
+                Case "Approved"
+                    e.CellStyle.BackColor = Color.FromArgb(153, 190, 165)
+                Case "Under Review"
+                    e.CellStyle.BackColor = Color.FromArgb(155, 200, 225)
+                Case "Rejected"
+                    e.CellStyle.BackColor = Color.FromArgb(225, 160, 160)
+            End Select
+        End If
+    End Sub
+
+    ' ---------- MY PERFORMANCE ----------
+
+    Private Sub LoadPerformance()
+        ' Sample data. Replace with values computed from MySQL later.
+        SetStat(lblAverageValue, "84.2", "CURRENT AVERAGE")
+        SetStat(lblPassedValue, "12", "ACTIVITIES PASSED")
+        SetStat(lblPendingValue, "2", "PENDING")
+        SetStat(lblHighestValue, "88.5", "HIGHEST SCORE")
+
+        quizPct = 90
+        activityPct = 90
+        examPct = 83
+        projectPct = 86
+        UpdateBars()
+    End Sub
+
+    ' Each stat card has two labels. This finds the pair inside the card of
+    ' "anyLabel", puts the number on the one with the bigger font and the
+    ' caption on the other, so it works whichever label is named what.
+    Private Sub SetStat(anyLabel As Label, value As String, caption As String)
+        Dim other As Label = Nothing
+        If anyLabel.Parent IsNot Nothing Then
+            For Each c As Control In anyLabel.Parent.Controls
+                If TypeOf c Is Label AndAlso c IsNot anyLabel Then
+                    other = DirectCast(c, Label)
+                    Exit For
+                End If
+            Next
+        End If
+
+        If other Is Nothing Then
+            anyLabel.Text = value   ' card only has one label
+            Return
+        End If
+
+        Dim bigLabel As Label = If(anyLabel.Font.Size >= other.Font.Size, anyLabel, other)
+        Dim smallLabel As Label = If(bigLabel Is anyLabel, other, anyLabel)
+
+        bigLabel.Text = value
+        smallLabel.Text = caption
+    End Sub
+
+    Private Sub UpdateBars()
+        SetBar(trackQuiz, fillQuiz, lblQuizPct, quizPct)
+        SetBar(trackActivity, fillactivity, lblactivitypct, activityPct)
+        SetBar(trackExam, fillexam, lblexampct, examPct)
+        SetBar(trackProject, fillproject, lblprojectpct, projectPct)
+    End Sub
+
+    Private Sub SetBar(track As Panel, fill As Panel, lbl As Label, pct As Integer)
+        pct = Math.Max(0, Math.Min(100, pct))
+        Dim usable As Integer = track.ClientSize.Width - track.Padding.Horizontal
+        fill.Visible = (pct > 0)
+        fill.Width = Math.Max(fill.Height, CInt(usable * pct / 100))
+        lbl.Text = pct & "%"
+    End Sub
+
+    Private Sub tlpBars_SizeChanged(sender As Object, e As EventArgs) Handles tlpbars.SizeChanged
+        UpdateBars()
+    End Sub
+
+    Private Sub lblHighestCaption_Click(sender As Object, e As EventArgs) Handles lblHighestCaption.Click
+
+    End Sub
+
+    Private Sub lblactivitypct_Click(sender As Object, e As EventArgs) Handles lblactivitypct.Click
+
+    End Sub
+
+    Private Sub lblPassedValue_Click(sender As Object, e As EventArgs) Handles lblPassedValue.Click
+
+    End Sub
+
+    Private Sub lblHighestValue_Click(sender As Object, e As EventArgs) Handles lblHighestValue.Click
+
+    End Sub
+
+    Private Sub lblAverageValue_Click(sender As Object, e As EventArgs) Handles lblAverageValue.Click
+
+    End Sub
+
+    Private Sub lblrole_Click(sender As Object, e As EventArgs) Handles lblrole.Click
+
+    End Sub
+
+    Private Sub Label3_Click(sender As Object, e As EventArgs) Handles Label3.Click
+
+    End Sub
+
+    Private Sub RoundedPanel1_Paint(sender As Object, e As PaintEventArgs) Handles RoundedPanel1.Paint
+
+    End Sub
+
+    Private Sub Label2_Click(sender As Object, e As EventArgs)
+
+    End Sub
+
+    Private Sub cboCourse_SelectedIndexChanged(sender As Object, e As EventArgs) Handles cboCourse.SelectedIndexChanged
+
+    End Sub
+
+    Private Sub Label1_Click(sender As Object, e As EventArgs) Handles Label1.Click
+
+    End Sub
+
+    Private Sub lblstanding_Click(sender As Object, e As EventArgs) Handles lblstanding.Click
+
+    End Sub
+
+    Private Sub Label5_Click(sender As Object, e As EventArgs) Handles Label5.Click
+
+    End Sub
+
+    Private Sub PictureBox5_Click(sender As Object, e As EventArgs) Handles PictureBox5.Click
+
+    End Sub
+
+    Private Sub Label9_Click(sender As Object, e As EventArgs) Handles Label9.Click
+
+    End Sub
+
+    Private Sub PictureBox6_Click(sender As Object, e As EventArgs) Handles PictureBox6.Click
+
+    End Sub
+
+    Private Sub Label10_Click(sender As Object, e As EventArgs) Handles Label10.Click
+
+    End Sub
+
+    Private Sub lblPendingCaption_Click(sender As Object, e As EventArgs) Handles lblPendingCaption.Click
+
+    End Sub
+
+    Private Sub lblPendingValue_Click(sender As Object, e As EventArgs) Handles lblPendingValue.Click
+
+    End Sub
+
+    Private Sub lblPassedCaption_Click(sender As Object, e As EventArgs) Handles lblPassedCaption.Click
+
+    End Sub
+
+    Private Sub pnlheader_Paint(sender As Object, e As PaintEventArgs) Handles pnlheader.Paint
+
+    End Sub
+
+
+End Class
+
+' ===== PillLabel.vb =====
+
+Imports System.Drawing
+Imports System.Drawing.Drawing2D
+Imports System.Windows.Forms
+
+Public Class PillLabel
+    Inherits Label
+
+    Private _cornerRadius As Integer = 20
+    Public Property CornerRadius As Integer
+        Get
+            Return _cornerRadius
+        End Get
+        Set(value As Integer)
+            _cornerRadius = value
+            Me.Invalidate() ' Redraw when radius changes
+        End Set
+    End Property
+
+    Protected Overrides Sub OnPaint(e As PaintEventArgs)
+        MyBase.OnPaint(e)
+
+        ' Create rounded rectangle path
+        Dim path As New GraphicsPath()
+        Dim rect As Rectangle = Me.ClientRectangle
+        Dim radius As Integer = _cornerRadius
+
+        path.AddArc(rect.X, rect.Y, radius, radius, 180, 90)
+        path.AddArc(rect.Right - radius, rect.Y, radius, radius, 270, 90)
+        path.AddArc(rect.Right - radius, rect.Bottom - radius, radius, radius, 0, 90)
+        path.AddArc(rect.X, rect.Bottom - radius, radius, radius, 90, 90)
+        path.CloseFigure()
+
+        Me.Region = New Region(path)
+    End Sub
+End Class
+
+
+' ===== ProfessorInfo.vb =====
+
+Public Class ProfessorInfo
+    Public Property Name As String
+    Public Property EmployeeID As String
+    Public Property Department As String
+    Public Property Classes As Integer
+    Public Property Status As String
+
+
+End Class
+
+Public Class StudentInfo
+    Public Property StudentID As String
+    Public Property FullName As String
+    Public Property YearLevel As Integer
+    Public Property Section As String
+    Public Property Program As String
+    Public Property Status As String      ' "Active" or "Inactive"
+End Class
+
+' ===== quickactions.vb =====
+
+Imports Windows.Win32.UI.Controls
+
+Public Class quickactions
+
+    Public Enum FormMode
+        EnterGrades
+        ViewRequests
+        ViewAuditLogs
+    End Enum
+
+    Private _mode As FormMode
+
+    ' ===== Switch between the three panels =====
+    Public Sub ShowMode(mode As FormMode)
+        _mode = mode
+        Me.DialogResult = DialogResult.None
+
+        pnlGrades.Visible = False
+        pnlRequests.Visible = False
+        pnlLogs.Visible = False
+
+        btnPrimary.Visible = True
+
+        Select Case mode
+            Case FormMode.EnterGrades
+                Me.Text = "Enter Grades"
+                Me.ClientSize = New Size(460, 470)
+                pnlGrades.Visible = True
+                btnPrimary.Text = "Save Grade"
+                txtGrade.Clear()
+                LoadStudents()
+                LoadSubjects()
+                cboStudent.SelectedIndex = -1
+                cboSubject.SelectedIndex = -1
+
+            Case FormMode.ViewRequests
+                Me.Text = "Pending Requests"
+                Me.ClientSize = New Size(700, 420)
+                pnlRequests.Visible = True
+                btnPrimary.Text = "Approve"
+
+                LoadRequests()
+
+            Case FormMode.ViewAuditLogs
+                Me.Text = "Audit Logs"
+                Me.ClientSize = New Size(780, 450)
+                pnlLogs.Visible = True
+                btnPrimary.Visible = False
+                LoadLogs()
+        End Select
+
+        Me.CenterToParent()
+    End Sub
+
+    ' ===== Bottom bar buttons =====
+    Private Sub btnPrimary_Click(sender As Object, e As EventArgs) Handles btnPrimary.Click
+        Select Case _mode
+            Case FormMode.EnterGrades : SaveGrade()
+            Case FormMode.ViewRequests : ApproveSelected()
+        End Select
+    End Sub
+
+
+
+
+
+    ' ===== Enter Grades =====
+    Private Sub SaveGrade()
+        Dim grade As Decimal
+        If cboStudent.SelectedIndex = -1 OrElse cboSubject.SelectedIndex = -1 Then
+            MessageBox.Show("Select a student and a subject.")
+            Return
+        End If
+        If Not Decimal.TryParse(txtGrade.Text, grade) Then
+            MessageBox.Show("Enter a valid numeric grade.")
+            Return
+        End If
+        ' TODO: save to MySQL + audit log row
+        MessageBox.Show("Grade saved!")
+        Me.DialogResult = DialogResult.OK
+    End Sub
+
+    Private Sub LoadStudents()
+        cboStudent.Items.Clear()
+        cboStudent.Items.AddRange(New String() {
+            "Mariano, Geoff Andreii",
+            "Condes, Hope Gian D.",
+            "Lalata, Carl Jade",
+            "Santos, Maria Angelica",
+            "Oropilla, Charles",
+            "Puyat, Ron Jacob",
+            "Buluran, Family I.",
+            "Rodas, Rodas P.",
+            "Ramos, Reago W.",
+            "Salceda, Poknat X."
+        })
+    End Sub
+
+    Private Sub LoadSubjects()
+        cboSubject.Items.Clear()
+        cboSubject.Items.AddRange(New String() {"DBMS2", "IT101"})   ' temporary test data
+    End Sub
+
+    ' ===== View Requests =====
+    Private Sub ApproveSelected()
+        If dgvrequests.CurrentRow Is Nothing Then Return
+        ' TODO: approve + audit log row
+        LoadRequests()
+    End Sub
+
+    Private Sub RejectSelected()
+        If dgvrequests.CurrentRow Is Nothing Then Return
+        ' TODO: reject + audit log row
+        LoadRequests()
+    End Sub
+
+    Private Sub LoadRequests()
+        dgvrequests.AutoGenerateColumns = True
+
+        Dim dt As New DataTable()
+        For Each c In {"Student", "Assessment", "Current Grade", "Requested", "Reason", "Status"}
+            dt.Columns.Add(c)
+        Next
+        dt.Rows.Add("Lalata, Carl Jade", "Quiz#1", "18/20", "+2pts", "Misread Answer", "Pending")
+        dt.Rows.Add("Condes, Hope Gian D.", "Final Exam", "--", "Recheck", "Item 7 correct", "Pending")
+        dt.Rows.Add("Mariano, Geoff Andreii", "Activity#2", "43/50", "+5pts", "Late Submission", "Approved")
+
+        dgvrequests.DataSource = dt
+        StyleGrid(dgvrequests)
+        dgvrequests.ClearSelection()
+    End Sub
+
+    ' ===== Audit Logs =====
+    Private Sub LoadLogs()
+        dgvLogs.AutoGenerateColumns = True
+
+        Dim dt As New DataTable()
+        For Each c In {"Action", "Student", "Item", "Date & Time", "Changed By"}
+            dt.Columns.Add(c)
+        Next
+        dt.Rows.Add("Grades Updated", "Condes, Hope Gian D.", "Midterms", "2026-08-24 09:14", "Prof. Jhun")
+        dt.Rows.Add("Revision Approved", "Mariano, Geoff Andreii", "Activity#2", "2026-08-23 15:40", "Prof. Jhun")
+        dt.Rows.Add("Grades Updated", "Lalata, Carl Jade", "Quiz#1", "2026-08-22 11:05", "Prof. Jhun")
+
+        dgvLogs.DataSource = dt
+        StyleGrid(dgvLogs)
+        dgvLogs.ClearSelection()
+    End Sub
+
+    ' ===== Shared grid styling =====
+    Private Sub StyleGrid(g As DataGridView)
+        With g
+            .AllowUserToAddRows = False          ' removes the empty * row
+            .AllowUserToDeleteRows = False
+            .AllowUserToResizeRows = False
+            .ReadOnly = True                     ' no editing
+            .RowHeadersVisible = False           ' removes the left gray column
+            .MultiSelect = False
+            .SelectionMode = DataGridViewSelectionMode.FullRowSelect
+
+            .BackgroundColor = Color.White       ' removes the gray area
+            .BorderStyle = BorderStyle.None
+            .CellBorderStyle = DataGridViewCellBorderStyle.SingleHorizontal
+            .GridColor = Color.Gainsboro
+            .AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill   ' fills the width
+            .RowTemplate.Height = 32
+
+            .EnableHeadersVisualStyles = False
+            .ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.DisableResizing
+            .ColumnHeadersHeight = 34
+            .ColumnHeadersBorderStyle = DataGridViewHeaderBorderStyle.None
+            With .ColumnHeadersDefaultCellStyle
+                .BackColor = Color.FromArgb(224, 247, 250)
+                .ForeColor = Color.FromArgb(0, 80, 0)
+                .Font = New Font("Segoe UI", 9, FontStyle.Bold)
+                .SelectionBackColor = Color.FromArgb(224, 247, 250)
+                .SelectionForeColor = Color.FromArgb(0, 80, 0)
+            End With
+
+            With .DefaultCellStyle
+                .BackColor = Color.White
+                .ForeColor = Color.FromArgb(0, 100, 0)
+                .Font = New Font("Segoe UI", 9)
+                .SelectionBackColor = Color.FromArgb(235, 250, 240)
+                .SelectionForeColor = Color.FromArgb(0, 100, 0)
+            End With
+
+            For Each c As DataGridViewColumn In .Columns
+                c.SortMode = DataGridViewColumnSortMode.NotSortable
+            Next
+        End With
+    End Sub
+
+    Private Sub AddLogColumn(name As String, header As String, weight As Single)
+        Dim c As New DataGridViewTextBoxColumn()
+        c.Name = name
+        c.DataPropertyName = name
+        c.HeaderText = header
+        c.FillWeight = weight
+        dgvLogs.Columns.Add(c)
+    End Sub
+
+End Class
+
+' ===== RoundedPanel.vb =====
+
+Imports System.Drawing.Drawing2D
+Imports System.Windows.Forms
+
+Public Class RoundedPanel
+    Inherits Panel
+
+    ' How round the corners are
+    Public Property CornerRadius As Integer = 20
+
+    ' Border customization
+    Public Property BorderColor As Color = Color.DarkGreen
+    Public Property BorderThickness As Integer = 2
+
+    Protected Overrides Sub OnPaint(e As PaintEventArgs)
+        MyBase.OnPaint(e)
+
+        Dim rect As Rectangle = Me.ClientRectangle
+        rect.Width -= 1
+        rect.Height -= 1
+
+        Using path As GraphicsPath = GetRoundedPath(rect, CornerRadius)
+            e.Graphics.SmoothingMode = SmoothingMode.AntiAlias
+            e.Graphics.FillPath(New SolidBrush(Me.BackColor), path)
+            e.Graphics.DrawPath(New Pen(BorderColor, BorderThickness), path)
+        End Using
+    End Sub
+
+    Private Function GetRoundedPath(rect As Rectangle, radius As Integer) As GraphicsPath
+        Dim path As New GraphicsPath()
+        path.AddArc(rect.X, rect.Y, radius, radius, 180, 90)
+        path.AddArc(rect.Right - radius, rect.Y, radius, radius, 270, 90)
+        path.AddArc(rect.Right - radius, rect.Bottom - radius, radius, radius, 0, 90)
+        path.AddArc(rect.X, rect.Bottom - radius, radius, radius, 90, 90)
+        path.CloseFigure()
+        Return path
+    End Function
+End Class
+
+' ===== AppSession.vb =====
+
+Imports DAUNTLESS_WOLVES_PROF.Models
+
+
+Public Module AppSession
+
+        Public Property CurrentUser As UserModel
+
+        Public ReadOnly Property IsLoggedIn As Boolean
+            Get
+                Return CurrentUser IsNot Nothing
+            End Get
+        End Property
+
+        Public ReadOnly Property IsAdmin As Boolean
+            Get
+                Return IsLoggedIn AndAlso CurrentUser.Role.Equals("Admin", StringComparison.OrdinalIgnoreCase)
+            End Get
+        End Property
+
+        Public ReadOnly Property IsTeacher As Boolean
+            Get
+                Return IsLoggedIn AndAlso CurrentUser.Role.Equals("Teacher", StringComparison.OrdinalIgnoreCase)
+            End Get
+        End Property
+
+        Public ReadOnly Property IsStudent As Boolean
+            Get
+                Return IsLoggedIn AndAlso CurrentUser.Role.Equals("Student", StringComparison.OrdinalIgnoreCase)
+            End Get
+        End Property
+
+        Public Sub StartSession(user As UserModel)
+            CurrentUser = user
+        End Sub
+
+        Public Sub ClearSession()
+            CurrentUser = Nothing
+        End Sub
+
+End Module
+
+' ===== DatabaseHelper.vb =====
+
+Imports System.Data
+Imports System.IO
+Imports System.Text.Json
+Imports MySql.Data.MySqlClient
+
+Public Class DatabaseHelper
+
+    Private Shared _connString As String
+    Private Shared ReadOnly LockObj As New Object()
+
+    Private Shared Function GetConnString() As String
+        If _connString Is Nothing Then
+            SyncLock LockObj
+                If _connString Is Nothing Then
+                    _connString = BuildConnString()
+                End If
+            End SyncLock
+        End If
+        Return _connString
+    End Function
+
+    Private Shared Function BuildConnString() As String
+        Dim host As String = "127.0.0.1"
+        Dim port As Integer = 3306
+        Dim db As String = "transparent_grading_system"
+        Dim user As String = "root"
+        Dim pass As String = ""
+
+        Dim configPath As String = Path.Combine(AppContext.BaseDirectory, "dbconfig.json")
+        If File.Exists(configPath) Then
+            Try
+                Using doc As JsonDocument = JsonDocument.Parse(File.ReadAllText(configPath))
+                    Dim root As JsonElement = doc.RootElement
+                    host = ReadText(root, "Host", host)
+                    db = ReadText(root, "Database", db)
+                    user = ReadText(root, "User", user)
+                    pass = ReadText(root, "Password", pass)
+
+                    Dim portEl As JsonElement
+                    If root.TryGetProperty("Port", portEl) AndAlso portEl.ValueKind = JsonValueKind.Number Then
+                        port = portEl.GetInt32()
+                    End If
+                End Using
+            Catch ex As JsonException
+                Throw New InvalidOperationException("dbconfig.json is not valid JSON: " & ex.Message)
+            End Try
+        End If
+
+        Dim b As New MySqlConnectionStringBuilder()
+        b.Server = host
+        b.Port = CUInt(port)
+        b.Database = db
+        b.UserID = user
+        b.Password = pass
+        b.SslMode = MySqlSslMode.Preferred
+        b.AllowZeroDateTime = True
+        Return b.ConnectionString
+    End Function
+
+    Private Shared Function ReadText(root As JsonElement, key As String, fallback As String) As String
+        Dim el As JsonElement
+        If root.TryGetProperty(key, el) AndAlso el.ValueKind = JsonValueKind.String Then
+            Return el.GetString()
+        End If
+        Return fallback
+    End Function
+
+    Public Shared Function GetConnection() As MySqlConnection
+        Dim conn As New MySqlConnection(GetConnString())
+        conn.Open()
+        Return conn
+    End Function
+
+
+    Public Shared Function ExecuteQuery(sql As String, ParamArray params As MySqlParameter()) As DataTable
+        Dim dt As New DataTable()
+        Using conn As MySqlConnection = GetConnection()
+            Using cmd As New MySqlCommand(sql, conn)
+                If params IsNot Nothing AndAlso params.Length > 0 Then
+                    cmd.Parameters.AddRange(params)
+                End If
+                Using adapter As New MySqlDataAdapter(cmd)
+                    adapter.Fill(dt)
+                End Using
+            End Using
+        End Using
+        Return dt
+    End Function
+
+    Public Shared Function ExecuteNonQuery(sql As String, ParamArray params As MySqlParameter()) As Integer
+        Using conn As MySqlConnection = GetConnection()
+            Using cmd As New MySqlCommand(sql, conn)
+                If params IsNot Nothing AndAlso params.Length > 0 Then
+                    cmd.Parameters.AddRange(params)
+                End If
+                Return cmd.ExecuteNonQuery()
+            End Using
+        End Using
+    End Function
+
+    Public Shared Function ExecuteScalar(sql As String, ParamArray params As MySqlParameter()) As Object
+        Using conn As MySqlConnection = GetConnection()
+            Using cmd As New MySqlCommand(sql, conn)
+                If params IsNot Nothing AndAlso params.Length > 0 Then
+                    cmd.Parameters.AddRange(params)
+                End If
+                Return cmd.ExecuteScalar()
+            End Using
+        End Using
+    End Function
+
+End Class
+
+' ===== PasswordHasher.vb =====
+
+Imports System.Security.Cryptography
+Imports System.Text
+
+Public Class PasswordHasher
+
+    ''' <summary>
+    ''' Verifies a raw password against a stored database hash or plain-text record.
+    ''' </summary>
+    Public Shared Function VerifyPassword(rawPassword As String, storedHash As String) As Boolean
+        If String.IsNullOrWhiteSpace(storedHash) OrElse String.IsNullOrWhiteSpace(rawPassword) Then
+            Return False
+        End If
+
+        ' 1. Plain-text match (for testing / unhashed seed data)
+        If rawPassword = storedHash Then Return True
+
+        ' 2. Built-in SHA256 hash verification
+        Dim hashedInput As String = HashSHA256(rawPassword)
+        If hashedInput.Equals(storedHash, StringComparison.OrdinalIgnoreCase) Then Return True
+
+        Return False
+    End Function
+
+    Public Shared Function HashSHA256(input As String) As String
+        Using sha256 As SHA256 = sha256.Create()
+            Dim bytes As Byte() = sha256.ComputeHash(Encoding.UTF8.GetBytes(input))
+            Dim sb As New StringBuilder()
+            For Each b As Byte In bytes
+                sb.Append(b.ToString("x2"))
+            Next
+            Return sb.ToString()
+        End Using
+    End Function
+
+End Class
+
+' ===== SecurityHelper.vb =====
+
+Imports System.Security.Cryptography
+Imports System.Text
+
+Public Class SecurityHelper
+
+    Public Shared Function HashPassword(password As String) As String
+        Return HashSHA256(password)
+    End Function
+
+    Public Shared Function VerifyPassword(password As String, storedHash As String) As Boolean
+        If String.IsNullOrEmpty(password) OrElse String.IsNullOrEmpty(storedHash) Then Return False
+        Return String.Equals(HashSHA256(password), storedHash, StringComparison.OrdinalIgnoreCase)
+    End Function
+
+    Public Shared Function HashSHA256(input As String) As String
+        If String.IsNullOrEmpty(input) Then Return String.Empty
+        Return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(input))).ToLower()
+    End Function
+
+End Class
+
+' ===== ValidationHelper.vb =====
+
+
+Imports System.Text.RegularExpressions
+
+Public Class ValidationHelper
+    Public Shared Function IsRequired(value As String) As Boolean
+        Return Not String.IsNullOrWhiteSpace(value)
+    End Function
+
+    Public Shared Function IsValidEmail(email As String) As Boolean
+        If String.IsNullOrWhiteSpace(email) Then Return False
+        Dim pattern As String = "^[^@\s]+@[^@\s]+\.[^@\s]+$"
+        Return Regex.IsMatch(email.Trim(), pattern, RegexOptions.IgnoreCase)
+    End Function
+
+    Public Shared Function IsStrongPassword(password As String) As Boolean
+        If String.IsNullOrEmpty(password) OrElse password.Length < 8 Then Return False
+        Dim hasUpper As Boolean = Regex.IsMatch(password, "[A-Z]")
+        Dim hasLower As Boolean = Regex.IsMatch(password, "[a-z]")
+        Dim hasNumber As Boolean = Regex.IsMatch(password, "[0-9]")
+        Dim hasSpecial As Boolean = Regex.IsMatch(password, "[!@#$%^&*(),.?:{}""'|<>]")
+        Return hasUpper AndAlso hasLower AndAlso hasNumber AndAlso hasSpecial
+    End Function
+
+    Public Shared Function CleanInput(input As String) As String
+        If String.IsNullOrEmpty(input) Then Return String.Empty
+        Return input.Trim()
+
+
+    End Function
+
+    Public Shared Function SanitizeInput(Input As String) As String
+        If String.IsNullOrWhiteSpace(Input) Then
+            Return String.Empty
+        End If
+        Return Input.Trim()
+    End Function
+
+    Public Shared Function IsValidScore(score As Double, maxScore As Double) As Boolean
+        Return score >= 0.0 AndAlso score <= maxScore
+    End Function
+
+    Public Shared Function IsValidWeight(weight As Double) As Boolean
+        Return weight >= 0.0 AndAlso weight <= 100.0
+    End Function
+End Class
+
+' ===== Assessment.vb =====
+
+Public Class Assessment
+    Public Property AssessmentId As Integer
+    Public Property ClassId As Integer
+    Public Property Term As String
+    Public Property Title As String
+    Public Property Type As String
+    Public Property TotalScore As Double
+    Public Property Weight As Double
+    Public Property CreatedAt As DateTime
+
+End Class
+
+' ===== AuditLog.vb =====
+
+Public Class AuditLog
+
+    Public Property LogId As Long
+    Public Property StudentId As String
+    Public Property TeacherId As String
+    Public Property AdminId As Nullable(Of Integer)
+    Public Property Action As String
+    Public Property EntityType As String
+    Public Property EntityId As String
+    Public Property OldValue As String
+    Public Property NewValue As String
+    Public Property Timestamp As DateTime
+    Public Property Details As String
+
+
+End Class
+
+' ===== RevisionRequest.vb =====
+
+Public Class RevisionRequest
+    Public Property RequestId As Integer
+    Public Property GradeId As Integer
+    Public Property RequestedPoints As Nullable(Of Double)
+    Public Property Reason As String
+    Public Property Status As String
+    Public Property RequestedAt As DateTime
+    Public Property ReviewedAt As Nullable(Of DateTime)
+    Public Property ReviewedBy As String
+
+End Class
+
+' ===== StudentGrade.vb =====
+
+Public Class StudentGrade
+    Public Property GradeId As Integer
+    Public Property EnrollmentId As Integer
+    Public Property AssessmentId As Integer
+    Public Property Score As Nullable(Of Double)
+    Public Property Remarks As String
+    Public Property CreatedAt As DateTime
+    Public Property UpdatedAt As DateTime
+End Class
+
+' ===== UserModel.vb =====
+
+Namespace Models
+    Public Class UserModel
+        Public Property UserId As String
+        Public Property FullName As String
+        Public Property Email As String
+        Public Property Role As String
+        Public Property DepartmentOrProgram As String
+
+        Public Sub New()
+        End Sub
+
+        Public Sub New(id As String, fullName As String, email As String, role As String, Optional deptOrProg As String = "")
+            Me.UserId = id
+            Me.FullName = fullName
+            Me.Email = email
+            Me.Role = role
+            Me.DepartmentOrProgram = deptOrProg
+        End Sub
+    End Class
+End Namespace
+
+' ===== AuditService.vb =====
+
+Imports MySql.Data.MySqlClient
+Imports System.Data
+
+Public Class AuditService
+
+    ' Standalone: opens its own connection
+    Public Shared Function LogAction(actorRole As String, actorUserId As String, action As String,
+                                     entityType As String, entityId As String,
+                                     Optional oldValue As String = Nothing,
+                                     Optional newValue As String = Nothing,
+                                     Optional details As String = Nothing) As Boolean
+        Try
+            Using conn As MySqlConnection = DatabaseHelper.GetConnection()
+                Return InsertLog(conn, Nothing, actorRole, actorUserId, action, entityType, entityId, oldValue, newValue, details)
+            End Using
+        Catch ex As Exception
+            Console.WriteLine("[AUDIT LOG ERROR] " & ex.Message)
+            Return False
+        End Try
+    End Function
+
+    ' Inside an existing transaction (so the log rolls back together with the grade change)
+    Public Shared Function LogActionTx(conn As MySqlConnection, tx As MySqlTransaction,
+                                       actorRole As String, actorUserId As String, action As String,
+                                       entityType As String, entityId As String,
+                                       Optional oldValue As String = Nothing,
+                                       Optional newValue As String = Nothing,
+                                       Optional details As String = Nothing) As Boolean
+        Return InsertLog(conn, tx, actorRole, actorUserId, action, entityType, entityId, oldValue, newValue, details)
+    End Function
+
+    Private Shared Function InsertLog(conn As MySqlConnection, tx As MySqlTransaction,
+                                      actorRole As String, actorUserId As String, action As String,
+                                      entityType As String, entityId As String,
+                                      oldValue As String, newValue As String, details As String) As Boolean
+        Dim studentId As Object = DBNull.Value
+        Dim teacherId As Object = DBNull.Value
+        Dim adminId As Object = DBNull.Value
+
+        Select Case actorRole.Trim().ToLower()
+            Case "student"
+                studentId = actorUserId
+            Case "teacher"
+                teacherId = actorUserId
+            Case "admin"
+                Dim parsed As Integer
+                If Not Integer.TryParse(actorUserId, parsed) Then
+                    Throw New ArgumentException("Admin id must be numeric.")
+                End If
+                adminId = parsed
+            Case Else
+                Throw New ArgumentException("Unknown actor role: " & actorRole)
+        End Select
+
+        Dim sql As String =
+            "INSERT INTO auditlog (student_id, teacher_id, admin_id, action, entity_type, entity_id, old_value, new_value, details) " &
+            "VALUES (@StudentId, @TeacherId, @AdminId, @Action, @EntityType, @EntityId, @OldVal, @NewVal, @Details)"
+
+        Using cmd As New MySqlCommand(sql, conn, tx)
+            cmd.Parameters.AddWithValue("@StudentId", studentId)
+            cmd.Parameters.AddWithValue("@TeacherId", teacherId)
+            cmd.Parameters.AddWithValue("@AdminId", adminId)
+            cmd.Parameters.AddWithValue("@Action", Clip(action, 100))
+            cmd.Parameters.AddWithValue("@EntityType", Clip(entityType, 50))
+            cmd.Parameters.AddWithValue("@EntityId", Clip(entityId, 20))
+            cmd.Parameters.AddWithValue("@OldVal", OrNull(oldValue, 100))
+            cmd.Parameters.AddWithValue("@NewVal", OrNull(newValue, 100))
+            cmd.Parameters.AddWithValue("@Details", OrNull(details, 500))
+            Return cmd.ExecuteNonQuery() > 0
+        End Using
+    End Function
+
+    ' Trim to the column length so the insert doesn't fail with "Data too long"
+    Private Shared Function Clip(s As String, maxLen As Integer) As String
+        If s Is Nothing Then Return ""
+        Return If(s.Length > maxLen, s.Substring(0, maxLen), s)
+    End Function
+
+    Private Shared Function OrNull(s As String, maxLen As Integer) As Object
+        If String.IsNullOrEmpty(s) Then Return DBNull.Value
+        Return Clip(s, maxLen)
+    End Function
+
+    Public Shared Function GetLogsByActor(actorRole As String, actorUserId As String) As DataTable
+        Dim col As String
+        Select Case actorRole.Trim().ToLower()
+            Case "student" : col = "student_id"
+            Case "teacher" : col = "teacher_id"
+            Case "admin" : col = "admin_id"
+            Case Else : Return New DataTable()
+        End Select
+
+        Dim sql As String =
+            "SELECT log_id, student_id, teacher_id, admin_id, action, entity_type, entity_id, old_value, new_value, timestamp, details " &
+            "FROM auditlog WHERE " & col & " = @ActorId ORDER BY timestamp DESC"
+
+        Return DatabaseHelper.ExecuteQuery(sql, {New MySqlParameter("@ActorId", actorUserId)})
+    End Function
+
+End Class
+
+' ===== AuthService.vb =====
+
+Imports MySql.Data.MySqlClient
+Imports System.Data
+Imports DAUNTLESS_WOLVES_PROF.Core
+Imports DAUNTLESS_WOLVES_PROF.Models
+
+Public Class AuthService
+
+    Public Function VerifyLogin(login As String, rawPassword As String) As UserModel
+        Dim cleanLogin As String = ValidationHelper.CleanInput(login)
+        If cleanLogin = "" OrElse String.IsNullOrEmpty(rawPassword) Then Return Nothing
+
+        ' Cast IDs to CHAR to prevent MySQL UNION data type mismatch conflicts
+        Dim sql As String =
+            "SELECT 'Admin' AS Role, CAST(admin_id AS CHAR) AS UserId, full_name AS FullName, email, password_hash " &
+            "FROM admin WHERE email = @Login " &
+            "UNION ALL " &
+            "SELECT 'Teacher', CAST(teacher_id AS CHAR), full_name, email, password_hash " &
+            "FROM teacher WHERE (email = @Login OR teacher_id = @Login) AND status = 'Active' " &
+            "UNION ALL " &
+            "SELECT 'Student', CAST(student_id AS CHAR), full_name, email, password_hash " &
+            "FROM student WHERE (email = @Login OR student_id = @Login) AND status = 'Active'"
+
+        Dim params As MySqlParameter() = {New MySqlParameter("@Login", cleanLogin)}
+        Dim dt As DataTable = DatabaseHelper.ExecuteQuery(sql, params)
+
+        For Each row As DataRow In dt.Rows
+            If SecurityHelper.VerifyPassword(rawPassword, row("password_hash").ToString()) Then
+                Return New UserModel With {
+                    .UserId = row("UserId").ToString(),
+                    .FullName = row("FullName").ToString(),
+                    .Email = row("email").ToString(),
+                    .Role = row("Role").ToString()
+                }
+            End If
+        Next
+
+        Return Nothing
+    End Function
+
+End Class
+
+' ===== ExportService.vb =====
+
+Imports System.Data
+Imports System.Drawing
+Imports System.Drawing.Printing
+Imports System.IO
+Imports System.Text
+
+Public Class ExportService
+
+
+    Public Shared Function ExportToCSV(dt As DataTable, filePath As String) As Boolean
+        Try
+            If dt Is Nothing OrElse dt.Rows.Count = 0 Then
+                Console.WriteLine("[EXPORT WARNING] No data available to export.")
+                Return False
+            End If
+
+            Using writer As New StreamWriter(filePath, False, Encoding.UTF8)
+                ' Header Row
+                Dim columnHeaders As New List(Of String)()
+                For Each col As DataColumn In dt.Columns
+                    columnHeaders.Add($"""{col.ColumnName.Replace("""", """""")}""")
+                Next
+                writer.WriteLine(String.Join(",", columnHeaders))
+
+                ' Data Rows
+                For Each row As DataRow In dt.Rows
+                    Dim rowFields As New List(Of String)()
+                    For Each col As DataColumn In dt.Columns
+                        Dim cellValue As String = row(col).ToString().Replace("""", """""")
+                        rowFields.Add($"""{cellValue}""")
+                    Next
+                    writer.WriteLine(String.Join(",", rowFields))
+                Next
+            End Using
+            Return True
+        Catch ex As Exception
+            Console.WriteLine("[CSV EXPORT ERROR] " & ex.Message)
+            Return False
+        End Try
+    End Function
+
+
+    Public Shared Function ExportToPDF(dt As DataTable, documentTitle As String, filePath As String) As Boolean
+        If dt Is Nothing OrElse dt.Rows.Count = 0 Then Return False
+
+        Try
+            Dim printDoc As New PrintDocument()
+            printDoc.PrinterSettings.PrinterName = "Microsoft Print to PDF"
+            printDoc.PrinterSettings.PrintToFile = True
+            printDoc.PrinterSettings.PrintFileName = filePath
+
+            Dim rowIndex As Integer = 0
+
+            AddHandler printDoc.PrintPage, Sub(sender As Object, e As PrintPageEventArgs)
+                                               Dim fontHeader As New Font("Arial", 14, FontStyle.Bold)
+                                               Dim fontColumn As New Font("Arial", 10, FontStyle.Bold)
+                                               Dim fontBody As New Font("Arial", 9, FontStyle.Regular)
+
+                                               Dim x As Single = 40
+                                               Dim y As Single = 40
+                                               Dim rowHeight As Single = 25
+
+                                               ' Title
+                                               e.Graphics.DrawString(documentTitle, fontHeader, Brushes.Black, x, y)
+                                               y += 40
+
+                                               ' Table Headers
+                                               Dim colWidth As Single = (e.MarginBounds.Width - 40) / dt.Columns.Count
+                                               For c As Integer = 0 To dt.Columns.Count - 1
+                                                   e.Graphics.DrawString(dt.Columns(c).ColumnName, fontColumn, Brushes.DarkBlue, x + (c * colWidth), y)
+                                               Next
+                                               y += rowHeight
+                                               e.Graphics.DrawLine(Pens.Black, x, y, x + (dt.Columns.Count * colWidth), y)
+                                               y += 5
+
+                                               ' Data Rows
+                                               While rowIndex < dt.Rows.Count
+                                                   For c As Integer = 0 To dt.Columns.Count - 1
+                                                       Dim cellVal As String = dt.Rows(rowIndex)(c).ToString()
+                                                       e.Graphics.DrawString(cellVal, fontBody, Brushes.Black, x + (c * colWidth), y)
+                                                   Next
+                                                   y += rowHeight
+                                                   rowIndex += 1
+
+                                                   ' Check for Page Overflow
+                                                   If y + rowHeight > e.MarginBounds.Bottom Then
+                                                       e.HasMorePages = True
+                                                       Return
+                                                   End If
+                                               End While
+
+                                               e.HasMorePages = False
+                                           End Sub
+
+            printDoc.Print()
+            Return True
+        Catch ex As Exception
+            Console.WriteLine("[PDF EXPORT ERROR] " & ex.Message)
+            Return False
+        End Try
+    End Function
+
+End Class
+
+' ===== GradeCalculator.vb =====
+
+' Pure grade math. No database, so it is easy to test.
+Public Class GradeCalculator
+
+    ' Passing mark. Change it here if your school uses a different one.
+    Public Const PassingGrade As Double = 75.0
+
+    Public Shared Function CalculateScorePercentage(score As Double, totalScore As Double) As Double
+        If totalScore <= 0 Then Return 0.0
+        Return Math.Round((score / totalScore) * 100, 2)
+    End Function
+
+    Public Shared Function DetermineRemarks(percentage As Double) As String
+        Return If(percentage >= PassingGrade, "Passed", "Needs Improvement")
+    End Function
+
+    ' Weighted running grade over graded items only. Nothing graded yet = Nothing.
+    Public Shared Function CalculateRunningGrade(items As IEnumerable(Of ScoreItem)) As Double?
+        Dim earned As Double = 0.0
+        Dim weightUsed As Double = 0.0
+
+        For Each it As ScoreItem In items
+            If it.Score.HasValue AndAlso it.TotalScore > 0 AndAlso it.Weight > 0 Then
+                earned += (it.Score.Value / it.TotalScore) * it.Weight
+                weightUsed += it.Weight
+            End If
+        Next
+
+        If weightUsed = 0 Then Return Nothing
+        Return Math.Round(earned / weightUsed * 100, 2)
+    End Function
+
+    Public Shared Function GetStatus(runningGrade As Double?) As String
+        If Not runningGrade.HasValue Then Return "Not Yet"
+        Return If(runningGrade.Value >= PassingGrade, "Passed", "At risk")
+    End Function
+
+End Class
+
+' One graded (or not yet graded) item, used by the calculator
+Public Class ScoreItem
+    Public ReadOnly Property Score As Double?
+    Public ReadOnly Property TotalScore As Double
+    Public ReadOnly Property Weight As Double
+
+    Public Sub New(score As Double?, totalScore As Double, weight As Double)
+        Me.Score = score
+        Me.TotalScore = totalScore
+        Me.Weight = weight
+    End Sub
+End Class
+
+' ===== GradeService.vb =====
+
+Imports System.Data
+Imports System.Globalization
+Imports System.IO
+Imports MySql.Data.MySqlClient
+
+Public Class GradeService
+
+    ' =========================================================
+    '  RECORD SCORE (one transaction: score + running grade + audit row)
+    ' =========================================================
+
+    Public Function RecordScore(enrollmentId As Integer, assessmentId As Integer,
+                                newScore As Double, teacherId As String,
+                                Optional reason As String = Nothing) As OperationResult
+        Try
+            Using conn As MySqlConnection = DatabaseHelper.GetConnection()
+                Using tx As MySqlTransaction = conn.BeginTransaction()
+                    Try
+                        Dim res As OperationResult = RecordScoreTx(conn, tx, enrollmentId, assessmentId, newScore, teacherId, reason)
+                        If res.Success Then tx.Commit() Else tx.Rollback()
+                        Return res
+                    Catch
+                        tx.Rollback()
+                        Throw
+                    End Try
+                End Using
+            End Using
+        Catch ex As Exception
+            Console.WriteLine("[RECORD SCORE ERROR] " & ex.Message)
+            Return OperationResult.Fail("Could not save the score: " & ex.Message)
+        End Try
+    End Function
+
+    ' Same logic inside a transaction somebody else owns (the clarification approval will reuse this).
+    ' It never commits or rolls back by itself.
+    Public Function RecordScoreTx(conn As MySqlConnection, tx As MySqlTransaction,
+                                  enrollmentId As Integer, assessmentId As Integer,
+                                  newScore As Double, teacherId As String,
+                                  Optional reason As String = Nothing) As OperationResult
+
+        ' 1) Who owns this class, and how many points is the assessment worth?
+        Dim totalScore As Double = 0
+        Dim title As String = ""
+        Dim ownerId As String = ""
+        Dim sameClass As Boolean = False
+
+        Dim infoSql As String =
+            "SELECT a.total_score, a.title, c.teacher_id, (a.class_id = e.class_id) AS same_class " &
+            "FROM enrollment e " &
+            "JOIN class c ON e.class_id = c.class_id " &
+            "JOIN assessment a ON a.assessment_id = @AssessmentId " &
+            "WHERE e.enrollment_id = @EnrollmentId"
+
+        Using cmd As New MySqlCommand(infoSql, conn, tx)
+            cmd.Parameters.AddWithValue("@AssessmentId", assessmentId)
+            cmd.Parameters.AddWithValue("@EnrollmentId", enrollmentId)
+            Using r As MySqlDataReader = cmd.ExecuteReader()
+                If Not r.Read() Then Return OperationResult.Fail("Enrollment or assessment not found.")
+                totalScore = Convert.ToDouble(r.GetValue(0))
+                title = r.GetValue(1).ToString()
+                ownerId = r.GetValue(2).ToString()
+                sameClass = (Convert.ToInt32(r.GetValue(3)) = 1)
+            End Using
+        End Using
+
+        If Not String.Equals(ownerId, teacherId, StringComparison.OrdinalIgnoreCase) Then
+            Return OperationResult.Fail("You can only record scores for your own classes.")
+        End If
+        If Not sameClass Then
+            Return OperationResult.Fail("That assessment belongs to a different class.")
+        End If
+        If Not ValidationHelper.IsValidScore(newScore, totalScore) Then
+            Return OperationResult.Fail("Score must be between 0 and " & Fmt(totalScore) & ".")
+        End If
+
+        ' 2) Lock the current row and read the old score (NULL = not graded yet)
+        Dim oldScore As Double? = Nothing
+        Dim lockSql As String = "SELECT score FROM studentgrade WHERE enrollment_id = @EnrollmentId AND assessment_id = @AssessmentId FOR UPDATE"
+        Using cmd As New MySqlCommand(lockSql, conn, tx)
+            cmd.Parameters.AddWithValue("@EnrollmentId", enrollmentId)
+            cmd.Parameters.AddWithValue("@AssessmentId", assessmentId)
+            oldScore = ToNullableDouble(cmd.ExecuteScalar())
+        End Using
+
+        If oldScore.HasValue AndAlso oldScore.Value = newScore Then
+            Return OperationResult.Ok("Score unchanged.")
+        End If
+
+        ' 3) Save the score (the row usually exists already; insert if it does not)
+        Dim upsertSql As String =
+            "INSERT INTO studentgrade (enrollment_id, assessment_id, score, remarks) " &
+            "VALUES (@EnrollmentId, @AssessmentId, @Score, @Remarks) " &
+            "ON DUPLICATE KEY UPDATE score = VALUES(score), remarks = VALUES(remarks)"
+        Using cmd As New MySqlCommand(upsertSql, conn, tx)
+            cmd.Parameters.AddWithValue("@EnrollmentId", enrollmentId)
+            cmd.Parameters.AddWithValue("@AssessmentId", assessmentId)
+            cmd.Parameters.AddWithValue("@Score", newScore)
+            cmd.Parameters.AddWithValue("@Remarks", GradeCalculator.DetermineRemarks(GradeCalculator.CalculateScorePercentage(newScore, totalScore)))
+            cmd.ExecuteNonQuery()
+        End Using
+
+        ' 4) Refresh the cached running grade on the enrollment
+        RefreshRunningGrade(conn, tx, enrollmentId)
+
+        ' 5) Audit row (same transaction, so it rolls back with the score)
+        Dim gradeId As String
+        Using cmd As New MySqlCommand("SELECT grade_id FROM studentgrade WHERE enrollment_id = @EnrollmentId AND assessment_id = @AssessmentId", conn, tx)
+            cmd.Parameters.AddWithValue("@EnrollmentId", enrollmentId)
+            cmd.Parameters.AddWithValue("@AssessmentId", assessmentId)
+            gradeId = cmd.ExecuteScalar().ToString()
+        End Using
+
+        Dim oldText As String = Nothing
+        If oldScore.HasValue Then oldText = Fmt(oldScore.Value) & "/" & Fmt(totalScore)
+
+        AuditService.LogActionTx(conn, tx, "Teacher", teacherId,
+                                 If(oldScore.HasValue, "Updated score", "Recorded score"),
+                                 "StudentGrade", gradeId,
+                                 oldText, Fmt(newScore) & "/" & Fmt(totalScore), reason)
+
+        Return OperationResult.Ok("Saved " & title & ": " & Fmt(newScore) & "/" & Fmt(totalScore))
+    End Function
+
+    Private Shared Function RefreshRunningGrade(conn As MySqlConnection, tx As MySqlTransaction, enrollmentId As Integer) As Double?
+        Dim items As New List(Of ScoreItem)()
+        Dim sql As String =
+            "SELECT sg.score, a.total_score, a.weight " &
+            "FROM studentgrade sg JOIN assessment a ON sg.assessment_id = a.assessment_id " &
+            "WHERE sg.enrollment_id = @EnrollmentId"
+
+        Using cmd As New MySqlCommand(sql, conn, tx)
+            cmd.Parameters.AddWithValue("@EnrollmentId", enrollmentId)
+            Using r As MySqlDataReader = cmd.ExecuteReader()
+                While r.Read()
+                    items.Add(New ScoreItem(ToNullableDouble(r.GetValue(0)),
+                                            Convert.ToDouble(r.GetValue(1)),
+                                            Convert.ToDouble(r.GetValue(2))))
+                End While
+            End Using
+        End Using
+
+        Dim running As Double? = GradeCalculator.CalculateRunningGrade(items)
+
+        Using cmd As New MySqlCommand("UPDATE enrollment SET running_grade = @Running WHERE enrollment_id = @EnrollmentId", conn, tx)
+            If running.HasValue Then
+                cmd.Parameters.AddWithValue("@Running", running.Value)
+            Else
+                cmd.Parameters.AddWithValue("@Running", DBNull.Value)
+            End If
+            cmd.Parameters.AddWithValue("@EnrollmentId", enrollmentId)
+            cmd.ExecuteNonQuery()
+        End Using
+
+        Return running
+    End Function
+
+    ' One-time helper: fills running_grade for every enrollment (the seed data has them all NULL)
+    Public Function RecalculateAllRunningGrades() As Integer
+        Using conn As MySqlConnection = DatabaseHelper.GetConnection()
+            Using tx As MySqlTransaction = conn.BeginTransaction()
+                Dim ids As New List(Of Integer)()
+                Using cmd As New MySqlCommand("SELECT enrollment_id FROM enrollment", conn, tx)
+                    Using r As MySqlDataReader = cmd.ExecuteReader()
+                        While r.Read()
+                            ids.Add(Convert.ToInt32(r.GetValue(0)))
+                        End While
+                    End Using
+                End Using
+
+                For Each id As Integer In ids
+                    RefreshRunningGrade(conn, tx, id)
+                Next
+
+                tx.Commit()
+                Return ids.Count
+            End Using
+        End Using
+    End Function
+
+    ' =========================================================
+    '  READ QUERIES (every one checks who is asking)
+    ' =========================================================
+
+    ' Teacher's class dropdown
+    Public Function GetClassesByTeacher(teacherId As String) As DataTable
+        Dim sql As String =
+            "SELECT c.class_id, c.course_code, co.course_name, c.section, c.semester, c.academic_year, " &
+            "       COUNT(e.enrollment_id) AS student_count " &
+            "FROM class c " &
+            "JOIN course co ON c.course_code = co.course_code " &
+            "LEFT JOIN enrollment e ON e.class_id = c.class_id " &
+            "WHERE c.teacher_id = @TeacherId " &
+            "GROUP BY c.class_id, c.course_code, co.course_name, c.section, c.semester, c.academic_year " &
+            "ORDER BY c.course_code, c.section"
+        Return DatabaseHelper.ExecuteQuery(sql, {New MySqlParameter("@TeacherId", teacherId)})
+    End Function
+
+    ' Students in one of the teacher's classes
+    Public Function GetEnrollmentsByClass(classId As Integer, teacherId As String) As DataTable
+        Dim sql As String =
+            "SELECT e.enrollment_id, s.student_id, s.full_name, e.running_grade " &
+            "FROM enrollment e " &
+            "JOIN student s ON e.student_id = s.student_id " &
+            "JOIN class c ON e.class_id = c.class_id " &
+            "WHERE e.class_id = @ClassId AND c.teacher_id = @TeacherId " &
+            "ORDER BY s.full_name"
+        Return DatabaseHelper.ExecuteQuery(sql, {New MySqlParameter("@ClassId", classId), New MySqlParameter("@TeacherId", teacherId)})
+    End Function
+
+    ' Student's own classes (for the course dropdown on My Grades)
+    Public Function GetEnrollmentsByStudent(studentId As String) As DataTable
+        Dim sql As String =
+            "SELECT e.enrollment_id, c.class_id, c.course_code, co.course_name, c.section, e.running_grade " &
+            "FROM enrollment e " &
+            "JOIN class c ON e.class_id = c.class_id " &
+            "JOIN course co ON c.course_code = co.course_code " &
+            "WHERE e.student_id = @StudentId " &
+            "ORDER BY c.course_code"
+        Return DatabaseHelper.ExecuteQuery(sql, {New MySqlParameter("@StudentId", studentId)})
+    End Function
+
+    ' Student's own grades for one enrollment (the student id check blocks peeking at others)
+    Public Function GetGradesForStudent(enrollmentId As Integer, studentId As String) As DataTable
+        Dim sql As String =
+            "SELECT sg.grade_id, a.term, a.title, a.type, sg.score, a.total_score, a.weight, sg.remarks, sg.updated_at " &
+            "FROM studentgrade sg " &
+            "JOIN assessment a ON sg.assessment_id = a.assessment_id " &
+            "JOIN enrollment e ON sg.enrollment_id = e.enrollment_id " &
+            "WHERE sg.enrollment_id = @EnrollmentId AND e.student_id = @StudentId " &
+            "ORDER BY a.term, a.created_at, a.assessment_id"
+        Return DatabaseHelper.ExecuteQuery(sql, {New MySqlParameter("@EnrollmentId", enrollmentId), New MySqlParameter("@StudentId", studentId)})
+    End Function
+
+    ' Grade History screen: reads score changes from auditlog
+    Public Function GetGradeHistoryForStudent(studentId As String) As DataTable
+        Dim sql As String =
+            "SELECT al.timestamp AS changed_at, a.title AS assessment, al.old_value, al.new_value, " &
+            "       COALESCE(t.full_name, al.teacher_id) AS changed_by, al.details AS reason " &
+            "FROM auditlog al " &
+            "JOIN studentgrade sg ON sg.grade_id = CAST(al.entity_id AS UNSIGNED) " &
+            "JOIN enrollment e ON sg.enrollment_id = e.enrollment_id " &
+            "JOIN assessment a ON sg.assessment_id = a.assessment_id " &
+            "LEFT JOIN teacher t ON al.teacher_id = t.teacher_id " &
+            "WHERE al.entity_type = 'StudentGrade' AND e.student_id = @StudentId " &
+            "ORDER BY al.timestamp DESC, al.log_id DESC"
+        Return DatabaseHelper.ExecuteQuery(sql, {New MySqlParameter("@StudentId", studentId)})
+    End Function
+
+    ' Class Grades table: one row per student, one column per assessment.
+    ' term = "All", "Midterm" or "Finals" ("Midterms" is accepted too).
+    ' Assessment columns are named "A<assessment_id>" and the title is in the column Caption.
+    Public Function GetClassGradeSheet(classId As Integer, teacherId As String,
+                                       Optional term As String = "All") As DataTable
+        If term = "Midterms" Then term = "Midterm"
+        Dim filterTerm As Boolean = Not String.IsNullOrEmpty(term) AndAlso
+                                    Not term.Equals("All", StringComparison.OrdinalIgnoreCase)
+
+        ' Assessment columns (empty if this teacher does not own the class)
+        Dim aSql As String =
+            "SELECT a.assessment_id, a.title FROM assessment a " &
+            "JOIN class c ON a.class_id = c.class_id " &
+            "WHERE a.class_id = @ClassId AND c.teacher_id = @TeacherId"
+        Dim aParams As New List(Of MySqlParameter) From {
+            New MySqlParameter("@ClassId", classId),
+            New MySqlParameter("@TeacherId", teacherId)}
+        If filterTerm Then
+            aSql &= " AND a.term = @Term"
+            aParams.Add(New MySqlParameter("@Term", term))
+        End If
+        aSql &= " ORDER BY a.term, a.created_at, a.assessment_id"
+        Dim assessments As DataTable = DatabaseHelper.ExecuteQuery(aSql, aParams.ToArray())
+
+        Dim students As DataTable = GetEnrollmentsByClass(classId, teacherId)
+
+        Dim gradesSql As String =
+            "SELECT sg.enrollment_id, sg.assessment_id, sg.score, a.total_score " &
+            "FROM studentgrade sg " &
+            "JOIN assessment a ON sg.assessment_id = a.assessment_id " &
+            "JOIN enrollment e ON sg.enrollment_id = e.enrollment_id " &
+            "JOIN class c ON e.class_id = c.class_id " &
+            "WHERE e.class_id = @ClassId AND c.teacher_id = @TeacherId"
+        Dim grades As DataTable = DatabaseHelper.ExecuteQuery(gradesSql,
+            {New MySqlParameter("@ClassId", classId), New MySqlParameter("@TeacherId", teacherId)})
+
+        Dim cells As New Dictionary(Of String, String)()
+        For Each g As DataRow In grades.Rows
+            Dim key As String = g("enrollment_id").ToString() & ":" & g("assessment_id").ToString()
+            If Convert.IsDBNull(g("score")) Then
+                cells(key) = "-"
+            Else
+                cells(key) = Fmt(Convert.ToDouble(g("score"))) & "/" & Fmt(Convert.ToDouble(g("total_score")))
+            End If
+        Next
+
+        Dim sheet As New DataTable()
+        sheet.Columns.Add("EnrollmentId", GetType(Integer))
+        sheet.Columns.Add("StudentId", GetType(String))
+        sheet.Columns.Add("Student", GetType(String))
+        For Each a As DataRow In assessments.Rows
+            Dim col As DataColumn = sheet.Columns.Add("A" & a("assessment_id").ToString(), GetType(String))
+            col.Caption = a("title").ToString()
+        Next
+        sheet.Columns.Add("RunningGrade", GetType(Double))
+        sheet.Columns.Add("Status", GetType(String))
+
+        For Each s As DataRow In students.Rows
+            Dim row As DataRow = sheet.NewRow()
+            row("EnrollmentId") = Convert.ToInt32(s("enrollment_id"))
+            row("StudentId") = s("student_id").ToString()
+            row("Student") = s("full_name").ToString()
+
+            For Each a As DataRow In assessments.Rows
+                Dim cell As String = Nothing
+                If Not cells.TryGetValue(s("enrollment_id").ToString() & ":" & a("assessment_id").ToString(), cell) Then
+                    cell = "-"
+                End If
+                row("A" & a("assessment_id").ToString()) = cell
+            Next
+
+            Dim rg As Double? = ToNullableDouble(s("running_grade"))
+            If rg.HasValue Then
+                row("RunningGrade") = rg.Value
+            Else
+                row("RunningGrade") = DBNull.Value
+            End If
+            row("Status") = GradeCalculator.GetStatus(rg)
+
+            sheet.Rows.Add(row)
+        Next
+
+        Return sheet
+    End Function
+
+    ' =========================================================
+    '  CSV IMPORT (reuses RecordScore, so every row is checked and audited)
+    ' =========================================================
+
+    Public Function BulkImportGradesFromCSV(classId As Integer, assessmentId As Integer,
+                                            filePath As String, teacherId As String) As (SuccessCount As Integer, FailCount As Integer)
+        Dim successCount As Integer = 0
+        Dim failCount As Integer = 0
+
+        If Not File.Exists(filePath) Then Return (0, 0)
+
+        Dim lines() As String = File.ReadAllLines(filePath)
+
+        ' Row 0 is the header
+        For i As Integer = 1 To lines.Length - 1
+            Dim line As String = lines(i).Trim()
+            If String.IsNullOrWhiteSpace(line) Then Continue For
+
+            Dim parts() As String = line.Split(","c)
+            If parts.Length < 2 Then
+                failCount += 1
+                Continue For
+            End If
+
+            Dim studentId As String = parts(0).Trim().Replace("""", "")
+            Dim scoreVal As Double
+            If Not Double.TryParse(parts(1).Trim().Replace("""", ""), NumberStyles.Float, CultureInfo.InvariantCulture, scoreVal) Then
+                failCount += 1
+                Continue For
+            End If
+
+            Dim enrollmentId As Integer = GetEnrollmentIdByStudentAndClass(studentId, classId)
+            If enrollmentId <= 0 Then
+                failCount += 1
+                Continue For
+            End If
+
+            If RecordScore(enrollmentId, assessmentId, scoreVal, teacherId, "Bulk CSV Upload").Success Then
+                successCount += 1
+            Else
+                failCount += 1
+            End If
+        Next
+
+        Return (successCount, failCount)
+    End Function
+
+    Private Function GetEnrollmentIdByStudentAndClass(studentId As String, classId As Integer) As Integer
+        Dim sql As String = "SELECT enrollment_id FROM enrollment WHERE student_id = @StudentId AND class_id = @ClassId"
+        Dim result As Object = DatabaseHelper.ExecuteScalar(sql,
+            {New MySqlParameter("@StudentId", studentId), New MySqlParameter("@ClassId", classId)})
+        If result IsNot Nothing AndAlso Not Convert.IsDBNull(result) Then
+            Return Convert.ToInt32(result)
+        End If
+        Return 0
+    End Function
+
+    ' =========================================================
+    '  SMALL HELPERS
+    ' =========================================================
+
+    Private Shared Function ToNullableDouble(o As Object) As Double?
+        If o Is Nothing OrElse Convert.IsDBNull(o) Then Return Nothing
+        Return Convert.ToDouble(o)
+    End Function
+
+    ' 18 -> "18", 92.5 -> "92.5"
+    Private Shared Function Fmt(value As Double) As String
+        Return value.ToString("0.##", CultureInfo.InvariantCulture)
+    End Function
+
+End Class
+
+' ===== OperationResult.vb =====
+
+Public Class OperationResult
+    ' What the service methods return, so the UI can show a real message
+    Public Property Success As Boolean
+    Public Property Message As String
+
+    Public Shared Function Ok(Optional message As String = "") As OperationResult
+        Return New OperationResult With {.Success = True, .Message = message}
+    End Function
+
+    Public Shared Function Fail(message As String) As OperationResult
+        Return New OperationResult With {.Success = False, .Message = message}
+    End Function
+End Class
+
+' ===== RevisionRequestService.vb =====
+
+Imports MySql.Data.MySqlClient
+Imports System.Data
+Imports DAUNTLESS_WOLVES_PROF.Core
+Imports DAUNTLESS_WOLVES_PROF.Models
+
+Public Class RevisionRequestService
+
+    Public Function SubmitRequest(request As RevisionRequest, studentId As String) As Boolean
+        Dim sql As String = "INSERT INTO revisionrequest (grade_id, requested_points, reason, status, requested_at) " &
+                            "VALUES (@GradeId, @RequestedPoints, @Reason, 'Pending', NOW())"
+
+        Dim params As MySqlParameter() = {
+            New MySqlParameter("@GradeId", request.GradeId),
+            New MySqlParameter("@RequestedPoints", If(request.RequestedPoints.HasValue, request.RequestedPoints.Value, DBNull.Value)),
+            New MySqlParameter("@Reason", ValidationHelper.SanitizeInput(request.Reason))
+        }
+
+        Try
+            Dim rowsAffected As Integer = DatabaseHelper.ExecuteNonQuery(sql, params)
+            If rowsAffected > 0 Then
+                AuditService.LogAction("Student", studentId, "SUBMIT_CLARIFICATION_REQUEST", "studentgrade", request.GradeId.ToString(), details:=request.Reason)
+                Return True
+            End If
+            Return False
+        Catch ex As Exception
+            Console.WriteLine("[REVISION SERVICE ERROR] " & ex.Message)
+            Return False
+        End Try
+    End Function
+
+    Public Function ReviewRequest(requestId As Integer, status As String, teacherId As String) As Boolean
+        Dim sql As String = "UPDATE revisionrequest " &
+                            "SET status = @Status, reviewed_at = NOW(), reviewed_by = @TeacherId " &
+                            "WHERE request_id = @RequestId"
+
+        Dim params As MySqlParameter() = {
+            New MySqlParameter("@Status", status),
+            New MySqlParameter("@TeacherId", teacherId),
+            New MySqlParameter("@RequestId", requestId)
+        }
+
+        Try
+            Dim rowsAffected As Integer = DatabaseHelper.ExecuteNonQuery(sql, params)
+            If rowsAffected > 0 Then
+                AuditService.LogAction("Teacher", teacherId, $"REVISION_{status.ToUpper()}", "revisionrequest", requestId.ToString(), details:=$"Status set to {status}")
+                Return True
+            End If
+            Return False
+        Catch ex As Exception
+            Console.WriteLine("[REVISION SERVICE ERROR] " & ex.Message)
+            Return False
+        End Try
+    End Function
+
+    Public Function GetPendingRequestsByTeacher(teacherId As String) As DataTable
+        Dim sql As String = "SELECT r.request_id, r.grade_id, s.full_name AS student_name, a.title AS assessment_title, " &
+                            "sg.score AS current_score, r.requested_points, r.reason, r.status, r.requested_at " &
+                            "FROM revisionrequest r " &
+                            "JOIN studentgrade sg ON r.grade_id = sg.grade_id " &
+                            "JOIN enrollment e ON sg.enrollment_id = e.enrollment_id " &
+                            "JOIN student s ON e.student_id = s.student_id " &
+                            "JOIN class c ON e.class_id = c.class_id " &
+                            "JOIN assessment a ON sg.assessment_id = a.assessment_id " &
+                            "WHERE c.teacher_id = @TeacherId AND r.status = 'Pending' " &
+                            "ORDER BY r.requested_at DESC"
+
+        Dim params As MySqlParameter() = {
+            New MySqlParameter("@TeacherId", teacherId)
+        }
+
+        Return DatabaseHelper.ExecuteQuery(sql, params)
+    End Function
+
+End Class
+
+' ===== UserService.vb =====
+
+Imports MySql.Data.MySqlClient
+Imports System.Data
+Imports DAUNTLESS_WOLVES_PROF.Core
+
+Public Class UserService
+
+    Public Function CreateTeacher(teacherId As String, rawPassword As String, fullName As String, email As String, department As String, adminId As String) As Boolean
+        Dim hashedPassword As String = SecurityHelper.HashSHA256(rawPassword)
+        Dim sql As String = "INSERT INTO teacher (teacher_id, full_name, email, password_hash, department, status) " &
+                            "VALUES (@TeacherId, @FullName, @Email, @PasswordHash, @Department, 'Active')"
+
+        Dim params As MySqlParameter() = {
+            New MySqlParameter("@TeacherId", ValidationHelper.SanitizeInput(teacherId)),
+            New MySqlParameter("@FullName", ValidationHelper.SanitizeInput(fullName)),
+            New MySqlParameter("@Email", ValidationHelper.SanitizeInput(email)),
+            New MySqlParameter("@PasswordHash", hashedPassword),
+            New MySqlParameter("@Department", ValidationHelper.SanitizeInput(department))
+        }
+
+        Try
+            Dim rowsAffected As Integer = DatabaseHelper.ExecuteNonQuery(sql, params)
+            If rowsAffected > 0 Then
+                AuditService.LogAction("Admin", adminId, "CREATE_TEACHER", "teacher", teacherId, details:=$"Created Teacher: {email}")
+                Return True
+            End If
+            Return False
+        Catch ex As Exception
+            Console.WriteLine("[USER SERVICE ERROR] " & ex.Message)
+            Return False
+        End Try
+    End Function
+
+    Public Function CreateStudent(studentId As String, rawPassword As String, fullName As String, email As String, program As String, yearLevel As Integer, section As String, adminId As String) As Boolean
+        Dim hashedPassword As String = SecurityHelper.HashSHA256(rawPassword)
+        Dim sql As String = "INSERT INTO student (student_id, full_name, email, password_hash, program, year_level, section, status) " &
+                            "VALUES (@StudentId, @FullName, @Email, @PasswordHash, @Program, @YearLevel, @Section, 'Active')"
+
+        Dim params As MySqlParameter() = {
+            New MySqlParameter("@StudentId", ValidationHelper.SanitizeInput(studentId)),
+            New MySqlParameter("@FullName", ValidationHelper.SanitizeInput(fullName)),
+            New MySqlParameter("@Email", ValidationHelper.SanitizeInput(email)),
+            New MySqlParameter("@PasswordHash", hashedPassword),
+            New MySqlParameter("@Program", ValidationHelper.SanitizeInput(program)),
+            New MySqlParameter("@YearLevel", yearLevel),
+            New MySqlParameter("@Section", ValidationHelper.SanitizeInput(section))
+        }
+
+        Try
+            Dim rowsAffected As Integer = DatabaseHelper.ExecuteNonQuery(sql, params)
+            If rowsAffected > 0 Then
+                AuditService.LogAction("Admin", adminId, "CREATE_STUDENT", "student", studentId, details:=$"Created Student: {email}")
+                Return True
+            End If
+            Return False
+        Catch ex As Exception
+            Console.WriteLine("[USER SERVICE ERROR] " & ex.Message)
+            Return False
+        End Try
+    End Function
+
+    Public Function GetAllTeachers() As DataTable
+        Dim sql As String = "SELECT teacher_id, full_name, email, department, status, created_at FROM teacher ORDER BY full_name ASC"
+        Return DatabaseHelper.ExecuteQuery(sql)
+    End Function
+
+    Public Function GetAllStudents() As DataTable
+        Dim sql As String = "SELECT student_id, full_name, email, program, year_level, section, status, created_at FROM student ORDER BY full_name ASC"
+        Return DatabaseHelper.ExecuteQuery(sql)
+    End Function
+
+    Public Function ToggleUserStatus(role As String, userId As String, newStatus As String, adminId As String) As Boolean
+        Dim tableName As String = If(role.Equals("Teacher", StringComparison.OrdinalIgnoreCase), "teacher", "student")
+        Dim idColumn As String = If(role.Equals("Teacher", StringComparison.OrdinalIgnoreCase), "teacher_id", "student_id")
+
+        Dim sql As String = $"UPDATE {tableName} SET status = @Status WHERE {idColumn} = @UserId"
+        Dim params As MySqlParameter() = {
+            New MySqlParameter("@Status", newStatus),
+            New MySqlParameter("@UserId", userId)
+        }
+
+        Try
+            Dim rowsAffected As Integer = DatabaseHelper.ExecuteNonQuery(sql, params)
+            If rowsAffected > 0 Then
+                AuditService.LogAction("Admin", adminId, $"SET_STATUS_{newStatus.ToUpper()}", tableName, userId, details:=$"Changed status of {role} {userId} to {newStatus}")
+                Return True
+            End If
+            Return False
+        Catch ex As Exception
+            Console.WriteLine("[USER SERVICE ERROR] " & ex.Message)
+            Return False
+        End Try
+    End Function
+
+End Class

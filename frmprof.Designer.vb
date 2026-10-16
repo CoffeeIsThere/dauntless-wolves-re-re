@@ -262,7 +262,7 @@ Partial Class frmprof
         lblProfName.Name = "lblProfName"
         lblProfName.Size = New Size(101, 15)
         lblProfName.TabIndex = 1
-        lblProfName.Text = "Prof. Jhun Alvarez"
+        lblProfName.Text = AppSession.CurrentUser.FullName
         ' 
         ' PictureBox1
         ' 

@@ -1270,7 +1270,8 @@ Partial Class frmstudent
         lblstudentname.Name = "lblstudentname"
         lblstudentname.Size = New Size(154, 20)
         lblstudentname.TabIndex = 0
-        lblstudentname.Text = "Condes, Hope Gian D."
+        lblstudentname.Text = AppSession.CurrentUser.FullName
+
         ' 
         ' PictureBox1
         ' 
