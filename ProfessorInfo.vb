@@ -4,6 +4,7 @@
     Public Property Department As String
     Public Property Classes As Integer
     Public Property Status As String
+    Public Property EmploymentType As String
 
 
 End Class

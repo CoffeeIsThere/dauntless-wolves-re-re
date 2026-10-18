@@ -28,8 +28,6 @@ Public Class Admin
         InitStudentPage()
         InitDashboardPage()
 
-
-
         ' (Optional) Display user name on a label on your form
         ' lblAdminName.Text = $"Logged in as: {AppSession.CurrentUser.FullName}"
     End Sub
@@ -127,11 +125,12 @@ Public Class Admin
             .Columns.Add("colEmpId", "Employee ID")
             .Columns.Add("colDept", "Department")
             .Columns.Add("colClasses", "Assigned Class")
+            .Columns.Add("colType", "Type")
             .Columns.Add("colStatus", "Status")
             .Columns.Add("colActions", "Actions")
 
             ' Fixed-width columns (never get squeezed)
-            For Each item In {("colCheck", 45), ("colStatus", 110), ("colActions", 130)}
+            For Each item In {("colCheck", 45), ("colType", 110), ("colStatus", 110), ("colActions", 130)}
                 With .Columns(item.Item1)
                     .AutoSizeMode = DataGridViewAutoSizeColumnMode.None
                     .Width = item.Item2
@@ -148,6 +147,7 @@ Public Class Admin
                 .Columns(n).MinimumWidth = 110
             Next
 
+            .Columns("colType").HeaderCell.Style.Alignment = DataGridViewContentAlignment.MiddleCenter
             .Columns("colStatus").HeaderCell.Style.Alignment = DataGridViewContentAlignment.MiddleCenter
             .Columns("colActions").HeaderCell.Style.Alignment = DataGridViewContentAlignment.MiddleCenter
 
@@ -171,6 +171,7 @@ Public Class Admin
             .EmployeeID = row("teacher_id").ToString(),
             .Department = row("department").ToString(),
             .Classes = If(IsDBNull(row("class_count")), 0, Convert.ToInt32(row("class_count"))),
+            .EmploymentType = "Full-time",   ' UI only for now (change to "Part-time" to preview the other pill)
             .Status = row("status").ToString()
         })
         Next
@@ -194,7 +195,7 @@ Public Class Admin
     Private Sub ShowProfPage()
         dgvProf.Rows.Clear()
         For Each p In filteredProfs.Skip((profPage - 1) * ProfPageSize).Take(ProfPageSize)
-            dgvProf.Rows.Add(False, p.Name, p.EmployeeID, p.Department, p.Classes & " classes", p.Status, "")
+            dgvProf.Rows.Add(False, p.Name, p.EmployeeID, p.Department, p.Classes & " classes", p.EmploymentType, p.Status, "")
         Next
         lblTotalProf.Text = "Total Professors: " & filteredProfs.Count
         dgvProf.ClearSelection()
@@ -295,12 +296,22 @@ Public Class Admin
     Private Sub dgvProf_CellPainting(sender As Object, e As DataGridViewCellPaintingEventArgs) Handles dgvProf.CellPainting
         If e.RowIndex < 0 Then Return
         Dim col As String = dgvProf.Columns(e.ColumnIndex).Name
-        If col <> "colStatus" AndAlso col <> "colActions" Then Return
+        If col <> "colStatus" AndAlso col <> "colActions" AndAlso col <> "colType" Then Return
 
         e.PaintBackground(e.ClipBounds, False)
         e.Graphics.SmoothingMode = SmoothingMode.AntiAlias
 
-        If col = "colStatus" Then
+        If col = "colType" Then
+            Dim t As String = Convert.ToString(e.Value)
+            Dim r As New Rectangle(e.CellBounds.X + (e.CellBounds.Width - 90) \ 2,
+                                   e.CellBounds.Y + (e.CellBounds.Height - 24) \ 2, 90, 24)
+            If t = "Part-time" Then
+                DrawPill(e.Graphics, r, Color.FromArgb(255, 232, 190), Color.FromArgb(150, 90, 0), "Part-time")
+            Else
+                DrawPill(e.Graphics, r, Color.FromArgb(205, 230, 250), Color.FromArgb(0, 70, 140), "Full-time")
+            End If
+
+        ElseIf col = "colStatus" Then
             Dim status As String = Convert.ToString(e.Value)
             Dim r As New Rectangle(e.CellBounds.X + (e.CellBounds.Width - 80) \ 2,
                                    e.CellBounds.Y + (e.CellBounds.Height - 24) \ 2, 80, 24)
@@ -309,6 +320,7 @@ Public Class Admin
             Else
                 DrawPill(e.Graphics, r, Color.FromArgb(250, 190, 190), Color.FromArgb(180, 0, 0), "Inactive")
             End If
+
         Else
             Dim rects = ActionRects(e.CellBounds)
             DrawPill(e.Graphics, rects(0), Color.FromArgb(198, 240, 214), Color.FromArgb(0, 100, 0), "Edit")
@@ -765,5 +777,9 @@ Public Class Admin
         Dim loginForm As New frmlogin()
         loginForm.Show()
         Me.Close()
+    End Sub
+
+    Private Sub dgvProf_CellContentClick(sender As Object, e As DataGridViewCellEventArgs) Handles dgvProf.CellContentClick
+
     End Sub
 End Class
