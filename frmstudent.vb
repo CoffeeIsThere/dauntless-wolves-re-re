@@ -53,6 +53,9 @@ Public Class frmStudent
         ShowPage(btnMyGrades)   ' keep this last
     End Sub
 
+    ' class -> (assessment -> current score). Replace with a MySQL query later.
+    Private ReadOnly classData As New Dictionary(Of String, Dictionary(Of String, String))
+
     ' Grids select their first cell when first displayed, so clear it here
     Private Sub frmStudent_Shown(sender As Object, e As EventArgs) Handles MyBase.Shown
         dgvgrades.ClearSelection()
@@ -192,18 +195,21 @@ Public Class frmStudent
     ' ---------- REQUEST REVISION ----------
 
     Private Sub LoadAssessments()
-        assessmentScores.Clear()
-        assessmentScores.Add("Quiz 1", "18/20")
-        assessmentScores.Add("Activity 2", "45/50")
-        assessmentScores.Add("Midterm Exam", "82/100")
-        assessmentScores.Add("Project Draft", "82/100")
-        ' Final Exam is left out because it has no score yet
+        classData.Clear()
+        classData.Add("CS 103 - Object Oriented Programming", New Dictionary(Of String, String) From {
+        {"Quiz 1", "18/20"}, {"Activity 2", "45/50"},
+        {"Midterm Exam", "82/100"}, {"Project Draft", "82/100"}})
+        classData.Add("CS 101 - Intro to Computing", New Dictionary(Of String, String) From {
+        {"Quiz 1", "9/10"}, {"Seatwork 1", "18/20"}})
+
+        cboclass.Items.Clear()
+        For Each className In classData.Keys
+            cboclass.Items.Add(className)
+        Next
+        cboclass.SelectedIndex = -1
 
         cboAssessment.Items.Clear()
-        For Each assessmentName In assessmentScores.Keys
-            cboAssessment.Items.Add(assessmentName)
-        Next
-        cboAssessment.SelectedIndex = -1
+        cboAssessment.Enabled = False
         txtCurrentGrade.Clear()
     End Sub
 
@@ -426,6 +432,34 @@ Public Class frmStudent
     Private Sub pnlheader_Paint(sender As Object, e As PaintEventArgs) Handles pnlheader.Paint
 
     End Sub
+
+    Private Sub cboClass_SelectedIndexChanged(sender As Object, e As EventArgs) Handles cboclass.SelectedIndexChanged
+        cboAssessment.Items.Clear()
+        txtCurrentGrade.Clear()
+
+        Dim items As Dictionary(Of String, String) = Nothing
+        If cboclass.SelectedIndex <> -1 AndAlso classData.TryGetValue(cboclass.Text, items) Then
+            For Each a In items.Keys
+                cboAssessment.Items.Add(a)
+            Next
+            cboAssessment.Enabled = True
+        Else
+            cboAssessment.Enabled = False
+        End If
+
+        ' Show only requests for the chosen class (all rows when none is chosen)
+        Dim code As String = If(cboclass.SelectedIndex = -1, "", ClassCode(cboclass.Text))
+        dgvRequests.CurrentCell = Nothing
+        For Each row As DataGridViewRow In dgvRequests.Rows
+            row.Visible = (code = "" OrElse Convert.ToString(row.Cells(0).Value) = code)
+        Next
+    End Sub
+
+    ' "CS 103 - Object Oriented Programming" -> "CS 103"
+    Private Function ClassCode(fullName As String) As String
+        Return fullName.Split("-"c)(0).Trim()
+    End Function
+
 
 
 End Class

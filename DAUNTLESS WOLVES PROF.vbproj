@@ -4,7 +4,7 @@
     <OutputType>WinExe</OutputType>
     <TargetFramework>net8.0-windows</TargetFramework>
     <RootNamespace>DAUNTLESS_WOLVES_PROF</RootNamespace>
-	  <StartupObject>DAUNTLESS_WOLVES_PROF.frmlogin</StartupObject>
+	  <StartupObject>DAUNTLESS_WOLVES_PROF.My.MyApplication</StartupObject>
     <UseWindowsForms>true</UseWindowsForms>
     <MyType>WindowsForms</MyType>
   </PropertyGroup>
