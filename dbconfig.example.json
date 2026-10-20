@@ -1,7 +1,0 @@
-   {
-     "Host": "yorhouse",
-     "Port": 3306,
-     "Database": "transparent_grading_system",
-     "User": "root",
-     "Password": ""
-   }

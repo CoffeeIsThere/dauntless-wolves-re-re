@@ -33,36 +33,6 @@ Partial Class frmstudent
         btnGradeHistory = New Button()
         btnMyGrades = New Button()
         pnlContent = New Panel()
-        pnlRequestRevision = New Panel()
-        tlprevision = New TableLayoutPanel()
-        cardSubmit = New CustomPanel()
-        btnSubmitRequest = New Button()
-        txtReason = New TextBox()
-        Label9 = New Label()
-        txtCurrentGrade = New TextBox()
-        Label8 = New Label()
-        Label7 = New Label()
-        cboAssessment = New ComboBox()
-        Panel2 = New Panel()
-        pnlSubmitHeader = New Panel()
-        PictureBox4 = New PictureBox()
-        Label6 = New Label()
-        cardStatus = New CustomPanel()
-        dgvRequests = New DataGridView()
-        pnlStatusHeader = New Panel()
-        PictureBox5 = New PictureBox()
-        lblStatusTitle = New Label()
-        pnlclassbar = New Panel()
-        lblClass = New Label()
-        cboclass = New ComboBox()
-        pnlGradeHistory = New Panel()
-        RoundedPanel2 = New CustomPanel()
-        dgvHistory = New DataGridView()
-        Label5 = New Label()
-        pnlHistoryHeader = New Panel()
-        PictureBox3 = New PictureBox()
-        Label4 = New Label()
-        Panel7 = New Panel()
         pnlMyPerformance = New Panel()
         cardPerformance = New CustomPanel()
         tlpbars = New TableLayoutPanel()
@@ -96,6 +66,8 @@ Partial Class frmstudent
         lblHighestCaption = New Label()
         lblHighestValue = New Label()
         pnlperfheader = New Panel()
+        cboperfterm = New ComboBox()
+        cboperfcourse = New ComboBox()
         Label10 = New Label()
         PictureBox6 = New PictureBox()
         Panel1 = New Panel()
@@ -106,8 +78,39 @@ Partial Class frmstudent
         dgvgrades = New DataGridView()
         Panel3 = New Panel()
         Panel4 = New Panel()
+        cboterm = New ComboBox()
         PictureBox2 = New PictureBox()
         cboCourse = New ComboBox()
+        pnlRequestRevision = New Panel()
+        tlprevision = New TableLayoutPanel()
+        cardSubmit = New CustomPanel()
+        btnSubmitRequest = New Button()
+        txtReason = New TextBox()
+        Label9 = New Label()
+        txtCurrentGrade = New TextBox()
+        Label8 = New Label()
+        Label7 = New Label()
+        cboAssessment = New ComboBox()
+        Panel2 = New Panel()
+        pnlSubmitHeader = New Panel()
+        PictureBox4 = New PictureBox()
+        Label6 = New Label()
+        cardStatus = New CustomPanel()
+        dgvRequests = New DataGridView()
+        pnlStatusHeader = New Panel()
+        PictureBox5 = New PictureBox()
+        lblStatusTitle = New Label()
+        pnlclassbar = New Panel()
+        lblClass = New Label()
+        cboclass = New ComboBox()
+        pnlGradeHistory = New Panel()
+        RoundedPanel2 = New CustomPanel()
+        dgvHistory = New DataGridView()
+        Label5 = New Label()
+        pnlHistoryHeader = New Panel()
+        PictureBox3 = New PictureBox()
+        Label4 = New Label()
+        Panel7 = New Panel()
         pnlheader = New Panel()
         Panel6 = New Panel()
         lblrole = New Label()
@@ -118,21 +121,6 @@ Partial Class frmstudent
         Pnlheaderheader.SuspendLayout()
         Pnltabs.SuspendLayout()
         pnlContent.SuspendLayout()
-        pnlRequestRevision.SuspendLayout()
-        tlprevision.SuspendLayout()
-        cardSubmit.SuspendLayout()
-        pnlSubmitHeader.SuspendLayout()
-        CType(PictureBox4, ComponentModel.ISupportInitialize).BeginInit()
-        cardStatus.SuspendLayout()
-        CType(dgvRequests, ComponentModel.ISupportInitialize).BeginInit()
-        pnlStatusHeader.SuspendLayout()
-        CType(PictureBox5, ComponentModel.ISupportInitialize).BeginInit()
-        pnlclassbar.SuspendLayout()
-        pnlGradeHistory.SuspendLayout()
-        RoundedPanel2.SuspendLayout()
-        CType(dgvHistory, ComponentModel.ISupportInitialize).BeginInit()
-        pnlHistoryHeader.SuspendLayout()
-        CType(PictureBox3, ComponentModel.ISupportInitialize).BeginInit()
         pnlMyPerformance.SuspendLayout()
         cardPerformance.SuspendLayout()
         tlpbars.SuspendLayout()
@@ -156,6 +144,21 @@ Partial Class frmstudent
         CType(dgvgrades, ComponentModel.ISupportInitialize).BeginInit()
         Panel4.SuspendLayout()
         CType(PictureBox2, ComponentModel.ISupportInitialize).BeginInit()
+        pnlRequestRevision.SuspendLayout()
+        tlprevision.SuspendLayout()
+        cardSubmit.SuspendLayout()
+        pnlSubmitHeader.SuspendLayout()
+        CType(PictureBox4, ComponentModel.ISupportInitialize).BeginInit()
+        cardStatus.SuspendLayout()
+        CType(dgvRequests, ComponentModel.ISupportInitialize).BeginInit()
+        pnlStatusHeader.SuspendLayout()
+        CType(PictureBox5, ComponentModel.ISupportInitialize).BeginInit()
+        pnlclassbar.SuspendLayout()
+        pnlGradeHistory.SuspendLayout()
+        RoundedPanel2.SuspendLayout()
+        CType(dgvHistory, ComponentModel.ISupportInitialize).BeginInit()
+        pnlHistoryHeader.SuspendLayout()
+        CType(PictureBox3, ComponentModel.ISupportInitialize).BeginInit()
         pnlheader.SuspendLayout()
         CType(PictureBox1, ComponentModel.ISupportInitialize).BeginInit()
         SuspendLayout()
@@ -278,16 +281,622 @@ Partial Class frmstudent
         ' pnlContent
         ' 
         pnlContent.BackColor = Color.White
+        pnlContent.Controls.Add(pnlMyPerformance)
+        pnlContent.Controls.Add(pnlMyGrades)
         pnlContent.Controls.Add(pnlRequestRevision)
         pnlContent.Controls.Add(pnlGradeHistory)
         pnlContent.Controls.Add(Panel7)
-        pnlContent.Controls.Add(pnlMyPerformance)
-        pnlContent.Controls.Add(pnlMyGrades)
         pnlContent.Dock = DockStyle.Fill
         pnlContent.Location = New Point(0, 114)
         pnlContent.Name = "pnlContent"
         pnlContent.Size = New Size(1264, 540)
         pnlContent.TabIndex = 7
+        ' 
+        ' pnlMyPerformance
+        ' 
+        pnlMyPerformance.BackColor = Color.WhiteSmoke
+        pnlMyPerformance.Controls.Add(cardPerformance)
+        pnlMyPerformance.Dock = DockStyle.Fill
+        pnlMyPerformance.Location = New Point(0, 3)
+        pnlMyPerformance.Name = "pnlMyPerformance"
+        pnlMyPerformance.Padding = New Padding(30)
+        pnlMyPerformance.Size = New Size(1264, 537)
+        pnlMyPerformance.TabIndex = 8
+        pnlMyPerformance.Visible = False
+        ' 
+        ' cardPerformance
+        ' 
+        cardPerformance.BackColor = Color.White
+        cardPerformance.BorderColor = Color.FromArgb(CByte(0), CByte(85), CByte(0))
+        cardPerformance.Controls.Add(tlpbars)
+        cardPerformance.Controls.Add(tlpstats)
+        cardPerformance.Controls.Add(pnlperfheader)
+        cardPerformance.Controls.Add(Panel1)
+        cardPerformance.Dock = DockStyle.Fill
+        cardPerformance.Location = New Point(30, 30)
+        cardPerformance.Name = "cardPerformance"
+        cardPerformance.Padding = New Padding(20)
+        cardPerformance.Size = New Size(1204, 477)
+        cardPerformance.TabIndex = 0
+        ' 
+        ' tlpbars
+        ' 
+        tlpbars.ColumnCount = 2
+        tlpbars.ColumnStyles.Add(New ColumnStyle(SizeType.Absolute, 110.0F))
+        tlpbars.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 100.0F))
+        tlpbars.Controls.Add(trackProject, 1, 3)
+        tlpbars.Controls.Add(trackExam, 1, 2)
+        tlpbars.Controls.Add(trackActivity, 1, 1)
+        tlpbars.Controls.Add(trackQuiz, 1, 0)
+        tlpbars.Controls.Add(Label12, 0, 3)
+        tlpbars.Controls.Add(Label13, 0, 2)
+        tlpbars.Controls.Add(Label14, 0, 1)
+        tlpbars.Controls.Add(Label11, 0, 0)
+        tlpbars.Dock = DockStyle.Fill
+        tlpbars.Location = New Point(20, 192)
+        tlpbars.Margin = New Padding(0)
+        tlpbars.Name = "tlpbars"
+        tlpbars.RowCount = 5
+        tlpbars.RowStyles.Add(New RowStyle(SizeType.Percent, 25.0F))
+        tlpbars.RowStyles.Add(New RowStyle(SizeType.Percent, 25.0F))
+        tlpbars.RowStyles.Add(New RowStyle(SizeType.Percent, 25.0F))
+        tlpbars.RowStyles.Add(New RowStyle(SizeType.Percent, 25.0F))
+        tlpbars.RowStyles.Add(New RowStyle(SizeType.Absolute, 20.0F))
+        tlpbars.Size = New Size(1164, 265)
+        tlpbars.TabIndex = 18
+        ' 
+        ' trackProject
+        ' 
+        trackProject.Anchor = AnchorStyles.Left Or AnchorStyles.Right
+        trackProject.BackColor = Color.White
+        trackProject.BorderColor = Color.FromArgb(CByte(0), CByte(85), CByte(0))
+        trackProject.Controls.Add(fillproject)
+        trackProject.CornerRadius = 13
+        trackProject.Location = New Point(113, 195)
+        trackProject.Name = "trackProject"
+        trackProject.Padding = New Padding(7)
+        trackProject.Size = New Size(1048, 37)
+        trackProject.TabIndex = 22
+        ' 
+        ' fillproject
+        ' 
+        fillproject.BackColor = Color.DarkGreen
+        fillproject.BorderColor = Color.FromArgb(CByte(0), CByte(85), CByte(0))
+        fillproject.BorderThickness = 0
+        fillproject.Controls.Add(lblprojectpct)
+        fillproject.CornerRadius = 11
+        fillproject.Dock = DockStyle.Left
+        fillproject.Location = New Point(7, 7)
+        fillproject.Name = "fillproject"
+        fillproject.Size = New Size(872, 23)
+        fillproject.TabIndex = 1
+        ' 
+        ' lblprojectpct
+        ' 
+        lblprojectpct.AutoSize = True
+        lblprojectpct.Font = New Font("Segoe UI", 9.75F, FontStyle.Bold, GraphicsUnit.Point, CByte(0))
+        lblprojectpct.ForeColor = Color.White
+        lblprojectpct.Location = New Point(11, 3)
+        lblprojectpct.Name = "lblprojectpct"
+        lblprojectpct.Size = New Size(26, 17)
+        lblprojectpct.TabIndex = 1
+        lblprojectpct.Text = "0%"
+        ' 
+        ' trackExam
+        ' 
+        trackExam.Anchor = AnchorStyles.Left Or AnchorStyles.Right
+        trackExam.BackColor = Color.White
+        trackExam.BorderColor = Color.FromArgb(CByte(0), CByte(85), CByte(0))
+        trackExam.Controls.Add(fillexam)
+        trackExam.CornerRadius = 13
+        trackExam.Location = New Point(113, 135)
+        trackExam.Name = "trackExam"
+        trackExam.Padding = New Padding(6)
+        trackExam.Size = New Size(1048, 35)
+        trackExam.TabIndex = 21
+        ' 
+        ' fillexam
+        ' 
+        fillexam.BackColor = Color.DarkGreen
+        fillexam.BorderColor = Color.FromArgb(CByte(0), CByte(85), CByte(0))
+        fillexam.BorderThickness = 0
+        fillexam.Controls.Add(lblexampct)
+        fillexam.CornerRadius = 10
+        fillexam.Dock = DockStyle.Left
+        fillexam.Location = New Point(6, 6)
+        fillexam.Margin = New Padding(0)
+        fillexam.Name = "fillexam"
+        fillexam.Size = New Size(872, 23)
+        fillexam.TabIndex = 1
+        ' 
+        ' lblexampct
+        ' 
+        lblexampct.AutoSize = True
+        lblexampct.Font = New Font("Segoe UI", 9.75F, FontStyle.Bold, GraphicsUnit.Point, CByte(0))
+        lblexampct.ForeColor = Color.White
+        lblexampct.Location = New Point(11, 2)
+        lblexampct.Name = "lblexampct"
+        lblexampct.Size = New Size(26, 17)
+        lblexampct.TabIndex = 1
+        lblexampct.Text = "0%"
+        ' 
+        ' trackActivity
+        ' 
+        trackActivity.Anchor = AnchorStyles.Left Or AnchorStyles.Right
+        trackActivity.BackColor = Color.White
+        trackActivity.BorderColor = Color.FromArgb(CByte(0), CByte(85), CByte(0))
+        trackActivity.Controls.Add(fillactivity)
+        trackActivity.CornerRadius = 13
+        trackActivity.Location = New Point(113, 74)
+        trackActivity.Name = "trackActivity"
+        trackActivity.Padding = New Padding(6)
+        trackActivity.Size = New Size(1048, 35)
+        trackActivity.TabIndex = 20
+        ' 
+        ' fillactivity
+        ' 
+        fillactivity.BackColor = Color.DarkGreen
+        fillactivity.BorderColor = Color.FromArgb(CByte(0), CByte(85), CByte(0))
+        fillactivity.BorderThickness = 0
+        fillactivity.Controls.Add(lblactivitypct)
+        fillactivity.CornerRadius = 11
+        fillactivity.Dock = DockStyle.Left
+        fillactivity.Location = New Point(6, 6)
+        fillactivity.Name = "fillactivity"
+        fillactivity.Size = New Size(873, 23)
+        fillactivity.TabIndex = 1
+        ' 
+        ' lblactivitypct
+        ' 
+        lblactivitypct.AutoSize = True
+        lblactivitypct.Font = New Font("Segoe UI", 9.75F, FontStyle.Bold, GraphicsUnit.Point, CByte(0))
+        lblactivitypct.ForeColor = Color.White
+        lblactivitypct.Location = New Point(12, 3)
+        lblactivitypct.Name = "lblactivitypct"
+        lblactivitypct.Size = New Size(26, 17)
+        lblactivitypct.TabIndex = 1
+        lblactivitypct.Text = "0%"
+        ' 
+        ' trackQuiz
+        ' 
+        trackQuiz.Anchor = AnchorStyles.Left Or AnchorStyles.Right
+        trackQuiz.BackColor = Color.White
+        trackQuiz.BorderColor = Color.FromArgb(CByte(0), CByte(85), CByte(0))
+        trackQuiz.Controls.Add(fillQuiz)
+        trackQuiz.CornerRadius = 13
+        trackQuiz.Location = New Point(113, 13)
+        trackQuiz.Name = "trackQuiz"
+        trackQuiz.Padding = New Padding(6)
+        trackQuiz.Size = New Size(1048, 35)
+        trackQuiz.TabIndex = 19
+        ' 
+        ' fillQuiz
+        ' 
+        fillQuiz.BackColor = Color.DarkGreen
+        fillQuiz.BorderColor = Color.FromArgb(CByte(0), CByte(85), CByte(0))
+        fillQuiz.BorderThickness = 0
+        fillQuiz.Controls.Add(lblQuizPct)
+        fillQuiz.CornerRadius = 11
+        fillQuiz.Dock = DockStyle.Left
+        fillQuiz.Location = New Point(6, 6)
+        fillQuiz.Name = "fillQuiz"
+        fillQuiz.Size = New Size(873, 23)
+        fillQuiz.TabIndex = 0
+        ' 
+        ' lblQuizPct
+        ' 
+        lblQuizPct.AutoSize = True
+        lblQuizPct.Font = New Font("Segoe UI", 9.75F, FontStyle.Bold, GraphicsUnit.Point, CByte(0))
+        lblQuizPct.ForeColor = Color.White
+        lblQuizPct.Location = New Point(12, 3)
+        lblQuizPct.Name = "lblQuizPct"
+        lblQuizPct.Size = New Size(26, 17)
+        lblQuizPct.TabIndex = 0
+        lblQuizPct.Text = "0%"
+        ' 
+        ' Label12
+        ' 
+        Label12.Anchor = AnchorStyles.None
+        Label12.BackColor = Color.White
+        Label12.Font = New Font("Segoe UI", 9.75F, FontStyle.Bold, GraphicsUnit.Point, CByte(0))
+        Label12.ForeColor = Color.DarkGreen
+        Label12.Location = New Point(27, 205)
+        Label12.Name = "Label12"
+        Label12.Size = New Size(55, 17)
+        Label12.TabIndex = 15
+        Label12.Text = "Projects"
+        ' 
+        ' Label13
+        ' 
+        Label13.Anchor = AnchorStyles.None
+        Label13.BackColor = Color.White
+        Label13.Font = New Font("Segoe UI", 9.75F, FontStyle.Bold, GraphicsUnit.Point, CByte(0))
+        Label13.ForeColor = Color.DarkGreen
+        Label13.Location = New Point(27, 144)
+        Label13.Name = "Label13"
+        Label13.Size = New Size(55, 17)
+        Label13.TabIndex = 16
+        Label13.Text = "Exams "
+        ' 
+        ' Label14
+        ' 
+        Label14.Anchor = AnchorStyles.None
+        Label14.BackColor = Color.White
+        Label14.Font = New Font("Segoe UI", 9.75F, FontStyle.Bold, GraphicsUnit.Point, CByte(0))
+        Label14.ForeColor = Color.DarkGreen
+        Label14.Location = New Point(21, 82)
+        Label14.Name = "Label14"
+        Label14.Size = New Size(67, 18)
+        Label14.TabIndex = 17
+        Label14.Text = "Activities"
+        ' 
+        ' Label11
+        ' 
+        Label11.Anchor = AnchorStyles.None
+        Label11.BackColor = Color.White
+        Label11.Font = New Font("Segoe UI", 9.75F, FontStyle.Bold, GraphicsUnit.Point, CByte(0))
+        Label11.ForeColor = Color.DarkGreen
+        Label11.Location = New Point(26, 21)
+        Label11.Name = "Label11"
+        Label11.Size = New Size(58, 19)
+        Label11.TabIndex = 14
+        Label11.Text = "Quizzes"
+        ' 
+        ' tlpstats
+        ' 
+        tlpstats.ColumnCount = 4
+        tlpstats.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 25.0F))
+        tlpstats.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 25.0F))
+        tlpstats.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 25.0F))
+        tlpstats.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 25.0F))
+        tlpstats.Controls.Add(RoundedPanel6, 0, 0)
+        tlpstats.Controls.Add(RoundedPanel8, 1, 0)
+        tlpstats.Controls.Add(RoundedPanel7, 2, 0)
+        tlpstats.Controls.Add(RoundedPanel9, 3, 0)
+        tlpstats.Dock = DockStyle.Top
+        tlpstats.Location = New Point(20, 80)
+        tlpstats.Name = "tlpstats"
+        tlpstats.RowCount = 1
+        tlpstats.RowStyles.Add(New RowStyle(SizeType.Percent, 100.0F))
+        tlpstats.Size = New Size(1164, 112)
+        tlpstats.TabIndex = 21
+        ' 
+        ' RoundedPanel6
+        ' 
+        RoundedPanel6.BackColor = Color.AliceBlue
+        RoundedPanel6.BorderColor = Color.FromArgb(CByte(0), CByte(85), CByte(0))
+        RoundedPanel6.Controls.Add(lblAverageCaption)
+        RoundedPanel6.Controls.Add(lblAverageValue)
+        RoundedPanel6.Dock = DockStyle.Fill
+        RoundedPanel6.Location = New Point(10, 10)
+        RoundedPanel6.Margin = New Padding(10)
+        RoundedPanel6.Name = "RoundedPanel6"
+        RoundedPanel6.Padding = New Padding(6)
+        RoundedPanel6.Size = New Size(271, 92)
+        RoundedPanel6.TabIndex = 11
+        ' 
+        ' lblAverageCaption
+        ' 
+        lblAverageCaption.BackColor = Color.Transparent
+        lblAverageCaption.Dock = DockStyle.Fill
+        lblAverageCaption.Font = New Font("Segoe UI", 11.25F, FontStyle.Bold, GraphicsUnit.Point, CByte(0))
+        lblAverageCaption.ForeColor = Color.DarkGreen
+        lblAverageCaption.Location = New Point(6, 64)
+        lblAverageCaption.Name = "lblAverageCaption"
+        lblAverageCaption.Size = New Size(259, 22)
+        lblAverageCaption.TabIndex = 15
+        lblAverageCaption.Text = "Current Average"
+        lblAverageCaption.TextAlign = ContentAlignment.MiddleCenter
+        ' 
+        ' lblAverageValue
+        ' 
+        lblAverageValue.BackColor = Color.Transparent
+        lblAverageValue.Dock = DockStyle.Top
+        lblAverageValue.Font = New Font("Segoe UI", 15.75F, FontStyle.Bold, GraphicsUnit.Point, CByte(0))
+        lblAverageValue.ForeColor = Color.DarkGreen
+        lblAverageValue.Location = New Point(6, 6)
+        lblAverageValue.Name = "lblAverageValue"
+        lblAverageValue.Size = New Size(259, 58)
+        lblAverageValue.TabIndex = 20
+        lblAverageValue.Text = "0"
+        lblAverageValue.TextAlign = ContentAlignment.MiddleCenter
+        ' 
+        ' RoundedPanel8
+        ' 
+        RoundedPanel8.BackColor = Color.AliceBlue
+        RoundedPanel8.BorderColor = Color.FromArgb(CByte(0), CByte(85), CByte(0))
+        RoundedPanel8.Controls.Add(lblPassedCaption)
+        RoundedPanel8.Controls.Add(lblPassedValue)
+        RoundedPanel8.Dock = DockStyle.Bottom
+        RoundedPanel8.Location = New Point(301, 10)
+        RoundedPanel8.Margin = New Padding(10)
+        RoundedPanel8.Name = "RoundedPanel8"
+        RoundedPanel8.Padding = New Padding(6)
+        RoundedPanel8.Size = New Size(271, 92)
+        RoundedPanel8.TabIndex = 12
+        ' 
+        ' lblPassedCaption
+        ' 
+        lblPassedCaption.BackColor = Color.Transparent
+        lblPassedCaption.Dock = DockStyle.Fill
+        lblPassedCaption.Font = New Font("Segoe UI", 11.25F, FontStyle.Bold, GraphicsUnit.Point, CByte(0))
+        lblPassedCaption.ForeColor = Color.DarkGreen
+        lblPassedCaption.Location = New Point(6, 66)
+        lblPassedCaption.Name = "lblPassedCaption"
+        lblPassedCaption.Size = New Size(259, 20)
+        lblPassedCaption.TabIndex = 16
+        lblPassedCaption.Text = "Activities Passed"
+        lblPassedCaption.TextAlign = ContentAlignment.TopCenter
+        ' 
+        ' lblPassedValue
+        ' 
+        lblPassedValue.BackColor = Color.Transparent
+        lblPassedValue.Dock = DockStyle.Top
+        lblPassedValue.Font = New Font("Segoe UI", 15.75F, FontStyle.Bold, GraphicsUnit.Point, CByte(0))
+        lblPassedValue.ForeColor = Color.DarkGreen
+        lblPassedValue.Location = New Point(6, 6)
+        lblPassedValue.Name = "lblPassedValue"
+        lblPassedValue.Size = New Size(259, 60)
+        lblPassedValue.TabIndex = 19
+        lblPassedValue.Text = "0"
+        lblPassedValue.TextAlign = ContentAlignment.MiddleCenter
+        ' 
+        ' RoundedPanel7
+        ' 
+        RoundedPanel7.BackColor = Color.AliceBlue
+        RoundedPanel7.BorderColor = Color.FromArgb(CByte(0), CByte(85), CByte(0))
+        RoundedPanel7.Controls.Add(lblPendingCaption)
+        RoundedPanel7.Controls.Add(lblPendingValue)
+        RoundedPanel7.Dock = DockStyle.Fill
+        RoundedPanel7.Location = New Point(592, 10)
+        RoundedPanel7.Margin = New Padding(10)
+        RoundedPanel7.Name = "RoundedPanel7"
+        RoundedPanel7.Padding = New Padding(6)
+        RoundedPanel7.Size = New Size(271, 92)
+        RoundedPanel7.TabIndex = 12
+        ' 
+        ' lblPendingCaption
+        ' 
+        lblPendingCaption.BackColor = Color.Transparent
+        lblPendingCaption.Dock = DockStyle.Fill
+        lblPendingCaption.Font = New Font("Segoe UI", 11.25F, FontStyle.Bold, GraphicsUnit.Point, CByte(0))
+        lblPendingCaption.ForeColor = Color.DarkGreen
+        lblPendingCaption.Location = New Point(6, 65)
+        lblPendingCaption.Name = "lblPendingCaption"
+        lblPendingCaption.Size = New Size(259, 21)
+        lblPendingCaption.TabIndex = 16
+        lblPendingCaption.Text = "Pending"
+        lblPendingCaption.TextAlign = ContentAlignment.TopCenter
+        ' 
+        ' lblPendingValue
+        ' 
+        lblPendingValue.BackColor = Color.Transparent
+        lblPendingValue.Dock = DockStyle.Top
+        lblPendingValue.Font = New Font("Segoe UI", 15.75F, FontStyle.Bold, GraphicsUnit.Point, CByte(0))
+        lblPendingValue.ForeColor = Color.DarkGreen
+        lblPendingValue.Location = New Point(6, 6)
+        lblPendingValue.Name = "lblPendingValue"
+        lblPendingValue.Size = New Size(259, 59)
+        lblPendingValue.TabIndex = 19
+        lblPendingValue.Text = "0"
+        lblPendingValue.TextAlign = ContentAlignment.MiddleCenter
+        ' 
+        ' RoundedPanel9
+        ' 
+        RoundedPanel9.BackColor = Color.AliceBlue
+        RoundedPanel9.BorderColor = Color.FromArgb(CByte(0), CByte(85), CByte(0))
+        RoundedPanel9.Controls.Add(lblHighestCaption)
+        RoundedPanel9.Controls.Add(lblHighestValue)
+        RoundedPanel9.Dock = DockStyle.Fill
+        RoundedPanel9.Location = New Point(883, 10)
+        RoundedPanel9.Margin = New Padding(10)
+        RoundedPanel9.Name = "RoundedPanel9"
+        RoundedPanel9.Padding = New Padding(6)
+        RoundedPanel9.Size = New Size(271, 92)
+        RoundedPanel9.TabIndex = 12
+        ' 
+        ' lblHighestCaption
+        ' 
+        lblHighestCaption.BackColor = Color.Transparent
+        lblHighestCaption.Dock = DockStyle.Fill
+        lblHighestCaption.Font = New Font("Segoe UI", 11.25F, FontStyle.Bold, GraphicsUnit.Point, CByte(0))
+        lblHighestCaption.ForeColor = Color.DarkGreen
+        lblHighestCaption.Location = New Point(6, 66)
+        lblHighestCaption.Name = "lblHighestCaption"
+        lblHighestCaption.Size = New Size(259, 20)
+        lblHighestCaption.TabIndex = 17
+        lblHighestCaption.Text = "Highest Score"
+        lblHighestCaption.TextAlign = ContentAlignment.TopCenter
+        ' 
+        ' lblHighestValue
+        ' 
+        lblHighestValue.BackColor = Color.Transparent
+        lblHighestValue.Dock = DockStyle.Top
+        lblHighestValue.Font = New Font("Segoe UI", 15.75F, FontStyle.Bold, GraphicsUnit.Point, CByte(0))
+        lblHighestValue.ForeColor = Color.DarkGreen
+        lblHighestValue.Location = New Point(6, 6)
+        lblHighestValue.Name = "lblHighestValue"
+        lblHighestValue.Size = New Size(259, 60)
+        lblHighestValue.TabIndex = 18
+        lblHighestValue.Text = "0"
+        lblHighestValue.TextAlign = ContentAlignment.MiddleCenter
+        ' 
+        ' pnlperfheader
+        ' 
+        pnlperfheader.Controls.Add(cboperfterm)
+        pnlperfheader.Controls.Add(cboperfcourse)
+        pnlperfheader.Controls.Add(Label10)
+        pnlperfheader.Controls.Add(PictureBox6)
+        pnlperfheader.Dock = DockStyle.Top
+        pnlperfheader.Location = New Point(20, 20)
+        pnlperfheader.Name = "pnlperfheader"
+        pnlperfheader.Size = New Size(1164, 60)
+        pnlperfheader.TabIndex = 20
+        ' 
+        ' cboperfterm
+        ' 
+        cboperfterm.Anchor = AnchorStyles.Top Or AnchorStyles.Right
+        cboperfterm.DropDownStyle = ComboBoxStyle.DropDownList
+        cboperfterm.FormattingEnabled = True
+        cboperfterm.Location = New Point(743, 19)
+        cboperfterm.Name = "cboperfterm"
+        cboperfterm.Size = New Size(121, 23)
+        cboperfterm.TabIndex = 12
+        ' 
+        ' cboperfcourse
+        ' 
+        cboperfcourse.Anchor = AnchorStyles.Top Or AnchorStyles.Right
+        cboperfcourse.DropDownStyle = ComboBoxStyle.DropDownList
+        cboperfcourse.FormattingEnabled = True
+        cboperfcourse.Location = New Point(876, 19)
+        cboperfcourse.Name = "cboperfcourse"
+        cboperfcourse.Size = New Size(275, 23)
+        cboperfcourse.TabIndex = 11
+        ' 
+        ' Label10
+        ' 
+        Label10.AutoSize = True
+        Label10.BackColor = Color.White
+        Label10.Font = New Font("Segoe UI", 18.0F, FontStyle.Bold, GraphicsUnit.Point, CByte(0))
+        Label10.ForeColor = Color.DarkGreen
+        Label10.Location = New Point(72, 12)
+        Label10.Name = "Label10"
+        Label10.Size = New Size(318, 32)
+        Label10.TabIndex = 10
+        Label10.Text = "My Performance Overview"
+        ' 
+        ' PictureBox6
+        ' 
+        PictureBox6.Image = CType(resources.GetObject("PictureBox6.Image"), Image)
+        PictureBox6.Location = New Point(9, 1)
+        PictureBox6.Name = "PictureBox6"
+        PictureBox6.Size = New Size(59, 55)
+        PictureBox6.SizeMode = PictureBoxSizeMode.Zoom
+        PictureBox6.TabIndex = 1
+        PictureBox6.TabStop = False
+        ' 
+        ' Panel1
+        ' 
+        Panel1.BackColor = Color.DimGray
+        Panel1.Location = New Point(30, 77)
+        Panel1.Name = "Panel1"
+        Panel1.Size = New Size(1022, 2)
+        Panel1.TabIndex = 19
+        ' 
+        ' pnlMyGrades
+        ' 
+        pnlMyGrades.BackColor = Color.WhiteSmoke
+        pnlMyGrades.Controls.Add(Label1)
+        pnlMyGrades.Controls.Add(RoundedPanel1)
+        pnlMyGrades.Dock = DockStyle.Fill
+        pnlMyGrades.Location = New Point(0, 3)
+        pnlMyGrades.Name = "pnlMyGrades"
+        pnlMyGrades.Size = New Size(1264, 537)
+        pnlMyGrades.TabIndex = 7
+        ' 
+        ' Label1
+        ' 
+        Label1.AutoSize = True
+        Label1.BackColor = Color.WhiteSmoke
+        Label1.Font = New Font("Segoe UI", 18.0F, FontStyle.Bold, GraphicsUnit.Point, CByte(0))
+        Label1.ForeColor = Color.DarkGreen
+        Label1.Location = New Point(144, 4)
+        Label1.Name = "Label1"
+        Label1.Size = New Size(167, 32)
+        Label1.TabIndex = 10
+        Label1.Text = "Grade Report"
+        ' 
+        ' RoundedPanel1
+        ' 
+        RoundedPanel1.Anchor = AnchorStyles.Top Or AnchorStyles.Bottom Or AnchorStyles.Left Or AnchorStyles.Right
+        RoundedPanel1.BackColor = Color.White
+        RoundedPanel1.BorderColor = Color.FromArgb(CByte(0), CByte(85), CByte(0))
+        RoundedPanel1.Controls.Add(lblstanding)
+        RoundedPanel1.Controls.Add(dgvgrades)
+        RoundedPanel1.Controls.Add(Panel3)
+        RoundedPanel1.Controls.Add(Panel4)
+        RoundedPanel1.Location = New Point(140, 40)
+        RoundedPanel1.Name = "RoundedPanel1"
+        RoundedPanel1.Padding = New Padding(14)
+        RoundedPanel1.Size = New Size(994, 444)
+        RoundedPanel1.TabIndex = 0
+        ' 
+        ' lblstanding
+        ' 
+        lblstanding.BackColor = Color.White
+        lblstanding.Dock = DockStyle.Bottom
+        lblstanding.Font = New Font("Segoe UI", 9.75F, FontStyle.Bold, GraphicsUnit.Point, CByte(0))
+        lblstanding.ForeColor = Color.DarkGreen
+        lblstanding.Location = New Point(14, 403)
+        lblstanding.Name = "lblstanding"
+        lblstanding.Padding = New Padding(10, 0, 0, 10)
+        lblstanding.Size = New Size(966, 27)
+        lblstanding.TabIndex = 12
+        lblstanding.Text = "Current Standing: 0%"
+        lblstanding.TextAlign = ContentAlignment.MiddleLeft
+        ' 
+        ' dgvgrades
+        ' 
+        dgvgrades.BackgroundColor = Color.White
+        dgvgrades.ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.AutoSize
+        dgvgrades.Dock = DockStyle.Fill
+        dgvgrades.Location = New Point(14, 66)
+        dgvgrades.Name = "dgvgrades"
+        dgvgrades.RowHeadersWidth = 51
+        dgvgrades.Size = New Size(966, 364)
+        dgvgrades.TabIndex = 3
+        ' 
+        ' Panel3
+        ' 
+        Panel3.BackColor = Color.DimGray
+        Panel3.Dock = DockStyle.Top
+        Panel3.Location = New Point(14, 64)
+        Panel3.Name = "Panel3"
+        Panel3.Size = New Size(966, 2)
+        Panel3.TabIndex = 13
+        ' 
+        ' Panel4
+        ' 
+        Panel4.BackColor = Color.White
+        Panel4.Controls.Add(cboterm)
+        Panel4.Controls.Add(PictureBox2)
+        Panel4.Controls.Add(cboCourse)
+        Panel4.Dock = DockStyle.Top
+        Panel4.Location = New Point(14, 14)
+        Panel4.Name = "Panel4"
+        Panel4.Size = New Size(966, 50)
+        Panel4.TabIndex = 14
+        ' 
+        ' cboterm
+        ' 
+        cboterm.DropDownStyle = ComboBoxStyle.DropDownList
+        cboterm.Font = New Font("Segoe UI Semibold", 9.0F, FontStyle.Bold, GraphicsUnit.Point, CByte(0))
+        cboterm.ForeColor = Color.DarkGreen
+        cboterm.FormattingEnabled = True
+        cboterm.Location = New Point(370, 14)
+        cboterm.Name = "cboterm"
+        cboterm.Size = New Size(121, 23)
+        cboterm.TabIndex = 3
+        ' 
+        ' PictureBox2
+        ' 
+        PictureBox2.Image = My.Resources.Resources.Gemini_Generated_Image_902bw4902bw4902b_removebg_preview
+        PictureBox2.Location = New Point(0, 3)
+        PictureBox2.Name = "PictureBox2"
+        PictureBox2.Size = New Size(67, 43)
+        PictureBox2.SizeMode = PictureBoxSizeMode.Zoom
+        PictureBox2.TabIndex = 1
+        PictureBox2.TabStop = False
+        ' 
+        ' cboCourse
+        ' 
+        cboCourse.BackColor = Color.FloralWhite
+        cboCourse.DropDownStyle = ComboBoxStyle.DropDownList
+        cboCourse.FormattingEnabled = True
+        cboCourse.Location = New Point(80, 14)
+        cboCourse.Name = "cboCourse"
+        cboCourse.Size = New Size(277, 23)
+        cboCourse.TabIndex = 2
         ' 
         ' pnlRequestRevision
         ' 
@@ -644,578 +1253,6 @@ Partial Class frmstudent
         Panel7.Size = New Size(1264, 3)
         Panel7.TabIndex = 11
         ' 
-        ' pnlMyPerformance
-        ' 
-        pnlMyPerformance.BackColor = Color.WhiteSmoke
-        pnlMyPerformance.Controls.Add(cardPerformance)
-        pnlMyPerformance.Dock = DockStyle.Fill
-        pnlMyPerformance.Location = New Point(0, 0)
-        pnlMyPerformance.Name = "pnlMyPerformance"
-        pnlMyPerformance.Padding = New Padding(30)
-        pnlMyPerformance.Size = New Size(1264, 540)
-        pnlMyPerformance.TabIndex = 8
-        pnlMyPerformance.Visible = False
-        ' 
-        ' cardPerformance
-        ' 
-        cardPerformance.BackColor = Color.White
-        cardPerformance.BorderColor = Color.FromArgb(CByte(0), CByte(85), CByte(0))
-        cardPerformance.Controls.Add(tlpbars)
-        cardPerformance.Controls.Add(tlpstats)
-        cardPerformance.Controls.Add(pnlperfheader)
-        cardPerformance.Controls.Add(Panel1)
-        cardPerformance.Dock = DockStyle.Fill
-        cardPerformance.Location = New Point(30, 30)
-        cardPerformance.Name = "cardPerformance"
-        cardPerformance.Padding = New Padding(20)
-        cardPerformance.Size = New Size(1204, 480)
-        cardPerformance.TabIndex = 0
-        ' 
-        ' tlpbars
-        ' 
-        tlpbars.ColumnCount = 2
-        tlpbars.ColumnStyles.Add(New ColumnStyle(SizeType.Absolute, 110.0F))
-        tlpbars.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 100.0F))
-        tlpbars.Controls.Add(trackProject, 1, 3)
-        tlpbars.Controls.Add(trackExam, 1, 2)
-        tlpbars.Controls.Add(trackActivity, 1, 1)
-        tlpbars.Controls.Add(trackQuiz, 1, 0)
-        tlpbars.Controls.Add(Label12, 0, 3)
-        tlpbars.Controls.Add(Label13, 0, 2)
-        tlpbars.Controls.Add(Label14, 0, 1)
-        tlpbars.Controls.Add(Label11, 0, 0)
-        tlpbars.Dock = DockStyle.Fill
-        tlpbars.Location = New Point(20, 192)
-        tlpbars.Margin = New Padding(0)
-        tlpbars.Name = "tlpbars"
-        tlpbars.RowCount = 5
-        tlpbars.RowStyles.Add(New RowStyle(SizeType.Percent, 25.0F))
-        tlpbars.RowStyles.Add(New RowStyle(SizeType.Percent, 25.0F))
-        tlpbars.RowStyles.Add(New RowStyle(SizeType.Percent, 25.0F))
-        tlpbars.RowStyles.Add(New RowStyle(SizeType.Percent, 25.0F))
-        tlpbars.RowStyles.Add(New RowStyle(SizeType.Absolute, 20.0F))
-        tlpbars.Size = New Size(1164, 268)
-        tlpbars.TabIndex = 18
-        ' 
-        ' trackProject
-        ' 
-        trackProject.Anchor = AnchorStyles.Left Or AnchorStyles.Right
-        trackProject.BackColor = Color.White
-        trackProject.BorderColor = Color.FromArgb(CByte(0), CByte(85), CByte(0))
-        trackProject.Controls.Add(fillproject)
-        trackProject.CornerRadius = 13
-        trackProject.Location = New Point(113, 198)
-        trackProject.Name = "trackProject"
-        trackProject.Padding = New Padding(7)
-        trackProject.Size = New Size(1048, 37)
-        trackProject.TabIndex = 22
-        ' 
-        ' fillproject
-        ' 
-        fillproject.BackColor = Color.DarkGreen
-        fillproject.BorderColor = Color.FromArgb(CByte(0), CByte(85), CByte(0))
-        fillproject.BorderThickness = 0
-        fillproject.Controls.Add(lblprojectpct)
-        fillproject.CornerRadius = 11
-        fillproject.Dock = DockStyle.Left
-        fillproject.Location = New Point(7, 7)
-        fillproject.Name = "fillproject"
-        fillproject.Size = New Size(872, 23)
-        fillproject.TabIndex = 1
-        ' 
-        ' lblprojectpct
-        ' 
-        lblprojectpct.AutoSize = True
-        lblprojectpct.Font = New Font("Segoe UI", 9.75F, FontStyle.Bold, GraphicsUnit.Point, CByte(0))
-        lblprojectpct.ForeColor = Color.White
-        lblprojectpct.Location = New Point(11, 3)
-        lblprojectpct.Name = "lblprojectpct"
-        lblprojectpct.Size = New Size(26, 17)
-        lblprojectpct.TabIndex = 1
-        lblprojectpct.Text = "0%"
-        ' 
-        ' trackExam
-        ' 
-        trackExam.Anchor = AnchorStyles.Left Or AnchorStyles.Right
-        trackExam.BackColor = Color.White
-        trackExam.BorderColor = Color.FromArgb(CByte(0), CByte(85), CByte(0))
-        trackExam.Controls.Add(fillexam)
-        trackExam.CornerRadius = 13
-        trackExam.Location = New Point(113, 137)
-        trackExam.Name = "trackExam"
-        trackExam.Padding = New Padding(6)
-        trackExam.Size = New Size(1048, 35)
-        trackExam.TabIndex = 21
-        ' 
-        ' fillexam
-        ' 
-        fillexam.BackColor = Color.DarkGreen
-        fillexam.BorderColor = Color.FromArgb(CByte(0), CByte(85), CByte(0))
-        fillexam.BorderThickness = 0
-        fillexam.Controls.Add(lblexampct)
-        fillexam.CornerRadius = 10
-        fillexam.Dock = DockStyle.Left
-        fillexam.Location = New Point(6, 6)
-        fillexam.Margin = New Padding(0)
-        fillexam.Name = "fillexam"
-        fillexam.Size = New Size(872, 23)
-        fillexam.TabIndex = 1
-        ' 
-        ' lblexampct
-        ' 
-        lblexampct.AutoSize = True
-        lblexampct.Font = New Font("Segoe UI", 9.75F, FontStyle.Bold, GraphicsUnit.Point, CByte(0))
-        lblexampct.ForeColor = Color.White
-        lblexampct.Location = New Point(11, 2)
-        lblexampct.Name = "lblexampct"
-        lblexampct.Size = New Size(26, 17)
-        lblexampct.TabIndex = 1
-        lblexampct.Text = "0%"
-        ' 
-        ' trackActivity
-        ' 
-        trackActivity.Anchor = AnchorStyles.Left Or AnchorStyles.Right
-        trackActivity.BackColor = Color.White
-        trackActivity.BorderColor = Color.FromArgb(CByte(0), CByte(85), CByte(0))
-        trackActivity.Controls.Add(fillactivity)
-        trackActivity.CornerRadius = 13
-        trackActivity.Location = New Point(113, 75)
-        trackActivity.Name = "trackActivity"
-        trackActivity.Padding = New Padding(6)
-        trackActivity.Size = New Size(1048, 35)
-        trackActivity.TabIndex = 20
-        ' 
-        ' fillactivity
-        ' 
-        fillactivity.BackColor = Color.DarkGreen
-        fillactivity.BorderColor = Color.FromArgb(CByte(0), CByte(85), CByte(0))
-        fillactivity.BorderThickness = 0
-        fillactivity.Controls.Add(lblactivitypct)
-        fillactivity.CornerRadius = 11
-        fillactivity.Dock = DockStyle.Left
-        fillactivity.Location = New Point(6, 6)
-        fillactivity.Name = "fillactivity"
-        fillactivity.Size = New Size(873, 23)
-        fillactivity.TabIndex = 1
-        ' 
-        ' lblactivitypct
-        ' 
-        lblactivitypct.AutoSize = True
-        lblactivitypct.Font = New Font("Segoe UI", 9.75F, FontStyle.Bold, GraphicsUnit.Point, CByte(0))
-        lblactivitypct.ForeColor = Color.White
-        lblactivitypct.Location = New Point(12, 3)
-        lblactivitypct.Name = "lblactivitypct"
-        lblactivitypct.Size = New Size(26, 17)
-        lblactivitypct.TabIndex = 1
-        lblactivitypct.Text = "0%"
-        ' 
-        ' trackQuiz
-        ' 
-        trackQuiz.Anchor = AnchorStyles.Left Or AnchorStyles.Right
-        trackQuiz.BackColor = Color.White
-        trackQuiz.BorderColor = Color.FromArgb(CByte(0), CByte(85), CByte(0))
-        trackQuiz.Controls.Add(fillQuiz)
-        trackQuiz.CornerRadius = 13
-        trackQuiz.Location = New Point(113, 13)
-        trackQuiz.Name = "trackQuiz"
-        trackQuiz.Padding = New Padding(6)
-        trackQuiz.Size = New Size(1048, 35)
-        trackQuiz.TabIndex = 19
-        ' 
-        ' fillQuiz
-        ' 
-        fillQuiz.BackColor = Color.DarkGreen
-        fillQuiz.BorderColor = Color.FromArgb(CByte(0), CByte(85), CByte(0))
-        fillQuiz.BorderThickness = 0
-        fillQuiz.Controls.Add(lblQuizPct)
-        fillQuiz.CornerRadius = 11
-        fillQuiz.Dock = DockStyle.Left
-        fillQuiz.Location = New Point(6, 6)
-        fillQuiz.Name = "fillQuiz"
-        fillQuiz.Size = New Size(873, 23)
-        fillQuiz.TabIndex = 0
-        ' 
-        ' lblQuizPct
-        ' 
-        lblQuizPct.AutoSize = True
-        lblQuizPct.Font = New Font("Segoe UI", 9.75F, FontStyle.Bold, GraphicsUnit.Point, CByte(0))
-        lblQuizPct.ForeColor = Color.White
-        lblQuizPct.Location = New Point(12, 3)
-        lblQuizPct.Name = "lblQuizPct"
-        lblQuizPct.Size = New Size(26, 17)
-        lblQuizPct.TabIndex = 0
-        lblQuizPct.Text = "0%"
-        ' 
-        ' Label12
-        ' 
-        Label12.Anchor = AnchorStyles.None
-        Label12.BackColor = Color.White
-        Label12.Font = New Font("Segoe UI", 9.75F, FontStyle.Bold, GraphicsUnit.Point, CByte(0))
-        Label12.ForeColor = Color.DarkGreen
-        Label12.Location = New Point(27, 208)
-        Label12.Name = "Label12"
-        Label12.Size = New Size(55, 17)
-        Label12.TabIndex = 15
-        Label12.Text = "Projects"
-        ' 
-        ' Label13
-        ' 
-        Label13.Anchor = AnchorStyles.None
-        Label13.BackColor = Color.White
-        Label13.Font = New Font("Segoe UI", 9.75F, FontStyle.Bold, GraphicsUnit.Point, CByte(0))
-        Label13.ForeColor = Color.DarkGreen
-        Label13.Location = New Point(27, 146)
-        Label13.Name = "Label13"
-        Label13.Size = New Size(55, 17)
-        Label13.TabIndex = 16
-        Label13.Text = "Exams "
-        ' 
-        ' Label14
-        ' 
-        Label14.Anchor = AnchorStyles.None
-        Label14.BackColor = Color.White
-        Label14.Font = New Font("Segoe UI", 9.75F, FontStyle.Bold, GraphicsUnit.Point, CByte(0))
-        Label14.ForeColor = Color.DarkGreen
-        Label14.Location = New Point(21, 84)
-        Label14.Name = "Label14"
-        Label14.Size = New Size(67, 18)
-        Label14.TabIndex = 17
-        Label14.Text = "Activities"
-        ' 
-        ' Label11
-        ' 
-        Label11.Anchor = AnchorStyles.None
-        Label11.BackColor = Color.White
-        Label11.Font = New Font("Segoe UI", 9.75F, FontStyle.Bold, GraphicsUnit.Point, CByte(0))
-        Label11.ForeColor = Color.DarkGreen
-        Label11.Location = New Point(26, 21)
-        Label11.Name = "Label11"
-        Label11.Size = New Size(58, 19)
-        Label11.TabIndex = 14
-        Label11.Text = "Quizzes"
-        ' 
-        ' tlpstats
-        ' 
-        tlpstats.ColumnCount = 4
-        tlpstats.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 25.0F))
-        tlpstats.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 25.0F))
-        tlpstats.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 25.0F))
-        tlpstats.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 25.0F))
-        tlpstats.Controls.Add(RoundedPanel6, 0, 0)
-        tlpstats.Controls.Add(RoundedPanel8, 1, 0)
-        tlpstats.Controls.Add(RoundedPanel7, 2, 0)
-        tlpstats.Controls.Add(RoundedPanel9, 3, 0)
-        tlpstats.Dock = DockStyle.Top
-        tlpstats.Location = New Point(20, 80)
-        tlpstats.Name = "tlpstats"
-        tlpstats.RowCount = 1
-        tlpstats.RowStyles.Add(New RowStyle(SizeType.Percent, 100.0F))
-        tlpstats.Size = New Size(1164, 112)
-        tlpstats.TabIndex = 21
-        ' 
-        ' RoundedPanel6
-        ' 
-        RoundedPanel6.BackColor = Color.AliceBlue
-        RoundedPanel6.BorderColor = Color.FromArgb(CByte(0), CByte(85), CByte(0))
-        RoundedPanel6.Controls.Add(lblAverageCaption)
-        RoundedPanel6.Controls.Add(lblAverageValue)
-        RoundedPanel6.Dock = DockStyle.Fill
-        RoundedPanel6.Location = New Point(10, 10)
-        RoundedPanel6.Margin = New Padding(10)
-        RoundedPanel6.Name = "RoundedPanel6"
-        RoundedPanel6.Padding = New Padding(6)
-        RoundedPanel6.Size = New Size(271, 92)
-        RoundedPanel6.TabIndex = 11
-        ' 
-        ' lblAverageCaption
-        ' 
-        lblAverageCaption.BackColor = Color.Transparent
-        lblAverageCaption.Dock = DockStyle.Fill
-        lblAverageCaption.Font = New Font("Segoe UI", 11.25F, FontStyle.Bold, GraphicsUnit.Point, CByte(0))
-        lblAverageCaption.ForeColor = Color.DarkGreen
-        lblAverageCaption.Location = New Point(6, 64)
-        lblAverageCaption.Name = "lblAverageCaption"
-        lblAverageCaption.Size = New Size(259, 22)
-        lblAverageCaption.TabIndex = 15
-        lblAverageCaption.Text = "Current Average"
-        lblAverageCaption.TextAlign = ContentAlignment.MiddleCenter
-        ' 
-        ' lblAverageValue
-        ' 
-        lblAverageValue.BackColor = Color.Transparent
-        lblAverageValue.Dock = DockStyle.Top
-        lblAverageValue.Font = New Font("Segoe UI", 15.75F, FontStyle.Bold, GraphicsUnit.Point, CByte(0))
-        lblAverageValue.ForeColor = Color.DarkGreen
-        lblAverageValue.Location = New Point(6, 6)
-        lblAverageValue.Name = "lblAverageValue"
-        lblAverageValue.Size = New Size(259, 58)
-        lblAverageValue.TabIndex = 20
-        lblAverageValue.Text = "0"
-        lblAverageValue.TextAlign = ContentAlignment.MiddleCenter
-        ' 
-        ' RoundedPanel8
-        ' 
-        RoundedPanel8.BackColor = Color.AliceBlue
-        RoundedPanel8.BorderColor = Color.FromArgb(CByte(0), CByte(85), CByte(0))
-        RoundedPanel8.Controls.Add(lblPassedCaption)
-        RoundedPanel8.Controls.Add(lblPassedValue)
-        RoundedPanel8.Dock = DockStyle.Bottom
-        RoundedPanel8.Location = New Point(301, 10)
-        RoundedPanel8.Margin = New Padding(10)
-        RoundedPanel8.Name = "RoundedPanel8"
-        RoundedPanel8.Padding = New Padding(6)
-        RoundedPanel8.Size = New Size(271, 92)
-        RoundedPanel8.TabIndex = 12
-        ' 
-        ' lblPassedCaption
-        ' 
-        lblPassedCaption.BackColor = Color.Transparent
-        lblPassedCaption.Dock = DockStyle.Fill
-        lblPassedCaption.Font = New Font("Segoe UI", 11.25F, FontStyle.Bold, GraphicsUnit.Point, CByte(0))
-        lblPassedCaption.ForeColor = Color.DarkGreen
-        lblPassedCaption.Location = New Point(6, 66)
-        lblPassedCaption.Name = "lblPassedCaption"
-        lblPassedCaption.Size = New Size(259, 20)
-        lblPassedCaption.TabIndex = 16
-        lblPassedCaption.Text = "Activities Passed"
-        lblPassedCaption.TextAlign = ContentAlignment.TopCenter
-        ' 
-        ' lblPassedValue
-        ' 
-        lblPassedValue.BackColor = Color.Transparent
-        lblPassedValue.Dock = DockStyle.Top
-        lblPassedValue.Font = New Font("Segoe UI", 15.75F, FontStyle.Bold, GraphicsUnit.Point, CByte(0))
-        lblPassedValue.ForeColor = Color.DarkGreen
-        lblPassedValue.Location = New Point(6, 6)
-        lblPassedValue.Name = "lblPassedValue"
-        lblPassedValue.Size = New Size(259, 60)
-        lblPassedValue.TabIndex = 19
-        lblPassedValue.Text = "0"
-        lblPassedValue.TextAlign = ContentAlignment.MiddleCenter
-        ' 
-        ' RoundedPanel7
-        ' 
-        RoundedPanel7.BackColor = Color.AliceBlue
-        RoundedPanel7.BorderColor = Color.FromArgb(CByte(0), CByte(85), CByte(0))
-        RoundedPanel7.Controls.Add(lblPendingCaption)
-        RoundedPanel7.Controls.Add(lblPendingValue)
-        RoundedPanel7.Dock = DockStyle.Fill
-        RoundedPanel7.Location = New Point(592, 10)
-        RoundedPanel7.Margin = New Padding(10)
-        RoundedPanel7.Name = "RoundedPanel7"
-        RoundedPanel7.Padding = New Padding(6)
-        RoundedPanel7.Size = New Size(271, 92)
-        RoundedPanel7.TabIndex = 12
-        ' 
-        ' lblPendingCaption
-        ' 
-        lblPendingCaption.BackColor = Color.Transparent
-        lblPendingCaption.Dock = DockStyle.Fill
-        lblPendingCaption.Font = New Font("Segoe UI", 11.25F, FontStyle.Bold, GraphicsUnit.Point, CByte(0))
-        lblPendingCaption.ForeColor = Color.DarkGreen
-        lblPendingCaption.Location = New Point(6, 65)
-        lblPendingCaption.Name = "lblPendingCaption"
-        lblPendingCaption.Size = New Size(259, 21)
-        lblPendingCaption.TabIndex = 16
-        lblPendingCaption.Text = "Pending"
-        lblPendingCaption.TextAlign = ContentAlignment.TopCenter
-        ' 
-        ' lblPendingValue
-        ' 
-        lblPendingValue.BackColor = Color.Transparent
-        lblPendingValue.Dock = DockStyle.Top
-        lblPendingValue.Font = New Font("Segoe UI", 15.75F, FontStyle.Bold, GraphicsUnit.Point, CByte(0))
-        lblPendingValue.ForeColor = Color.DarkGreen
-        lblPendingValue.Location = New Point(6, 6)
-        lblPendingValue.Name = "lblPendingValue"
-        lblPendingValue.Size = New Size(259, 59)
-        lblPendingValue.TabIndex = 19
-        lblPendingValue.Text = "0"
-        lblPendingValue.TextAlign = ContentAlignment.MiddleCenter
-        ' 
-        ' RoundedPanel9
-        ' 
-        RoundedPanel9.BackColor = Color.AliceBlue
-        RoundedPanel9.BorderColor = Color.FromArgb(CByte(0), CByte(85), CByte(0))
-        RoundedPanel9.Controls.Add(lblHighestCaption)
-        RoundedPanel9.Controls.Add(lblHighestValue)
-        RoundedPanel9.Dock = DockStyle.Fill
-        RoundedPanel9.Location = New Point(883, 10)
-        RoundedPanel9.Margin = New Padding(10)
-        RoundedPanel9.Name = "RoundedPanel9"
-        RoundedPanel9.Padding = New Padding(6)
-        RoundedPanel9.Size = New Size(271, 92)
-        RoundedPanel9.TabIndex = 12
-        ' 
-        ' lblHighestCaption
-        ' 
-        lblHighestCaption.BackColor = Color.Transparent
-        lblHighestCaption.Dock = DockStyle.Fill
-        lblHighestCaption.Font = New Font("Segoe UI", 11.25F, FontStyle.Bold, GraphicsUnit.Point, CByte(0))
-        lblHighestCaption.ForeColor = Color.DarkGreen
-        lblHighestCaption.Location = New Point(6, 66)
-        lblHighestCaption.Name = "lblHighestCaption"
-        lblHighestCaption.Size = New Size(259, 20)
-        lblHighestCaption.TabIndex = 17
-        lblHighestCaption.Text = "Highest Score"
-        lblHighestCaption.TextAlign = ContentAlignment.TopCenter
-        ' 
-        ' lblHighestValue
-        ' 
-        lblHighestValue.BackColor = Color.Transparent
-        lblHighestValue.Dock = DockStyle.Top
-        lblHighestValue.Font = New Font("Segoe UI", 15.75F, FontStyle.Bold, GraphicsUnit.Point, CByte(0))
-        lblHighestValue.ForeColor = Color.DarkGreen
-        lblHighestValue.Location = New Point(6, 6)
-        lblHighestValue.Name = "lblHighestValue"
-        lblHighestValue.Size = New Size(259, 60)
-        lblHighestValue.TabIndex = 18
-        lblHighestValue.Text = "0"
-        lblHighestValue.TextAlign = ContentAlignment.MiddleCenter
-        ' 
-        ' pnlperfheader
-        ' 
-        pnlperfheader.Controls.Add(Label10)
-        pnlperfheader.Controls.Add(PictureBox6)
-        pnlperfheader.Dock = DockStyle.Top
-        pnlperfheader.Location = New Point(20, 20)
-        pnlperfheader.Name = "pnlperfheader"
-        pnlperfheader.Size = New Size(1164, 60)
-        pnlperfheader.TabIndex = 20
-        ' 
-        ' Label10
-        ' 
-        Label10.AutoSize = True
-        Label10.BackColor = Color.White
-        Label10.Font = New Font("Segoe UI", 18.0F, FontStyle.Bold, GraphicsUnit.Point, CByte(0))
-        Label10.ForeColor = Color.DarkGreen
-        Label10.Location = New Point(72, 12)
-        Label10.Name = "Label10"
-        Label10.Size = New Size(318, 32)
-        Label10.TabIndex = 10
-        Label10.Text = "My Performance Overview"
-        ' 
-        ' PictureBox6
-        ' 
-        PictureBox6.Image = CType(resources.GetObject("PictureBox6.Image"), Image)
-        PictureBox6.Location = New Point(9, 1)
-        PictureBox6.Name = "PictureBox6"
-        PictureBox6.Size = New Size(59, 55)
-        PictureBox6.SizeMode = PictureBoxSizeMode.Zoom
-        PictureBox6.TabIndex = 1
-        PictureBox6.TabStop = False
-        ' 
-        ' Panel1
-        ' 
-        Panel1.BackColor = Color.DimGray
-        Panel1.Location = New Point(30, 77)
-        Panel1.Name = "Panel1"
-        Panel1.Size = New Size(1022, 2)
-        Panel1.TabIndex = 19
-        ' 
-        ' pnlMyGrades
-        ' 
-        pnlMyGrades.BackColor = Color.WhiteSmoke
-        pnlMyGrades.Controls.Add(Label1)
-        pnlMyGrades.Controls.Add(RoundedPanel1)
-        pnlMyGrades.Dock = DockStyle.Fill
-        pnlMyGrades.Location = New Point(0, 0)
-        pnlMyGrades.Name = "pnlMyGrades"
-        pnlMyGrades.Size = New Size(1264, 540)
-        pnlMyGrades.TabIndex = 7
-        ' 
-        ' Label1
-        ' 
-        Label1.AutoSize = True
-        Label1.BackColor = Color.WhiteSmoke
-        Label1.Font = New Font("Segoe UI", 18.0F, FontStyle.Bold, GraphicsUnit.Point, CByte(0))
-        Label1.ForeColor = Color.DarkGreen
-        Label1.Location = New Point(144, 4)
-        Label1.Name = "Label1"
-        Label1.Size = New Size(167, 32)
-        Label1.TabIndex = 10
-        Label1.Text = "Grade Report"
-        ' 
-        ' RoundedPanel1
-        ' 
-        RoundedPanel1.Anchor = AnchorStyles.Top Or AnchorStyles.Bottom Or AnchorStyles.Left Or AnchorStyles.Right
-        RoundedPanel1.BackColor = Color.White
-        RoundedPanel1.BorderColor = Color.FromArgb(CByte(0), CByte(85), CByte(0))
-        RoundedPanel1.Controls.Add(lblstanding)
-        RoundedPanel1.Controls.Add(dgvgrades)
-        RoundedPanel1.Controls.Add(Panel3)
-        RoundedPanel1.Controls.Add(Panel4)
-        RoundedPanel1.Location = New Point(140, 40)
-        RoundedPanel1.Name = "RoundedPanel1"
-        RoundedPanel1.Padding = New Padding(14)
-        RoundedPanel1.Size = New Size(994, 447)
-        RoundedPanel1.TabIndex = 0
-        ' 
-        ' lblstanding
-        ' 
-        lblstanding.BackColor = Color.White
-        lblstanding.Dock = DockStyle.Bottom
-        lblstanding.Font = New Font("Segoe UI", 9.75F, FontStyle.Bold, GraphicsUnit.Point, CByte(0))
-        lblstanding.ForeColor = Color.DarkGreen
-        lblstanding.Location = New Point(14, 406)
-        lblstanding.Name = "lblstanding"
-        lblstanding.Padding = New Padding(10, 0, 0, 10)
-        lblstanding.Size = New Size(966, 27)
-        lblstanding.TabIndex = 12
-        lblstanding.Text = "Current Standing: 0%"
-        lblstanding.TextAlign = ContentAlignment.MiddleLeft
-        ' 
-        ' dgvgrades
-        ' 
-        dgvgrades.BackgroundColor = Color.White
-        dgvgrades.ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.AutoSize
-        dgvgrades.Dock = DockStyle.Fill
-        dgvgrades.Location = New Point(14, 66)
-        dgvgrades.Name = "dgvgrades"
-        dgvgrades.RowHeadersWidth = 51
-        dgvgrades.Size = New Size(966, 367)
-        dgvgrades.TabIndex = 3
-        ' 
-        ' Panel3
-        ' 
-        Panel3.BackColor = Color.DimGray
-        Panel3.Dock = DockStyle.Top
-        Panel3.Location = New Point(14, 64)
-        Panel3.Name = "Panel3"
-        Panel3.Size = New Size(966, 2)
-        Panel3.TabIndex = 13
-        ' 
-        ' Panel4
-        ' 
-        Panel4.BackColor = Color.White
-        Panel4.Controls.Add(PictureBox2)
-        Panel4.Controls.Add(cboCourse)
-        Panel4.Dock = DockStyle.Top
-        Panel4.Location = New Point(14, 14)
-        Panel4.Name = "Panel4"
-        Panel4.Size = New Size(966, 50)
-        Panel4.TabIndex = 14
-        ' 
-        ' PictureBox2
-        ' 
-        PictureBox2.Image = My.Resources.Resources.Gemini_Generated_Image_902bw4902bw4902b_removebg_preview
-        PictureBox2.Location = New Point(0, 3)
-        PictureBox2.Name = "PictureBox2"
-        PictureBox2.Size = New Size(67, 43)
-        PictureBox2.SizeMode = PictureBoxSizeMode.Zoom
-        PictureBox2.TabIndex = 1
-        PictureBox2.TabStop = False
-        ' 
-        ' cboCourse
-        ' 
-        cboCourse.BackColor = Color.FloralWhite
-        cboCourse.DropDownStyle = ComboBoxStyle.DropDownList
-        cboCourse.FormattingEnabled = True
-        cboCourse.Location = New Point(80, 14)
-        cboCourse.Name = "cboCourse"
-        cboCourse.Size = New Size(277, 23)
-        cboCourse.TabIndex = 2
-        ' 
         ' pnlheader
         ' 
         pnlheader.BackColor = Color.Honeydew
@@ -1300,26 +1337,6 @@ Partial Class frmstudent
         Pnlheaderheader.PerformLayout()
         Pnltabs.ResumeLayout(False)
         pnlContent.ResumeLayout(False)
-        pnlRequestRevision.ResumeLayout(False)
-        tlprevision.ResumeLayout(False)
-        cardSubmit.ResumeLayout(False)
-        cardSubmit.PerformLayout()
-        pnlSubmitHeader.ResumeLayout(False)
-        pnlSubmitHeader.PerformLayout()
-        CType(PictureBox4, ComponentModel.ISupportInitialize).EndInit()
-        cardStatus.ResumeLayout(False)
-        CType(dgvRequests, ComponentModel.ISupportInitialize).EndInit()
-        pnlStatusHeader.ResumeLayout(False)
-        pnlStatusHeader.PerformLayout()
-        CType(PictureBox5, ComponentModel.ISupportInitialize).EndInit()
-        pnlclassbar.ResumeLayout(False)
-        pnlclassbar.PerformLayout()
-        pnlGradeHistory.ResumeLayout(False)
-        RoundedPanel2.ResumeLayout(False)
-        CType(dgvHistory, ComponentModel.ISupportInitialize).EndInit()
-        pnlHistoryHeader.ResumeLayout(False)
-        pnlHistoryHeader.PerformLayout()
-        CType(PictureBox3, ComponentModel.ISupportInitialize).EndInit()
         pnlMyPerformance.ResumeLayout(False)
         cardPerformance.ResumeLayout(False)
         tlpbars.ResumeLayout(False)
@@ -1349,6 +1366,26 @@ Partial Class frmstudent
         CType(dgvgrades, ComponentModel.ISupportInitialize).EndInit()
         Panel4.ResumeLayout(False)
         CType(PictureBox2, ComponentModel.ISupportInitialize).EndInit()
+        pnlRequestRevision.ResumeLayout(False)
+        tlprevision.ResumeLayout(False)
+        cardSubmit.ResumeLayout(False)
+        cardSubmit.PerformLayout()
+        pnlSubmitHeader.ResumeLayout(False)
+        pnlSubmitHeader.PerformLayout()
+        CType(PictureBox4, ComponentModel.ISupportInitialize).EndInit()
+        cardStatus.ResumeLayout(False)
+        CType(dgvRequests, ComponentModel.ISupportInitialize).EndInit()
+        pnlStatusHeader.ResumeLayout(False)
+        pnlStatusHeader.PerformLayout()
+        CType(PictureBox5, ComponentModel.ISupportInitialize).EndInit()
+        pnlclassbar.ResumeLayout(False)
+        pnlclassbar.PerformLayout()
+        pnlGradeHistory.ResumeLayout(False)
+        RoundedPanel2.ResumeLayout(False)
+        CType(dgvHistory, ComponentModel.ISupportInitialize).EndInit()
+        pnlHistoryHeader.ResumeLayout(False)
+        pnlHistoryHeader.PerformLayout()
+        CType(PictureBox3, ComponentModel.ISupportInitialize).EndInit()
         pnlheader.ResumeLayout(False)
         pnlheader.PerformLayout()
         CType(PictureBox1, ComponentModel.ISupportInitialize).EndInit()
@@ -1446,5 +1483,8 @@ Partial Class frmstudent
     Friend WithEvents pnlclassbar As Panel
     Friend WithEvents lblClass As Label
     Friend WithEvents cboclass As ComboBox
+    Friend WithEvents cboterm As ComboBox
+    Friend WithEvents cboperfterm As ComboBox
+    Friend WithEvents cboperfcourse As ComboBox
 
 End Class
