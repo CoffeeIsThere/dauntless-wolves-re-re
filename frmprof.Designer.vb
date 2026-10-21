@@ -206,7 +206,6 @@ Partial Class frmprof
         ' 
         ' CustomButton7
         ' 
-        CustomButton7.Anchor = AnchorStyles.Top Or AnchorStyles.Right
         CustomButton7.BackColor = Color.Green
         CustomButton7.BorderColor = Color.Black
         CustomButton7.BorderSize = 2
