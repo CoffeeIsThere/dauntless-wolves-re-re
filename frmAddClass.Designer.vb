@@ -125,6 +125,7 @@ Partial Class frmAddClass
         ' 
         ' cboProfessor
         ' 
+        cboProfessor.DropDownStyle = ComboBoxStyle.DropDownList
         cboProfessor.FormattingEnabled = True
         cboProfessor.Location = New Point(81, 297)
         cboProfessor.Name = "cboProfessor"
@@ -162,7 +163,7 @@ Partial Class frmAddClass
         lblrpof.Name = "lblrpof"
         lblrpof.Size = New Size(77, 15)
         lblrpof.TabIndex = 12
-        lblrpof.Text = "Subject Code"
+        lblrpof.Text = "Professor"
         ' 
         ' lblName
         ' 
@@ -178,7 +179,7 @@ Partial Class frmAddClass
         ' btnsave
         ' 
         btnsave.BackColor = Color.DarkGreen
-        btnsave.DialogResult = DialogResult.OK
+        btnsave.DialogResult = DialogResult.None
         btnsave.FlatStyle = FlatStyle.Flat
         btnsave.ForeColor = Color.White
         btnsave.Location = New Point(258, 357)

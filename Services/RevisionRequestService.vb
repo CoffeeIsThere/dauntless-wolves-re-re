@@ -26,33 +26,90 @@ Public Class RevisionRequestService
         End Try
     End Function
 
-    Public Function ApproveAndApplyRevision(requestId As Integer, enrollmentId As Integer, assessmentId As Integer, newScore As Double, teacherId As String, reason As String) As OperationResult
+    Private Shared Function NullD(o As Object) As Double?
+        If o Is Nothing OrElse Convert.IsDBNull(o) Then Return Nothing
+        Return Convert.ToDouble(o)
+    End Function
+
+    ' overrideScore: for "re-check" requests (no points requested), the teacher inputs the corrected score
+    Public Function ApproveAndApplyRevision(requestId As Integer, teacherId As String,
+                                        Optional overrideScore As Double? = Nothing) As OperationResult
         Try
             Using conn As MySqlConnection = DatabaseHelper.GetConnection()
                 Using tx As MySqlTransaction = conn.BeginTransaction()
                     Try
-                        ' 1. Mark Revision Request as Approved
-                        Dim updateReqSql As String = "UPDATE revisionrequest " &
-                                                     "SET status = 'Approved', reviewed_at = NOW(), reviewed_by = @TeacherId " &
-                                                     "WHERE request_id = @RequestId"
-                        Using cmd As New MySqlCommand(updateReqSql, conn, tx)
-                            cmd.Parameters.AddWithValue("@TeacherId", teacherId)
-                            cmd.Parameters.AddWithValue("@RequestId", requestId)
-                            cmd.ExecuteNonQuery()
+                        Dim status As String = "", reason As String = ""
+                        Dim requested As Double? = Nothing, current As Double? = Nothing
+                        Dim enrollmentId As Integer, assessmentId As Integer
+                        Dim total As Double = 0
+
+                        ' Lock row to read live values
+                        Dim sql As String =
+                        "SELECT r.status, r.requested_points, r.reason, sg.enrollment_id, sg.assessment_id, sg.score, a.total_score " &
+                        "FROM revisionrequest r " &
+                        "JOIN studentgrade sg ON r.grade_id = sg.grade_id " &
+                        "JOIN assessment a ON sg.assessment_id = a.assessment_id " &
+                        "WHERE r.request_id = @Id FOR UPDATE"
+
+                        Using cmd As New MySqlCommand(sql, conn, tx)
+                            cmd.Parameters.AddWithValue("@Id", requestId)
+                            Using r As MySqlDataReader = cmd.ExecuteReader()
+                                If Not r.Read() Then
+                                    tx.Rollback()
+                                    Return OperationResult.Fail("Request not found.")
+                                End If
+                                status = r.GetValue(0).ToString()
+                                requested = NullD(r.GetValue(1))
+                                reason = r.GetValue(2).ToString()
+                                enrollmentId = Convert.ToInt32(r.GetValue(3))
+                                assessmentId = Convert.ToInt32(r.GetValue(4))
+                                current = NullD(r.GetValue(5))
+                                total = Convert.ToDouble(r.GetValue(6))
+                            End Using
                         End Using
 
-                        ' 2. Apply Grade Change and Recalculate via GradeService in same transaction
-                        Dim gradeSvc As New GradeService()
-                        Dim gradeRes As OperationResult = gradeSvc.RecordScoreTx(conn, tx, enrollmentId, assessmentId, newScore, teacherId, $"Approved Revision Request #{requestId}: {reason}")
+                        ' Prevent approving twice
+                        If status <> "Pending" AndAlso status <> "Under Review" Then
+                            tx.Rollback()
+                            Return OperationResult.Fail("This request was already " & status.ToLower() & ".")
+                        End If
+
+                        ' Calculate score addition or request override score
+                        Dim newScore As Double
+                        If overrideScore.HasValue Then
+                            newScore = overrideScore.Value
+                        ElseIf requested.HasValue AndAlso current.HasValue Then
+                            newScore = Math.Min(current.Value + requested.Value, total)
+                        Else
+                            tx.Rollback()
+                            Return OperationResult.Fail("NEEDSCORE")   ' Signal frmprof to ask professor for the score
+                        End If
+
+                        ' 1) Record score, recalculate running grade, and log score audit
+                        Dim gradeRes As OperationResult = New GradeService().RecordScoreTx(
+                        conn, tx, enrollmentId, assessmentId, newScore, teacherId,
+                        $"Approved revision request #{requestId}: {reason}")
 
                         If Not gradeRes.Success Then
                             tx.Rollback()
                             Return gradeRes
                         End If
 
+                        ' 2) Update revision request status
+                        Using cmd As New MySqlCommand(
+                        "UPDATE revisionrequest SET status = 'Approved', reviewed_at = NOW(), reviewed_by = @T WHERE request_id = @Id", conn, tx)
+                            cmd.Parameters.AddWithValue("@T", teacherId)
+                            cmd.Parameters.AddWithValue("@Id", requestId)
+                            cmd.ExecuteNonQuery()
+                        End Using
+
+                        ' 3) Write request approval audit log
+                        AuditService.LogActionTx(conn, tx, "Teacher", teacherId, "Updated request status",
+                                             "RevisionRequest", requestId.ToString(), status, "Approved", reason)
+
                         tx.Commit()
-                        Return OperationResult.Ok($"Request #{requestId} approved and new score ({newScore}) applied.")
-                    Catch ex As Exception
+                        Return OperationResult.Ok($"Request #{requestId} approved. New score: {newScore:0.##}/{total:0.##}")
+                    Catch
                         tx.Rollback()
                         Throw
                     End Try
@@ -129,5 +186,38 @@ Public Class RevisionRequestService
 
         Return DatabaseHelper.ExecuteQuery(sql, params)
     End Function
+
+    Public Function GetRevisionRequestsByStudent(studentId As String) As DataTable
+        Dim sql As String = "SELECT " &
+                       "    r.request_id, " &
+                       "    co.course_code, " &
+                       "    co.course_name, " &
+                       "    c.section, " &
+                       "    IFNULL(t.full_name, 'Unassigned') AS professor_name, " &
+                       "    a.title AS assessment_title, " &
+                       "    sg.score AS current_score, " &
+                       "    a.total_score, " &
+                       "    r.requested_points, " &
+                       "    r.reason, " &
+                       "    r.status, " &
+                       "    r.requested_at, " &
+                       "    r.reviewed_at " &
+                       "FROM revisionrequest r " &
+                       "INNER JOIN studentgrade sg ON r.grade_id = sg.grade_id " &
+                       "INNER JOIN assessment a ON sg.assessment_id = a.assessment_id " &
+                       "INNER JOIN enrollment e ON sg.enrollment_id = e.enrollment_id " &
+                       "INNER JOIN class c ON e.class_id = c.class_id " &
+                       "INNER JOIN course co ON c.course_code = co.course_code " &
+                       "LEFT JOIN teacher t ON c.teacher_id = t.teacher_id " &
+                       "WHERE e.student_id = @StudentId " &
+                       "ORDER BY r.requested_at DESC"
+
+        Dim params As MySqlParameter() = {
+        New MySqlParameter("@StudentId", studentId)
+    }
+
+        Return DatabaseHelper.ExecuteQuery(sql, params)
+    End Function
+
 
 End Class

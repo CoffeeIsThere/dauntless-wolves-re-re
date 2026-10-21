@@ -6,14 +6,15 @@ Public Class Admin
     Private ReadOnly _userService As New UserService()
 
     ' Store logged-in admin ID
-    Private _currentAdminId As String = "ADM001"
+
 
     Private tabButtons As Button()
 
 
     Private Sub Admin_Load(sender As Object, e As EventArgs) Handles MyBase.Load
 
-        If AppSession.CurrentUser Is Nothing Then
+        ' Check if user is logged in and is an Admin
+        If AppSession.CurrentUser Is Nothing OrElse Not AppSession.IsAdmin Then
             MessageBox.Show("Please log in to access this page.", "Access Denied", MessageBoxButtons.OK, MessageBoxIcon.Warning)
 
             Dim loginForm As New frmlogin()
@@ -22,14 +23,14 @@ Public Class Admin
             Return
         End If
 
+        ' Displays actual full name from session
+        lblAdminName.Text = AppSession.CurrentUser.FullName
+
         tabButtons = {btnDashboard, btnStudents, btnProfessors}
-        ShowPanel(pnlDashboard, btnDashboard)   ' page shown first
+        ShowPanel(pnlDashboard, btnDashboard)
         InitProfessorPage()
         InitStudentPage()
         InitDashboardPage()
-
-        ' (Optional) Display user name on a label on your form
-        ' lblAdminName.Text = $"Logged in as: {AppSession.CurrentUser.FullName}"
     End Sub
 
 
@@ -41,10 +42,14 @@ Public Class Admin
         p.Visible = True
         p.BringToFront()
 
-        ' highlight the active tab
         For Each b As Button In tabButtons
             Dim isActive As Boolean = (b Is activeBtn)
-            b.BackColor = If(isActive, Color.White, Color.FromArgb(200, 215, 205))
+            ' Fix: Update NormalColor on CustomButtons so hover doesn't wipe out active color
+            If TypeOf b Is CustomButton Then
+                DirectCast(b, CustomButton).NormalColor = If(isActive, Color.White, Color.FromArgb(200, 215, 205))
+            Else
+                b.BackColor = If(isActive, Color.White, Color.FromArgb(200, 215, 205))
+            End If
             b.Font = New Font(b.Font, If(isActive, FontStyle.Bold, FontStyle.Regular))
         Next
     End Sub
@@ -160,23 +165,19 @@ Public Class Admin
 
     Private Sub LoadProfsFromDb()
         allProfs.Clear()
-
-        ' Fetch real teacher records from MySQL via UserService
         Dim dt As DataTable = _userService.GetAllTeachers()
 
-        ' Convert database rows into your existing ProfessorInfo list
         For Each row As DataRow In dt.Rows
             allProfs.Add(New ProfessorInfo With {
             .Name = row("full_name").ToString(),
             .EmployeeID = row("teacher_id").ToString(),
             .Department = row("department").ToString(),
             .Classes = If(IsDBNull(row("class_count")), 0, Convert.ToInt32(row("class_count"))),
-            .EmploymentType = "Full-time",   ' UI only for now (change to "Part-time" to preview the other pill)
+            .EmploymentType = row("employment_type").ToString(),
             .Status = row("status").ToString()
         })
         Next
 
-        ' Send real data into your existing pagination/filter pipeline
         ApplyProfFilter()
     End Sub
 
@@ -341,9 +342,11 @@ Public Class Admin
         If rects(0).Contains(e.Location) Then
             MessageBox.Show("Edit " & empId)             ' open your edit form here
         ElseIf rects(1).Contains(e.Location) Then
-            If MessageBox.Show("Delete " & empId & "?", "Confirm", MessageBoxButtons.YesNo) = DialogResult.Yes Then
-                allProfs.RemoveAll(Function(p) p.EmployeeID = empId)
-                ApplyProfFilter()
+            If MessageBox.Show("Deactivate " & empId & "? They will no longer be able to log in.", "Confirm",
+                   MessageBoxButtons.YesNo, MessageBoxIcon.Question) = DialogResult.Yes Then
+                If _userService.SetUserStatus("Teacher", empId, "Inactive", AppSession.CurrentUser.UserId) Then
+                    LoadProfsFromDb()
+                End If
             End If
         End If
     End Sub
@@ -374,7 +377,7 @@ Public Class Admin
 
     Private Sub InitStudentPage()
         SetupStudentGrid()
-        LoadSampleStudents()
+        LoadStudentsFromDb()
 
         cboYearLevel.DropDownStyle = ComboBoxStyle.DropDownList
         cboSection.DropDownStyle = ComboBoxStyle.DropDownList
@@ -476,25 +479,22 @@ Public Class Admin
         End With
     End Sub
 
-    Private Sub LoadSampleStudents()
-        ' Sample data. Replace with MySQL later.
+    Private Sub LoadStudentsFromDb()
         allStudents.Clear()
-        Dim rows = {
-            ("25-00839", "Mariano, Geoff Andreil", 2, "BSCS-2A", "BS Computer Science", "Active"),
-            ("23-00239", "Condes, Hope Gian D.", 4, "BSIT-4B", "BS Information Management", "Active"),
-            ("24-00934", "Lalata, Carl Jade", 3, "BSHM-3B", "BS Hospitality Management", "Inactive"),
-            ("25-00902", "Santos, Maria Angelica", 2, "BSCS-2A", "BS Computer Science", "Inactive"),
-            ("26-00783", "Oropilla, Charles", 1, "BSCS-2A", "BS Computer Science", "Active"),
-            ("26-00273", "Puyat, Ron Jacob", 1, "BSCS-1A", "BS Computer Science", "Active"),
-            ("25-00749", "Buluran, Family I.", 2, "BSCS-2A", "BS Computer Science", "Inactive"),
-            ("23-00111", "Rodas, Rodas P.", 4, "BSCS-4A", "BS Computer Science", "Active"),
-            ("23-06767", "Ramos, Reago W.", 4, "BSCS-4A", "BS Computer Science", "Inactive"),
-            ("25-08392", "Salceda, Poknat X.", 2, "BSA 2A", "BS Accountancy", "Active")}
-        For Each r In rows
+        Dim dt As DataTable = _userService.GetAllStudents()
+
+        For Each row As DataRow In dt.Rows
             allStudents.Add(New StudentInfo With {
-                .StudentID = r.Item1, .FullName = r.Item2, .YearLevel = r.Item3,
-                .Section = r.Item4, .Program = r.Item5, .Status = r.Item6})
+            .StudentID = row("student_id").ToString(),
+            .FullName = row("full_name").ToString(),
+            .YearLevel = Convert.ToInt32(row("year_level")),
+            .Section = row("section").ToString(),
+            .Program = row("program").ToString(),
+            .Status = row("status").ToString()
+        })
         Next
+
+        ApplyStudentFilter()
     End Sub
 
     Private Sub ApplyStudentFilter()
@@ -634,11 +634,14 @@ Public Class Admin
         Dim id As String = dgvstudents.Rows(e.RowIndex).Cells("colStudentId").Value.ToString()
 
         If rects(0).Contains(e.Location) Then
-            MessageBox.Show("Edit " & id)                 ' open your edit form here
+            MessageBox.Show("Edit " & id)             ' open your edit form here
         ElseIf rects(1).Contains(e.Location) Then
-            If MessageBox.Show("Delete " & id & "?", "Confirm", MessageBoxButtons.YesNo) = DialogResult.Yes Then
-                allStudents.RemoveAll(Function(s) s.StudentID = id)
-                ApplyStudentFilter()
+            If MessageBox.Show("Deactivate " & id & "? They will no longer be able to log in.", "Confirm",
+                       MessageBoxButtons.YesNo, MessageBoxIcon.Question) = DialogResult.Yes Then
+                If _userService.SetUserStatus("Student", id, "Inactive", AppSession.CurrentUser.UserId) Then
+                    LoadStudentsFromDb()
+                    ApplyStudentFilter()
+                End If
             End If
         End If
     End Sub
@@ -708,19 +711,20 @@ Public Class Admin
     End Sub
 
     Private Sub LoadDashboard()
-        ' Counts come from the student and professor lists already loaded.
-        ' Active classes and pending requests are sample values. Replace with MySQL later.
         lblStatStudents.Text = allStudents.Count.ToString("N0")
         lblStatProfs.Text = allProfs.Count.ToString("N0")
-        lblStatClasses.Text = "142"
-        lblStatPending.Text = "12"
+        lblStatClasses.Text = Convert.ToInt32(DatabaseHelper.ExecuteScalar("SELECT COUNT(*) FROM class")).ToString("N0")
+        lblStatPending.Text = Convert.ToInt32(DatabaseHelper.ExecuteScalar(
+        "SELECT COUNT(*) FROM revisionrequest WHERE status IN ('Pending','Under Review')")).ToString("N0")
 
-        ' Sample data. Replace with the latest rows from the audit log.
         dgvupdates.Rows.Clear()
-        dgvupdates.Rows.Add("Updated Lalata, Carl Jade's Quiz #1", "-Prof. Jhun")
-        dgvupdates.Rows.Add("Updated Condes, Hope Gian's SW #2", "-Prof. Becca")
-        dgvupdates.Rows.Add("Student added- Mariano, Geoff Andreii", "-DBMS2")
-        dgvupdates.Rows.Add("Professor added- Ramos, Aldrich Andreii", "-IT101")
+        Dim dt As DataTable = DatabaseHelper.ExecuteQuery(
+        "SELECT action, details, logged_at FROM auditlog ORDER BY logged_at DESC, log_id DESC LIMIT 6")
+        For Each r As DataRow In dt.Rows
+            Dim text As String = r("action").ToString()
+            If r("details").ToString() <> "" Then text &= " - " & r("details").ToString()
+            dgvupdates.Rows.Add(text, "-" & CDate(r("logged_at")).ToString("MMM d, HH:mm"))
+        Next
         dgvupdates.ClearSelection()
     End Sub
 

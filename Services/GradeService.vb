@@ -402,4 +402,65 @@ Public Class GradeService
         Return value.ToString("0.##", CultureInfo.InvariantCulture)
     End Function
 
+
+
+    ' Fetch all assessments for a specific teacher's class
+    Public Function GetAssessmentsByClass(classId As Integer, teacherId As String) As DataTable
+        Dim sql As String =
+            "SELECT a.assessment_id, a.title, a.term, a.total_score " &
+            "FROM assessment a JOIN class c ON a.class_id = c.class_id " &
+            "WHERE a.class_id = @ClassId AND c.teacher_id = @TeacherId " &
+            "ORDER BY a.term, a.created_at, a.assessment_id"
+        Return DatabaseHelper.ExecuteQuery(sql, {New MySqlParameter("@ClassId", classId), New MySqlParameter("@TeacherId", teacherId)})
+    End Function
+
+    ' Analytics tiles: class average, passing count, at-risk count, top score
+    Public Function GetClassSummary(classId As Integer, teacherId As String) As (Average As Double?, Passing As Integer, AtRisk As Integer, Top As Double?)
+        Dim dt As DataTable = GetEnrollmentsByClass(classId, teacherId)
+        Dim grades As New List(Of Double)()
+        For Each r As DataRow In dt.Rows
+            Dim g As Double? = ToNullableDouble(r("running_grade"))
+            If g.HasValue Then grades.Add(g.Value)
+        Next
+        If grades.Count = 0 Then Return (Nothing, 0, 0, Nothing)
+        Return (Math.Round(grades.Average(), 1),
+                grades.Where(Function(g) g >= GradeCalculator.PassingGrade).Count(),
+                grades.Where(Function(g) g < GradeCalculator.PassingGrade).Count(),
+                grades.Max())
+    End Function
+
+    ' Analytics bars: average % per assessment type (Quiz, Activity, Exam, Project, Attendance)
+    Public Function GetAveragesByType(classId As Integer, teacherId As String) As Dictionary(Of String, Double)
+        Dim sql As String =
+            "SELECT a.assessment_type, SUM(sg.score) / SUM(a.total_score) * 100 AS avg_pct " &
+            "FROM studentgrade sg " &
+            "JOIN assessment a ON sg.assessment_id = a.assessment_id " &
+            "JOIN enrollment e ON sg.enrollment_id = e.enrollment_id " &
+            "JOIN class c ON e.class_id = c.class_id " &
+            "WHERE e.class_id = @ClassId AND c.teacher_id = @TeacherId AND sg.score IS NOT NULL " &
+            "GROUP BY a.assessment_type"
+        Dim result As New Dictionary(Of String, Double)()
+        For Each r As DataRow In DatabaseHelper.ExecuteQuery(sql,
+                {New MySqlParameter("@ClassId", classId), New MySqlParameter("@TeacherId", teacherId)}).Rows
+            result(r("assessment_type").ToString()) = Math.Round(Convert.ToDouble(r("avg_pct")), 0)
+        Next
+        Return result
+    End Function
+
+    ' Teacher's Audit Logs tab: action, student name, assessment title, timestamp, logged user
+    Public Function GetAuditLogsForTeacher(teacherId As String) As DataTable
+        Dim sql As String =
+            "SELECT al.action AS Action, COALESCE(s.full_name, '-') AS Student, COALESCE(a.title, al.entity_type) AS Item, " &
+            "       DATE_FORMAT(al.logged_at, '%Y-%m-%d %H:%i') AS DateTime, t.full_name AS ChangedBy " &
+            "FROM auditlog al " &
+            "LEFT JOIN studentgrade sg ON al.entity_type = 'StudentGrade' AND sg.grade_id = CAST(al.entity_id AS UNSIGNED) " &
+            "LEFT JOIN enrollment e ON sg.enrollment_id = e.enrollment_id " &
+            "LEFT JOIN student s ON e.student_id = s.student_id " &
+            "LEFT JOIN assessment a ON sg.assessment_id = a.assessment_id " &
+            "LEFT JOIN teacher t ON al.teacher_id = t.teacher_id " &
+            "WHERE al.teacher_id = @TeacherId " &
+            "ORDER BY al.logged_at DESC, al.log_id DESC LIMIT 200"
+        Return DatabaseHelper.ExecuteQuery(sql, {New MySqlParameter("@TeacherId", teacherId)})
+    End Function
+
 End Class

@@ -1,4 +1,4 @@
-﻿
+﻿Imports System.Globalization
 Public Class frmprof
 
     Private ReadOnly _gradeService As New GradeService()
@@ -50,7 +50,8 @@ Public Class frmprof
         ShowPage(btnRecordScores)
 
         ' Select the first item in all ComboBoxes (including inside panels)
-        SetAllComboBoxes(Me)
+        ' Replace SetAllComboBoxes(Me) with this call:
+        LoadTeacherInfo()
 
         isLoading = False
         ConfigureGrid()
@@ -308,7 +309,7 @@ Public Class frmprof
         ' 2. Build the DataTable structure expected by dgvRequests
         Dim dt As New DataTable()
         For Each col In {"RequestId", "EnrollmentId", "AssessmentId", "RequestedPointsVal",
-                     "Student", "Assessment", "CurrentGrade", "Requested", "Reason", "Status", "Action"}
+                 "Student", "Assessment", "CurrentGrade", "Requested", "Reason", "Status", "Action"}
             dt.Columns.Add(col)
         Next
 
@@ -320,11 +321,17 @@ Public Class frmprof
             Dim studentName As String = row("student_name").ToString()
             Dim assessTitle As String = row("assessment_title").ToString()
 
-            Dim currScore As String = If(IsDBNull(row("current_score")), "--",
-                                     row("current_score").ToString() & "/" & row("total_score").ToString())
+            ' Format Current Score nicely (e.g. 9/20 instead of 9.00/20.00)
+            Dim currScore As String = "--"
+            If Not IsDBNull(row("current_score")) AndAlso Not IsDBNull(row("total_score")) Then
+                Dim cScore As Double = Convert.ToDouble(row("current_score"))
+                Dim tScore As Double = Convert.ToDouble(row("total_score"))
+                currScore = $"{cScore:0.##}/{tScore:0.##}"
+            End If
 
+            ' Show "Re-check" if requested_points is NULL, otherwise "+Xpts"
             Dim reqPtsVal As Double = If(IsDBNull(row("requested_points")), 0, Convert.ToDouble(row("requested_points")))
-            Dim reqPtsStr As String = "+" & reqPtsVal.ToString() & "pts"
+            Dim reqPtsStr As String = If(IsDBNull(row("requested_points")), "Re-check", "+" & reqPtsVal.ToString("0.##") & "pts")
 
             Dim reason As String = row("reason").ToString()
             Dim status As String = row("status").ToString()
@@ -379,26 +386,27 @@ Public Class frmprof
         If row.Cells("Action").Value.ToString() <> "Approve" Then Exit Sub
 
         If MessageBox.Show("Approve this revision request and update the student's grade?", "Confirm Revision Approval",
-                       MessageBoxButtons.YesNo, MessageBoxIcon.Question) = DialogResult.Yes Then
+                   MessageBoxButtons.YesNo, MessageBoxIcon.Question) = DialogResult.Yes Then
 
-            ' Retrieve bound database IDs from the row DataRowView
             Dim drv As DataRowView = DirectCast(row.DataBoundItem, DataRowView)
             If drv Is Nothing Then Exit Sub
 
             Dim requestId As Integer = Convert.ToInt32(drv("RequestId"))
-            Dim enrollmentId As Integer = Convert.ToInt32(drv("EnrollmentId"))
-            Dim assessmentId As Integer = Convert.ToInt32(drv("AssessmentId"))
-            Dim newScore As Double = Convert.ToDouble(drv("RequestedPointsVal"))
 
-            ' Execute transaction: approves request, updates student score, recalculates running grade, and creates audit log
-            Dim result As OperationResult = _revisionService.ApproveAndApplyRevision(
-            requestId, enrollmentId, assessmentId, newScore, _currentTeacherId, "Approved via Professor Dashboard"
-        )
+            ' Call updated Fix 5 method using requestId and teacherId
+            Dim result As OperationResult = _revisionService.ApproveAndApplyRevision(requestId, _currentTeacherId)
+
+            ' If "re-check" request (no points specified), prompt professor for corrected score
+            If Not result.Success AndAlso result.Message = "NEEDSCORE" Then
+                Dim txt As String = InputBox("Enter the corrected score for this assessment:", "Re-check")
+                Dim fixedScore As Double
+                If txt = "" OrElse Not Double.TryParse(txt, Globalization.NumberStyles.Float,
+                                                   Globalization.CultureInfo.InvariantCulture, fixedScore) Then Exit Sub
+                result = _revisionService.ApproveAndApplyRevision(requestId, _currentTeacherId, fixedScore)
+            End If
 
             If result.Success Then
                 MessageBox.Show(result.Message, "Request Approved", MessageBoxButtons.OK, MessageBoxIcon.Information)
-
-                ' Refresh grids to display updated database scores and request status
                 LoadRequests()
                 LoadClassGrades()
             Else
@@ -601,8 +609,42 @@ Public Class frmprof
     ' =====================================================
 
     Private Sub ComboBox1_SelectedIndexChanged(sender As Object, e As EventArgs) Handles ComboBox1.SelectedIndexChanged
-        ' Optional: add logic here if you want something to happen when selection changes
+        Dim classId As Integer = SelectedClassId()
+        If classId = 0 Then Exit Sub
+
+        ' Load students enrolled in the selected class
+        Dim students As DataTable = _gradeService.GetEnrollmentsByClass(classId, _currentTeacherId)
+        students.Columns.Add("Display", GetType(String), "student_id + ' - ' + full_name")
+        ComboBox2.DataSource = students
+        ComboBox2.DisplayMember = "Display"
+        ComboBox2.ValueMember = "enrollment_id"
+
+        ' Load assessments created for the selected class
+        Dim assessments As DataTable = _gradeService.GetAssessmentsByClass(classId, _currentTeacherId)
+        assessments.Columns.Add("Display", GetType(String), "term + ' - ' + title")
+        ComboBox4.DataSource = assessments
+        ComboBox4.DisplayMember = "Display"
+        ComboBox4.ValueMember = "assessment_id"
+
+        TextBox1.Clear()
+        If Not isLoading Then LoadClassGrades()
     End Sub
+
+    Private Sub LoadTeacherInfo()
+        lblProfName.Text = AppSession.CurrentUser.FullName
+
+        Dim classes As DataTable = _gradeService.GetClassesByTeacher(_currentTeacherId)
+        classes.Columns.Add("Display", GetType(String), "course_code + ' - ' + section")
+        ComboBox1.DataSource = classes
+        ComboBox1.DisplayMember = "Display"
+        ComboBox1.ValueMember = "class_id"
+    End Sub
+
+    Private Function SelectedClassId() As Integer
+        Dim drv As DataRowView = TryCast(ComboBox1.SelectedItem, DataRowView)
+        If drv Is Nothing Then Return 0
+        Return Convert.ToInt32(drv("class_id"))
+    End Function
 
     Private Sub lblEntryTitle_Click(sender As Object, e As EventArgs)
 
@@ -657,5 +699,33 @@ Public Class frmprof
     End Sub
 
     Private Sub CustomButton6_Click(sender As Object, e As EventArgs) Handles CustomButton6.Click
+    End Sub
+
+    Private Sub CustomButton5_Click(sender As Object, e As EventArgs) Handles CustomButton5.Click
+        Dim stu As DataRowView = TryCast(ComboBox2.SelectedItem, DataRowView)
+        Dim asm As DataRowView = TryCast(ComboBox4.SelectedItem, DataRowView)
+        If stu Is Nothing OrElse asm Is Nothing Then
+            MessageBox.Show("Select a student and an assessment.", "Missing info", MessageBoxButtons.OK, MessageBoxIcon.Warning)
+            Return
+        End If
+
+        Dim score As Double
+        If Not Double.TryParse(TextBox1.Text.Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, score) Then
+            MessageBox.Show("Enter a valid numeric score.", "Invalid score", MessageBoxButtons.OK, MessageBoxIcon.Warning)
+            TextBox1.Focus()
+            Return
+        End If
+
+        ' RecordScore saves the score, recalculates running grade, and logs audit in ONE transaction
+        Dim res As OperationResult = _gradeService.RecordScore(
+            Convert.ToInt32(stu("enrollment_id")), Convert.ToInt32(asm("assessment_id")),
+            score, _currentTeacherId, "Recorded via Record Scores page")
+
+        If res.Success Then
+            MessageBox.Show(res.Message, "Saved", MessageBoxButtons.OK, MessageBoxIcon.Information)
+            TextBox1.Clear()
+        Else
+            MessageBox.Show(res.Message, "Could not save", MessageBoxButtons.OK, MessageBoxIcon.Error)
+        End If
     End Sub
 End Class
