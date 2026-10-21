@@ -66,7 +66,6 @@ Partial Class frmGradebook
         ' 
         ' btnAddStudent
         ' 
-        btnAddStudent.Anchor = AnchorStyles.Top Or AnchorStyles.Right
         btnAddStudent.BackColor = Color.Green
         btnAddStudent.BorderColor = Color.Black
         btnAddStudent.BorderSize = 2
@@ -83,7 +82,6 @@ Partial Class frmGradebook
         ' 
         ' btnAddAssessment
         ' 
-        btnAddAssessment.Anchor = AnchorStyles.Top Or AnchorStyles.Right
         btnAddAssessment.BackColor = Color.Green
         btnAddAssessment.BorderColor = Color.Black
         btnAddAssessment.BorderSize = 2
@@ -109,7 +107,6 @@ Partial Class frmGradebook
         ' 
         ' btnAddClass
         ' 
-        btnAddClass.Anchor = AnchorStyles.Top Or AnchorStyles.Right
         btnAddClass.BackColor = Color.Green
         btnAddClass.BorderColor = Color.Black
         btnAddClass.BorderSize = 2
