@@ -13,6 +13,7 @@ Public Class frmStudent
     ' "course|term" -> avg, passed, pending, highest, quiz%, activity%, exam%, project%
     Private ReadOnly perfData As New Dictionary(Of String, Double())
     ' term, assessment, score, weight, running grade, status
+    Private Const OverallLabel As String = "Overall (All Courses)"
     Private ReadOnly gradeRows As New List(Of String())
     Private Sub frmStudent_Load(sender As Object, e As EventArgs) Handles MyBase.Load
         If AppSession.CurrentUser Is Nothing Then
@@ -332,10 +333,11 @@ Public Class frmStudent
         cboperfterm.Items.AddRange({"Midterm", "Final", "Combined"})
 
         cboperfcourse.Items.Clear()
+        cboperfcourse.Items.Add(OverallLabel)
         cboperfcourse.Items.AddRange({"CS 103 - Object Oriented Programming", "CS 101 - Intro to Computing"})
 
-        cboperfterm.SelectedIndex = 2       ' Combined (nothing shows until a course is chosen)
-        cboperfcourse.SelectedIndex = 0     ' triggers ShowPerformance
+        cboperfterm.SelectedIndex = 2       ' Combined
+        cboperfcourse.SelectedIndex = 0     ' Overall, triggers ShowPerformance
     End Sub
 
     Private Sub cboPerfTerm_SelectedIndexChanged(sender As Object, e As EventArgs) Handles cboperfterm.SelectedIndexChanged
@@ -350,7 +352,13 @@ Public Class frmStudent
         If cboperfterm.SelectedIndex = -1 OrElse cboperfcourse.SelectedIndex = -1 Then Return
 
         Dim v As Double() = Nothing
-        If perfData.TryGetValue(cboperfcourse.Text & "|" & cboperfterm.Text, v) Then
+        If cboperfcourse.Text = OverallLabel Then
+            v = CombineCourses(cboperfterm.Text)
+        Else
+            perfData.TryGetValue(cboperfcourse.Text & "|" & cboperfterm.Text, v)
+        End If
+
+        If v IsNot Nothing Then
             SetStat(lblAverageValue, v(0).ToString("0.0"), "CURRENT AVERAGE")
             SetStat(lblPassedValue, CInt(v(1)).ToString(), "ACTIVITIES PASSED")
             SetStat(lblPendingValue, CInt(v(2)).ToString(), "PENDING")
@@ -368,6 +376,27 @@ Public Class frmStudent
         End If
         UpdateBars()
     End Sub
+
+    ' Combines all courses for one term into the same 8 values
+    Private Function CombineCourses(term As String) As Double()
+        Dim rows = perfData.Where(Function(kv) kv.Key.EndsWith("|" & term)).
+                        Select(Function(kv) kv.Value).ToList()
+        If rows.Count = 0 Then Return Nothing
+
+        Dim result(7) As Double
+        result(0) = rows.Average(Function(r) r(0))   ' average of the course averages
+        result(1) = rows.Sum(Function(r) r(1))       ' passed: total
+        result(2) = rows.Sum(Function(r) r(2))       ' pending: total
+        result(3) = rows.Max(Function(r) r(3))       ' highest score overall
+
+        ' Category bars: average only the courses that have grades in that category
+        For i As Integer = 4 To 7
+            Dim idx As Integer = i
+            Dim withData = rows.Where(Function(r) r(idx) > 0).ToList()
+            result(i) = If(withData.Count = 0, 0, withData.Average(Function(r) r(idx)))
+        Next
+        Return result
+    End Function
 
     ' Each stat card has two labels. This finds the pair inside the card of
     ' "anyLabel", puts the number on the one with the bigger font and the
