@@ -224,7 +224,6 @@ Partial Class frmprof
         ' 
         ' ComboBox5
         ' 
-        ComboBox5.Visible = False
         ComboBox5.FlatStyle = FlatStyle.Flat
         ComboBox5.FormattingEnabled = True
         ComboBox5.Items.AddRange(New Object() {"DSA", "OOP"})
@@ -232,6 +231,7 @@ Partial Class frmprof
         ComboBox5.Name = "ComboBox5"
         ComboBox5.Size = New Size(141, 28)
         ComboBox5.TabIndex = 6
+        ComboBox5.Visible = False
         ' 
         ' LblRole
         ' 
@@ -1528,8 +1528,8 @@ Partial Class frmprof
         ' 
         ' frmprof
         ' 
-        AutoScaleDimensions = New SizeF(8F, 20F)
-        AutoScaleMode = AutoScaleMode.Font
+        AutoScaleDimensions = New SizeF(120F, 120F)
+        AutoScaleMode = AutoScaleMode.Dpi
         BackColor = Color.FromArgb(CByte(238), CByte(242), CByte(247))
         ClientSize = New Size(1262, 673)
         Controls.Add(pnlContent)
