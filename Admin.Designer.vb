@@ -47,6 +47,7 @@ Partial Class Admin
         btnAddProf = New CustomButton()
         cboDeptProf = New ComboBox()
         txtSearchProf = New TextBox()
+        CustomPanel7 = New CustomPanel()
         pnlDashboard = New Panel()
         cardDashboard = New CustomPanel()
         tlpDashBottom = New TableLayoutPanel()
@@ -308,6 +309,7 @@ Partial Class Admin
         ' 
         pnlProfessors.BackColor = Color.White
         pnlProfessors.Controls.Add(pnlProfCard)
+        pnlProfessors.Controls.Add(CustomPanel7)
         pnlProfessors.Dock = DockStyle.Fill
         pnlProfessors.Location = New Point(0, 0)
         pnlProfessors.Name = "pnlProfessors"
@@ -414,6 +416,16 @@ Partial Class Admin
         txtSearchProf.Name = "txtSearchProf"
         txtSearchProf.Size = New Size(260, 27)
         txtSearchProf.TabIndex = 0
+        ' 
+        ' CustomPanel7
+        ' 
+        CustomPanel7.Anchor = AnchorStyles.Top Or AnchorStyles.Bottom Or AnchorStyles.Left Or AnchorStyles.Right
+        CustomPanel7.BackColor = Color.White
+        CustomPanel7.BorderColor = Color.FromArgb(CByte(0), CByte(85), CByte(0))
+        CustomPanel7.Location = New Point(8, 16)
+        CustomPanel7.Name = "CustomPanel7"
+        CustomPanel7.Size = New Size(1351, 588)
+        CustomPanel7.TabIndex = 1
         ' 
         ' pnlDashboard
         ' 
@@ -1236,4 +1248,5 @@ Partial Class Admin
     Friend WithEvents btnViewRequests As CustomButton
     Friend WithEvents btnViewLogs As CustomButton
     Friend WithEvents Panel3 As Panel
+    Friend WithEvents CustomPanel7 As CustomPanel
 End Class
