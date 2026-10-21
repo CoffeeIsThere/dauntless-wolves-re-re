@@ -113,7 +113,7 @@ Partial Class quickactions
         ' btnPrimary
         ' 
         btnPrimary.Anchor = AnchorStyles.Bottom Or AnchorStyles.Right
-        btnPrimary.DialogResult = DialogResult.OK
+        btnPrimary.DialogResult = DialogResult.None
         btnPrimary.Location = New Point(357, 8)
         btnPrimary.Name = "btnPrimary"
         btnPrimary.Size = New Size(75, 23)

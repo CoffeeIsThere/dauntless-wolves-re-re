@@ -109,4 +109,15 @@ Public Class DatabaseHelper
         End Using
     End Function
 
+    ' Helper overload to accept Dictionary parameters
+    Public Shared Function ExecuteNonQueryDict(sql As String, params As Dictionary(Of String, Object)) As Integer
+        Dim pList As New List(Of MySqlParameter)()
+        If params IsNot Nothing Then
+            For Each kvp In params
+                pList.Add(New MySqlParameter(kvp.Key, If(kvp.Value, DBNull.Value)))
+            Next
+        End If
+        Return ExecuteNonQuery(sql, pList.ToArray())
+    End Function
+
 End Class

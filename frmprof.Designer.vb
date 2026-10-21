@@ -206,6 +206,7 @@ Partial Class frmprof
         ' 
         ' ComboBox5
         ' 
+        ComboBox5.Visible = False
         ComboBox5.FlatStyle = FlatStyle.Flat
         ComboBox5.FormattingEnabled = True
         ComboBox5.Items.AddRange(New Object() {"DSA", "OOP"})
@@ -245,6 +246,7 @@ Partial Class frmprof
         ' 
         ' ComboBox1
         ' 
+        ComboBox1.DropDownStyle = ComboBoxStyle.DropDownList
         ComboBox1.FlatStyle = FlatStyle.Flat
         ComboBox1.FormattingEnabled = True
         ComboBox1.Items.AddRange(New Object() {"BSCS-1A", "BSCS-2A", "BSCS-3A", "BSCS-4A"})
@@ -1379,6 +1381,7 @@ Partial Class frmprof
         ' 
         ' ComboBox4
         ' 
+        ComboBox4.DropDownStyle = ComboBoxStyle.DropDownList
         ComboBox4.FormattingEnabled = True
         ComboBox4.Location = New Point(11, 117)
         ComboBox4.Margin = New Padding(3, 2, 3, 2)
@@ -1399,6 +1402,7 @@ Partial Class frmprof
         ' 
         ' ComboBox2
         ' 
+        ComboBox2.DropDownStyle = ComboBoxStyle.DropDownList
         ComboBox2.FormattingEnabled = True
         ComboBox2.Location = New Point(11, 64)
         ComboBox2.Margin = New Padding(3, 2, 3, 2)

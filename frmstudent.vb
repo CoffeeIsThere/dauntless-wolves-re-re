@@ -10,7 +10,11 @@ Public Class frmStudent
 
     ' My Performance bar values (0-100)
     Private quizPct, activityPct, examPct, projectPct As Integer
-
+    ' "course|term" -> avg, passed, pending, highest, quiz%, activity%, exam%, project%
+    Private ReadOnly perfData As New Dictionary(Of String, Double())
+    ' term, assessment, score, weight, running grade, status
+    Private Const OverallLabel As String = "Overall (All Courses)"
+    Private ReadOnly gradeRows As New List(Of String())
     Private Sub frmStudent_Load(sender As Object, e As EventArgs) Handles MyBase.Load
         If AppSession.CurrentUser Is Nothing Then
             MessageBox.Show("Please log in to access this page.", "Access Denied", MessageBoxButtons.OK, MessageBoxIcon.Warning)
@@ -21,6 +25,7 @@ Public Class frmStudent
             Return
         End If
 
+        lblstudentname.Text = AppSession.CurrentUser.FullName
         pages.Add(btnMyGrades, pnlMyGrades)
         pages.Add(btnGradeHistory, pnlGradeHistory)
         pages.Add(btnRequestRevision, pnlRequestRevision)
@@ -51,7 +56,12 @@ Public Class frmStudent
         LoadPerformance()
 
         ShowPage(btnMyGrades)   ' keep this last
+
+
     End Sub
+
+    ' class -> (assessment -> current score). Replace with a MySQL query later.
+    Private ReadOnly classData As New Dictionary(Of String, Dictionary(Of String, String))
 
     ' Grids select their first cell when first displayed, so clear it here
     Private Sub frmStudent_Shown(sender As Object, e As EventArgs) Handles MyBase.Shown
@@ -118,25 +128,47 @@ Public Class frmStudent
     ' ---------- MY GRADES ----------
 
     Private Sub LoadGrades()
-        dgvgrades.Rows.Clear()
         If dgvgrades.Columns.Count = 0 Then
             For Each h In {"Assessment", "Score", "Weight", "Running Grade", "Status"}
                 dgvgrades.Columns.Add(h, h)
             Next
         End If
-        ' Sample data. Replace with MySQL later.
-        dgvgrades.Rows.Add("Quiz 1", "18/20", "10%", "90.0", "Passed")
-        dgvgrades.Rows.Add("Activity 2", "45/50", "15%", "90.0", "Passed")
-        dgvgrades.Rows.Add("Midterm Exam", "82/100", "25%", "82", "Passed")
-        dgvgrades.Rows.Add("Project Draft", "82/100", "20%", "85.6", "Passed")
-        dgvgrades.Rows.Add("Final Exam", "---", "30%", "Pending", "Not Yet")
 
-        dgvgrades.ClearSelection()
-        UpdateStanding()
+        ' Sample data. Replace with MySQL later (each row needs its term).
+        gradeRows.Clear()
+        gradeRows.Add({"Midterm", "Quiz 1", "18/20", "10%", "90.0", "Passed"})
+        gradeRows.Add({"Midterm", "Activity 2", "45/50", "15%", "90.0", "Passed"})
+        gradeRows.Add({"Midterm", "Midterm Exam", "82/100", "25%", "82", "Passed"})
+        gradeRows.Add({"Finals", "Project Draft", "82/100", "20%", "85.6", "Passed"})
+        gradeRows.Add({"Finals", "Finals Exam", "---", "30%", "Pending", "Not Yet"})
+
+        If cboterm.Items.Count = 0 Then
+            cboterm.Items.AddRange({"Midterm", "Finals", "Combined"})
+            cboterm.SelectedIndex = 2          ' triggers ShowGrades
+        Else
+            ShowGrades()
+        End If
     End Sub
 
-    ' Weighted average of graded items only
-    Private Sub UpdateStanding()
+    Private Sub cboTerm_SelectedIndexChanged(sender As Object, e As EventArgs) Handles cboterm.SelectedIndexChanged
+        If dgvgrades.Columns.Count > 0 Then ShowGrades()
+    End Sub
+
+    Private Sub ShowGrades()
+        Dim term As String = If(cboterm.SelectedIndex = -1, "Combined", cboterm.Text)
+
+        dgvgrades.Rows.Clear()
+        For Each r In gradeRows
+            If term = "Combined" OrElse r(0) = term Then
+                dgvgrades.Rows.Add(r(1), r(2), r(3), r(4), r(5))
+            End If
+        Next
+        dgvgrades.ClearSelection()
+        UpdateStanding(term)
+    End Sub
+
+    ' Weighted average of graded items in the visible rows
+    Private Sub UpdateStanding(term As String)
         Dim total As Double = 0
         Dim weights As Double = 0
 
@@ -146,17 +178,20 @@ Public Class frmStudent
 
             Dim score, maxScore, weight As Double
             If Double.TryParse(parts(0), score) AndAlso
-               Double.TryParse(parts(1), maxScore) AndAlso maxScore > 0 AndAlso
-               Double.TryParse(Convert.ToString(row.Cells(2).Value).TrimEnd("%"c), weight) Then
+           Double.TryParse(parts(1), maxScore) AndAlso maxScore > 0 AndAlso
+           Double.TryParse(Convert.ToString(row.Cells(2).Value).TrimEnd("%"c), weight) Then
                 total += score / maxScore * 100 * weight
                 weights += weight
             End If
         Next
 
+        Dim label As String = If(term = "Combined", "Current Standing", term & " Standing")
         If weights > 0 Then
             Dim pct As Double = Math.Round(total / weights, 1)
             ' 75 is an assumed passing mark. Use your school's.
-            lblstanding.Text = "Current Standing: " & pct & "% " & If(pct >= 75, "(Passing)", "(Failing)")
+            lblstanding.Text = label & ": " & pct & "% " & If(pct >= 75, "(Passing)", "(Failing)")
+        Else
+            lblstanding.Text = label & ": no grades yet"
         End If
     End Sub
 
@@ -192,28 +227,34 @@ Public Class frmStudent
     ' ---------- REQUEST REVISION ----------
 
     Private Sub LoadAssessments()
-        assessmentScores.Clear()
-        assessmentScores.Add("Quiz 1", "18/20")
-        assessmentScores.Add("Activity 2", "45/50")
-        assessmentScores.Add("Midterm Exam", "82/100")
-        assessmentScores.Add("Project Draft", "82/100")
-        ' Final Exam is left out because it has no score yet
+        classData.Clear()
+        classData.Add("CS 103 - Object Oriented Programming", New Dictionary(Of String, String) From {
+        {"Quiz 1", "18/20"}, {"Activity 2", "45/50"},
+        {"Midterm Exam", "82/100"}, {"Project Draft", "82/100"}})
+        classData.Add("CS 101 - Intro to Computing", New Dictionary(Of String, String) From {
+        {"Quiz 1", "9/10"}, {"Seatwork 1", "18/20"}})
+
+        cboclass.Items.Clear()
+        For Each className In classData.Keys
+            cboclass.Items.Add(className)
+        Next
+        cboclass.SelectedIndex = -1
 
         cboAssessment.Items.Clear()
-        For Each assessmentName In assessmentScores.Keys
-            cboAssessment.Items.Add(assessmentName)
-        Next
-        cboAssessment.SelectedIndex = -1
+        cboAssessment.Enabled = False
         txtCurrentGrade.Clear()
     End Sub
 
     Private Sub cboAssessment_SelectedIndexChanged(sender As Object, e As EventArgs) Handles cboAssessment.SelectedIndexChanged
-        Dim score As String = ""
-        If cboAssessment.SelectedIndex <> -1 AndAlso
-           assessmentScores.TryGetValue(cboAssessment.Text, score) Then
-            txtCurrentGrade.Text = score
-        Else
-            txtCurrentGrade.Clear()
+        txtCurrentGrade.Clear()
+
+        If cboclass.SelectedIndex <> -1 AndAlso cboAssessment.SelectedIndex <> -1 Then
+            Dim selectedClass As String = cboclass.Text
+            Dim selectedAssessment As String = cboAssessment.Text
+
+            If classData.ContainsKey(selectedClass) AndAlso classData(selectedClass).ContainsKey(selectedAssessment) Then
+                txtCurrentGrade.Text = classData(selectedClass)(selectedAssessment)
+            End If
         End If
     End Sub
 
@@ -276,7 +317,7 @@ Public Class frmStudent
                     e.CellStyle.BackColor = Color.FromArgb(153, 190, 165)
                 Case "Under Review"
                     e.CellStyle.BackColor = Color.FromArgb(155, 200, 225)
-                Case "Rejected"
+                Case "Closed", "Rejected"
                     e.CellStyle.BackColor = Color.FromArgb(225, 160, 160)
             End Select
         End If
@@ -286,17 +327,82 @@ Public Class frmStudent
 
     Private Sub LoadPerformance()
         ' Sample data. Replace with values computed from MySQL later.
-        SetStat(lblAverageValue, "84.2", "CURRENT AVERAGE")
-        SetStat(lblPassedValue, "12", "ACTIVITIES PASSED")
-        SetStat(lblPendingValue, "2", "PENDING")
-        SetStat(lblHighestValue, "88.5", "HIGHEST SCORE")
+        perfData.Clear()
+        perfData.Add("CS 103 - Object Oriented Programming|Midterm", {86.0, 7, 0, 90.0, 90, 90, 82, 0})
+        perfData.Add("CS 103 - Object Oriented Programming|Finals", {82.5, 5, 2, 85.6, 0, 0, 0, 86})
+        perfData.Add("CS 103 - Object Oriented Programming|Combined", {84.2, 12, 2, 88.5, 90, 90, 83, 86})
+        perfData.Add("CS 101 - Intro to Computing|Midterm", {91.0, 4, 0, 95.0, 90, 0, 92, 0})
+        perfData.Add("CS 101 - Intro to Computing|Finals", {88.0, 3, 1, 92.0, 0, 90, 0, 88})
+        perfData.Add("CS 101 - Intro to Computing|Combined", {89.5, 7, 1, 95.0, 90, 90, 92, 88})
 
-        quizPct = 90
-        activityPct = 90
-        examPct = 83
-        projectPct = 86
+        cboperfterm.Items.Clear()
+        cboperfterm.Items.AddRange({"Midterm", "Finals", "Combined"})
+
+        cboperfcourse.Items.Clear()
+        cboperfcourse.Items.Add(OverallLabel)
+        cboperfcourse.Items.AddRange({"CS 103 - Object Oriented Programming", "CS 101 - Intro to Computing"})
+
+        cboperfterm.SelectedIndex = 2       ' Combined
+        cboperfcourse.SelectedIndex = 0     ' Overall, triggers ShowPerformance
+    End Sub
+
+    Private Sub cboPerfTerm_SelectedIndexChanged(sender As Object, e As EventArgs) Handles cboperfterm.SelectedIndexChanged
+        ShowPerformance()
+    End Sub
+
+    Private Sub cboPerfCourse_SelectedIndexChanged(sender As Object, e As EventArgs) Handles cboperfcourse.SelectedIndexChanged
+        ShowPerformance()
+    End Sub
+
+    Private Sub ShowPerformance()
+        If cboperfterm.SelectedIndex = -1 OrElse cboperfcourse.SelectedIndex = -1 Then Return
+
+        Dim v As Double() = Nothing
+        If cboperfcourse.Text = OverallLabel Then
+            v = CombineCourses(cboperfterm.Text)
+        Else
+            perfData.TryGetValue(cboperfcourse.Text & "|" & cboperfterm.Text, v)
+        End If
+
+        If v IsNot Nothing Then
+            SetStat(lblAverageValue, v(0).ToString("0.0"), "CURRENT AVERAGE")
+            SetStat(lblPassedValue, CInt(v(1)).ToString(), "ACTIVITIES PASSED")
+            SetStat(lblPendingValue, CInt(v(2)).ToString(), "PENDING")
+            SetStat(lblHighestValue, v(3).ToString("0.0"), "HIGHEST SCORE")
+            quizPct = CInt(v(4))
+            activityPct = CInt(v(5))
+            examPct = CInt(v(6))
+            projectPct = CInt(v(7))
+        Else
+            SetStat(lblAverageValue, "--", "CURRENT AVERAGE")
+            SetStat(lblPassedValue, "--", "ACTIVITIES PASSED")
+            SetStat(lblPendingValue, "--", "PENDING")
+            SetStat(lblHighestValue, "--", "HIGHEST SCORE")
+            quizPct = 0 : activityPct = 0 : examPct = 0 : projectPct = 0
+        End If
         UpdateBars()
     End Sub
+
+    ' Combines all courses for one term into the same 8 values
+    Private Function CombineCourses(term As String) As Double()
+        Dim rows = perfData.Where(Function(kv) kv.Key.EndsWith("|" & term)).
+                        Select(Function(kv) kv.Value).ToList()
+        If rows.Count = 0 Then Return Nothing
+
+        Dim result(7) As Double
+        result(0) = rows.Average(Function(r) r(0))   ' average of the course averages
+        result(1) = rows.Sum(Function(r) r(1))       ' passed: total
+        result(2) = rows.Sum(Function(r) r(2))       ' pending: total
+        result(3) = rows.Max(Function(r) r(3))       ' highest score overall
+
+        ' Category bars: average only the courses that have grades in that category
+        For i As Integer = 4 To 7
+            Dim idx As Integer = i
+            Dim withData = rows.Where(Function(r) r(idx) > 0).ToList()
+            result(i) = If(withData.Count = 0, 0, withData.Average(Function(r) r(idx)))
+        Next
+        Return result
+    End Function
 
     ' Each stat card has two labels. This finds the pair inside the card of
     ' "anyLabel", puts the number on the one with the bigger font and the
@@ -427,5 +533,34 @@ Public Class frmStudent
 
     End Sub
 
+    Private Sub cboClass_SelectedIndexChanged(sender As Object, e As EventArgs) Handles cboclass.SelectedIndexChanged
+        cboAssessment.Items.Clear()
+        txtCurrentGrade.Clear()
 
+        ' 1. Populate assessment dropdown for selected class
+        Dim items As Dictionary(Of String, String) = Nothing
+        If cboclass.SelectedIndex <> -1 AndAlso classData.TryGetValue(cboclass.Text, items) Then
+            For Each assessmentName In items.Keys
+                cboAssessment.Items.Add(assessmentName)
+            Next
+            cboAssessment.Enabled = True
+        Else
+            cboAssessment.Enabled = False
+        End If
+
+        ' 2. Ensure mock request rows stay visible in dgvRequests
+        dgvRequests.CurrentCell = Nothing
+        For Each row As DataGridViewRow In dgvRequests.Rows
+            row.Visible = True
+        Next
+    End Sub
+
+    ' "CS 103 - Object Oriented Programming" -> "CS 103"
+    Private Function ClassCode(fullName As String) As String
+        Return fullName.Split("-"c)(0).Trim()
+    End Function
+
+    Private Sub ComboBox2_SelectedIndexChanged(sender As Object, e As EventArgs) Handles cboperfterm.SelectedIndexChanged
+
+    End Sub
 End Class

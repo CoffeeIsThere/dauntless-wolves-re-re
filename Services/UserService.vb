@@ -59,23 +59,23 @@ Public Class UserService
     End Function
 
     Public Function GetAllTeachers(Optional searchQuery As String = "", Optional department As String = "All") As DataTable
-        Dim sql As String = "SELECT teacher_id, full_name, email, department, status, " &
-                            "(SELECT COUNT(*) FROM class c WHERE c.teacher_id = t.teacher_id) AS class_count " &
-                            "FROM teacher t WHERE 1=1"
-
+        Dim sql As String =
+        "SELECT t.teacher_id, t.full_name, t.email, t.department, t.employment_type, t.status, " &
+        "(SELECT COUNT(*) FROM class c WHERE c.teacher_id = t.teacher_id) AS class_count " &
+        "FROM teacher t WHERE 1=1"
         Dim params As New List(Of MySqlParameter)()
 
         If Not String.IsNullOrWhiteSpace(searchQuery) Then
-            sql &= " AND (full_name LIKE @Search OR LOWER(teacher_id) LIKE @Search OR LOWER(email) LIKE @Search)"
+            sql &= " AND (LOWER(t.full_name) LIKE @Search OR LOWER(t.teacher_id) LIKE @Search OR LOWER(t.email) LIKE @Search)"
             params.Add(New MySqlParameter("@Search", "%" & searchQuery.Trim().ToLower() & "%"))
         End If
 
         If Not String.IsNullOrWhiteSpace(department) AndAlso Not department.Equals("All", StringComparison.OrdinalIgnoreCase) Then
-            sql &= " AND department = @Dept"
+            sql &= " AND t.department = @Dept"
             params.Add(New MySqlParameter("@Dept", department.Trim()))
         End If
 
-        sql &= " ORDER BY full_name ASC"
+        sql &= " ORDER BY t.full_name ASC"
         Return DatabaseHelper.ExecuteQuery(sql, params.ToArray())
     End Function
 
@@ -88,13 +88,11 @@ Public Class UserService
             params.Add(New MySqlParameter("@Search", "%" & searchQuery.Trim().ToLower() & "%"))
         End If
 
-        If Not String.IsNullOrWhiteSpace(yearLevel) AndAlso Not yearLevel.Equals("All", StringComparison.OrdinalIgnoreCase) Then
-            Dim yr As Integer
-            If Integer.TryParse(yearLevel, yr) Then
-                sql &= " AND year_level = @Yr"
-                params.Add(New MySqlParameter("@Yr", yr))
-                Return DatabaseHelper.ExecuteQuery(sql)
-            End If
+        Dim yr As Integer
+        If Not String.IsNullOrWhiteSpace(yearLevel) AndAlso Not yearLevel.Equals("All", StringComparison.OrdinalIgnoreCase) _
+       AndAlso Integer.TryParse(yearLevel, yr) Then
+            sql &= " AND year_level = @Yr"
+            params.Add(New MySqlParameter("@Yr", yr))
         End If
 
         If Not String.IsNullOrWhiteSpace(section) AndAlso Not section.Equals("All", StringComparison.OrdinalIgnoreCase) Then

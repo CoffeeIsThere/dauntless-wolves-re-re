@@ -38,7 +38,6 @@ Public Class frmlogin
         Dim username As String = ValidationHelper.SanitizeInput(boxuser.Text)
         Dim password As String = TextBox1.Text.Trim()
 
-
         If Not ValidationHelper.IsRequired(username) OrElse Not ValidationHelper.IsRequired(password) Then
             MessageBox.Show("Please enter both your Username/ID and Password.", "Validation Error", MessageBoxButtons.OK, MessageBoxIcon.Warning)
             boxuser.Focus()
@@ -50,14 +49,13 @@ Public Class frmlogin
             Dim user As UserModel = authService.VerifyLogin(username, password)
 
             If user IsNot Nothing Then
-
                 Dim role As String = user.Role.Trim().ToLower()
                 Dim picked As String = If(RadioButton1.Checked, "student", "teacher")
 
                 ' Admins have no radio button, so let them through with either selected
                 If role <> "admin" AndAlso role <> picked Then
                     MessageBox.Show("This account is not a " & picked & " account. Please select the correct role.",
-                    "Wrong role", MessageBoxButtons.OK, MessageBoxIcon.Warning)
+                                "Wrong role", MessageBoxButtons.OK, MessageBoxIcon.Warning)
                     TextBox1.Clear()
                     Return
                 End If
@@ -66,25 +64,25 @@ Public Class frmlogin
                 AppSession.StartSession(user)
 
                 ' 4. Route to designated form based on database user role
-                Me.Hide()
-
                 Select Case user.Role.Trim().ToLower()
                     Case "admin"
                         Dim adminForm As New Admin()
                         adminForm.Show()
+                        Me.Close()
 
                     Case "teacher", "professor", "prof"
                         Dim profForm As New frmprof()
                         profForm.Show()
+                        Me.Close()
 
                     Case "student"
                         Dim studentForm As New frmstudent()
                         studentForm.Show()
+                        Me.Close()
 
                     Case Else
                         MessageBox.Show("Unrecognized user role assigned.", "Access Denied", MessageBoxButtons.OK, MessageBoxIcon.Error)
                         AppSession.ClearSession()
-                        Me.Show()
                 End Select
             Else
                 MessageBox.Show("Invalid Username/ID or Password.", "Login Failed", MessageBoxButtons.OK, MessageBoxIcon.Error)

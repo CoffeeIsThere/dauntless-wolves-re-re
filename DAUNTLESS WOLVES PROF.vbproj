@@ -4,10 +4,17 @@
     <OutputType>WinExe</OutputType>
     <TargetFramework>net8.0-windows</TargetFramework>
     <RootNamespace>DAUNTLESS_WOLVES_PROF</RootNamespace>
-	  <StartupObject>DAUNTLESS_WOLVES_PROF.frmlogin</StartupObject>
+	  <StartupObject>DAUNTLESS_WOLVES_PROF.My.MyApplication</StartupObject>
     <UseWindowsForms>true</UseWindowsForms>
     <MyType>WindowsForms</MyType>
   </PropertyGroup>
+
+  <ItemGroup>
+    <None Remove="combined2.txt" />
+    <None Remove="combined3.txt" />
+    <None Remove="combined4.txt" />
+    <None Remove="combined5.txt" />
+  </ItemGroup>
 
   <ItemGroup>
     <Import Include="System.Data" />
