@@ -26,7 +26,6 @@ Partial Class frmprof
         pnlHeader = New Panel()
         Lbltransparentgradingsytem = New Label()
         pnlTabs = New Panel()
-        CustomButton7 = New CustomButton()
         ComboBox5 = New ComboBox()
         LblRole = New PillLabel()
         btnLogout = New Button()
@@ -191,7 +190,6 @@ Partial Class frmprof
         ' pnlTabs
         ' 
         pnlTabs.BackColor = Color.FromArgb(CByte(239), CByte(245), CByte(238))
-        pnlTabs.Controls.Add(CustomButton7)
         pnlTabs.Controls.Add(ComboBox5)
         pnlTabs.Controls.Add(LblRole)
         pnlTabs.Controls.Add(btnLogout)
@@ -203,24 +201,6 @@ Partial Class frmprof
         pnlTabs.Name = "pnlTabs"
         pnlTabs.Size = New Size(1262, 51)
         pnlTabs.TabIndex = 1
-        ' 
-        ' CustomButton7
-        ' 
-        CustomButton7.BackColor = Color.Green
-        CustomButton7.BorderColor = Color.Black
-        CustomButton7.BorderSize = 2
-        CustomButton7.CornerRadius = 10
-        CustomButton7.FlatStyle = FlatStyle.Flat
-        CustomButton7.Font = New Font("Segoe UI Semibold", 7.8F, FontStyle.Bold)
-        CustomButton7.ForeColor = Color.White
-        CustomButton7.HoverColor = Color.DarkGreen
-        CustomButton7.Location = New Point(662, 10)
-        CustomButton7.Name = "CustomButton7"
-        CustomButton7.NormalColor = Color.Green
-        CustomButton7.Size = New Size(116, 29)
-        CustomButton7.TabIndex = 18
-        CustomButton7.Text = "Add Class"
-        CustomButton7.UseVisualStyleBackColor = False
         ' 
         ' ComboBox5
         ' 
@@ -1699,5 +1679,4 @@ Partial Class frmprof
     Friend WithEvents PillLabel1 As PillLabel
     Friend WithEvents CustomButton6 As CustomButton
     Friend WithEvents ComboBox5 As ComboBox
-    Friend WithEvents CustomButton7 As CustomButton
 End Class
