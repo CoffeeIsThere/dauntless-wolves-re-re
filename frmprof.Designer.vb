@@ -1537,6 +1537,7 @@ Partial Class frmprof
         Controls.Add(pnlTabs)
         Controls.Add(pnlHeader)
         Cursor = Cursors.Hand
+        DoubleBuffered = True
         Name = "frmprof"
         StartPosition = FormStartPosition.CenterScreen
         Text = "frmprof"
