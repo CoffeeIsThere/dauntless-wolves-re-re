@@ -25,6 +25,7 @@ Partial Class frmGradebook
         Dim resources As System.ComponentModel.ComponentResourceManager = New System.ComponentModel.ComponentResourceManager(GetType(frmGradebook))
         Panel1 = New Panel()
         Panel2 = New Panel()
+        CustomButton2 = New CustomButton()
         btnAddStudent = New CustomButton()
         btnAddAssessment = New CustomButton()
         cboCourse = New ComboBox()
@@ -51,6 +52,7 @@ Partial Class frmGradebook
         ' 
         ' Panel2
         ' 
+        Panel2.Controls.Add(CustomButton2)
         Panel2.Controls.Add(btnAddStudent)
         Panel2.Controls.Add(btnAddAssessment)
         Panel2.Controls.Add(cboCourse)
@@ -63,6 +65,22 @@ Partial Class frmGradebook
         Panel2.Name = "Panel2"
         Panel2.Size = New Size(1445, 80)
         Panel2.TabIndex = 1
+        ' 
+        ' CustomButton2
+        ' 
+        CustomButton2.BackColor = Color.Green
+        CustomButton2.BorderColor = Color.Black
+        CustomButton2.BorderSize = 2
+        CustomButton2.CornerRadius = 10
+        CustomButton2.ForeColor = Color.White
+        CustomButton2.HoverColor = Color.DarkGreen
+        CustomButton2.Location = New Point(871, 33)
+        CustomButton2.Name = "CustomButton2"
+        CustomButton2.NormalColor = Color.Green
+        CustomButton2.Size = New Size(135, 29)
+        CustomButton2.TabIndex = 8
+        CustomButton2.Text = "Revision Request"
+        CustomButton2.UseVisualStyleBackColor = False
         ' 
         ' btnAddStudent
         ' 
@@ -207,4 +225,5 @@ Partial Class frmGradebook
     Friend WithEvents cboCourse As ComboBox
     Friend WithEvents btnAddClass As CustomButton
     Friend WithEvents btnAddStudent As CustomButton
+    Friend WithEvents CustomButton2 As CustomButton
 End Class

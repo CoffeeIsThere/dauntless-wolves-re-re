@@ -43,11 +43,7 @@ Public Class AuditService
             Case "teacher"
                 teacherId = actorUserId
             Case "admin"
-                Dim parsed As Integer
-                If Not Integer.TryParse(actorUserId, parsed) Then
-                    Throw New ArgumentException("Admin id must be numeric.")
-                End If
-                adminId = parsed
+                adminId = actorUserId
             Case Else
                 Throw New ArgumentException("Unknown actor role: " & actorRole)
         End Select

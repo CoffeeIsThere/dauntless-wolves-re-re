@@ -2,8 +2,8 @@
 Imports System.Text.RegularExpressions
 
 Public Class ValidationHelper
-    Public Shared Function IsRequired(value As String) As Boolean
-        Return Not String.IsNullOrWhiteSpace(value)
+    Public Shared Function IsRequired(input As String) As Boolean
+        Return Not String.IsNullOrWhiteSpace(input)
     End Function
 
     Public Shared Function IsValidEmail(email As String) As Boolean
@@ -22,19 +22,14 @@ Public Class ValidationHelper
     End Function
 
     Public Shared Function CleanInput(input As String) As String
-        If String.IsNullOrEmpty(input) Then Return String.Empty
+        If String.IsNullOrWhiteSpace(input) Then Return ""
         Return input.Trim()
-
-
     End Function
 
-    Public Shared Function SanitizeInput(Input As String) As String
-        If String.IsNullOrWhiteSpace(Input) Then
-            Return String.Empty
-        End If
-        Return Input.Trim()
+    ' Alias to CleanInput to eliminate duplicate code across services
+    Public Shared Function SanitizeInput(input As String) As String
+        Return CleanInput(input)
     End Function
-
     Public Shared Function IsValidScore(score As Double, maxScore As Double) As Boolean
         Return score >= 0.0 AndAlso score <= maxScore
     End Function

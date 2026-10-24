@@ -1,22 +1,29 @@
 ﻿
+Imports MySql.Data.MySqlClient
+
+
 Public Class frmStudent
+
+
+    Private ReadOnly _gradeService As New GradeService()
+    Private ReadOnly _revisionService As New RevisionRequestService()
 
     Private ReadOnly pages As New Dictionary(Of Button, Panel)
     Private ReadOnly boldFont As New Font("Segoe UI", 9.5F, FontStyle.Bold)
     Private ReadOnly normalFont As New Font("Segoe UI", 9.5F, FontStyle.Regular)
 
-    ' Sample data: assessment -> current score. Replace with a MySQL query later.
-    Private ReadOnly assessmentScores As New Dictionary(Of String, String)
 
-    ' My Performance bar values (0-100)
-    Private quizPct, activityPct, examPct, projectPct As Integer
-    ' "course|term" -> avg, passed, pending, highest, quiz%, activity%, exam%, project%
-    Private ReadOnly perfData As New Dictionary(Of String, Double())
-    ' term, assessment, score, weight, running grade, status
-    Private Const OverallLabel As String = "Overall (All Courses)"
+    Private _currentStudentId As String = ""
     Private ReadOnly gradeRows As New List(Of String())
+    Private ReadOnly assessmentMap As New Dictionary(Of String, DataRow)() ' Assessment Title -> DataRow (grade_id, score, total_score)
+
+
+    Private quizPct, activityPct, examPct, projectPct As Integer
+    Private Const OverallLabel As String = "Overall (All Courses)"
+
     Private Sub frmStudent_Load(sender As Object, e As EventArgs) Handles MyBase.Load
-        If AppSession.CurrentUser Is Nothing Then
+        ' 1. Session Guard Check
+        If Not AppSession.IsLoggedIn OrElse AppSession.CurrentUser Is Nothing Then
             MessageBox.Show("Please log in to access this page.", "Access Denied", MessageBoxButtons.OK, MessageBoxIcon.Warning)
 
             Dim loginForm As New frmlogin()
@@ -25,50 +32,42 @@ Public Class frmStudent
             Return
         End If
 
+        _currentStudentId = AppSession.CurrentUser.UserId
         lblstudentname.Text = AppSession.CurrentUser.FullName
+
+        ' 2. Bind Navigation Pages
+        pages.Clear()
         pages.Add(btnMyGrades, pnlMyGrades)
         pages.Add(btnGradeHistory, pnlGradeHistory)
         pages.Add(btnRequestRevision, pnlRequestRevision)
         pages.Add(btnMyPerformance, pnlMyPerformance)
 
         For Each b As Button In pages.Keys
+            RemoveHandler b.Click, AddressOf Tab_Click
             AddHandler b.Click, AddressOf Tab_Click
         Next
 
-        ' My Grades
-        cboCourse.Items.Clear()
-        cboCourse.Items.Add("CS 103 - Object Oriented Programming")
-        cboCourse.SelectedIndex = 0
-
+        ' 3. Initialize Shared Grid Styles
         StyleGrid(dgvgrades)
-        LoadGrades()
-
-        ' Grade History
         StyleGrid(dgvHistory)
-        LoadHistory()
-
-        ' Request Revision
         StyleGrid(dgvRequests)
-        LoadRequests()
-        LoadAssessments()
 
-        ' My Performance
+        ' 4. Populate Dynamic Data from MariaDB
+        LoadEnrolledCourses()
+        LoadHistory()
+        LoadRequests()
         LoadPerformance()
 
-        ShowPage(btnMyGrades)   ' keep this last
-
-
+        ShowPage(btnMyGrades) ' Keep this last
     End Sub
 
-    ' class -> (assessment -> current score). Replace with a MySQL query later.
-    Private ReadOnly classData As New Dictionary(Of String, Dictionary(Of String, String))
-
-    ' Grids select their first cell when first displayed, so clear it here
     Private Sub frmStudent_Shown(sender As Object, e As EventArgs) Handles MyBase.Shown
         dgvgrades.ClearSelection()
         dgvHistory.ClearSelection()
         dgvRequests.ClearSelection()
     End Sub
+
+    ' ---------- NAVIGATION & TAB CONTROL ----------
 
     Private Sub Tab_Click(sender As Object, e As EventArgs)
         ShowPage(DirectCast(sender, Button))
@@ -83,14 +82,12 @@ Public Class frmStudent
         Next
         pages(activeTab).BringToFront()
 
-        ' Measure the bars once the Performance page is actually visible
         If activeTab Is btnMyPerformance Then UpdateBars()
     End Sub
 
     Private Sub btnLogout_Click(sender As Object, e As EventArgs) Handles btnLogout.Click
         AppSession.ClearSession()
 
-        ' 2. Re-open login form and close current dashboard
         Dim loginForm As New frmlogin()
         loginForm.Show()
         Me.Close()
@@ -125,7 +122,52 @@ Public Class frmStudent
         End With
     End Sub
 
+    ' ---------- DYNAMIC COURSE LOADER ----------
+
+    Private Sub LoadEnrolledCourses()
+        Dim sql As String = "SELECT e.enrollment_id, e.class_id, " &
+                           "CONCAT(co.course_code, ' - ', co.course_name) AS full_title " &
+                           "FROM enrollment e " &
+                           "JOIN class c ON e.class_id = c.class_id " &
+                           "JOIN course co ON c.course_code COLLATE utf8mb4_unicode_ci = co.course_code COLLATE utf8mb4_unicode_ci " &
+                           "WHERE e.student_id COLLATE utf8mb4_unicode_ci = @StudentId"
+
+        Dim dt As DataTable = DatabaseHelper.ExecuteQuery(sql, New MySqlParameter() {New MySqlParameter("@StudentId", _currentStudentId)})
+
+        cboCourse.DataSource = Nothing
+        cboCourse.Items.Clear()
+
+        cboclass.DataSource = Nothing
+        cboclass.Items.Clear()
+
+        cboperfcourse.Items.Clear()
+        cboperfcourse.Items.Add(OverallLabel)
+
+        If dt IsNot Nothing AndAlso dt.Rows.Count > 0 Then
+            cboCourse.DisplayMember = "full_title"
+            cboCourse.ValueMember = "enrollment_id"
+            cboCourse.DataSource = dt.Copy()
+
+            cboclass.DisplayMember = "full_title"
+            cboclass.ValueMember = "enrollment_id"
+            cboclass.DataSource = dt.Copy()
+
+            For Each row As DataRow In dt.Rows
+                cboperfcourse.Items.Add(row("full_title").ToString())
+            Next
+
+            cboCourse.SelectedIndex = 0
+            cboclass.SelectedIndex = -1
+        Else
+            lblstanding.Text = "Current Standing: No enrolled classes"
+        End If
+    End Sub
+
     ' ---------- MY GRADES ----------
+
+    Private Sub cboCourse_SelectedIndexChanged(sender As Object, e As EventArgs) Handles cboCourse.SelectedIndexChanged
+        LoadGrades()
+    End Sub
 
     Private Sub LoadGrades()
         If dgvgrades.Columns.Count = 0 Then
@@ -134,17 +176,50 @@ Public Class frmStudent
             Next
         End If
 
-        ' Sample data. Replace with MySQL later (each row needs its term).
         gradeRows.Clear()
-        gradeRows.Add({"Midterm", "Quiz 1", "18/20", "10%", "90.0", "Passed"})
-        gradeRows.Add({"Midterm", "Activity 2", "45/50", "15%", "90.0", "Passed"})
-        gradeRows.Add({"Midterm", "Midterm Exam", "82/100", "25%", "82", "Passed"})
-        gradeRows.Add({"Finals", "Project Draft", "82/100", "20%", "85.6", "Passed"})
-        gradeRows.Add({"Finals", "Finals Exam", "---", "30%", "Pending", "Not Yet"})
+
+        If cboCourse.SelectedValue IsNot Nothing AndAlso IsNumeric(cboCourse.SelectedValue) Then
+            Dim enrollmentId As Integer = Convert.ToInt32(cboCourse.SelectedValue)
+
+            ' Query live assessment grades for this enrollment
+            Dim sql As String = "SELECT a.term, a.title, sg.score, a.total_score, a.weight " &
+                               "FROM assessment a " &
+                               "JOIN enrollment e ON a.class_id = e.class_id " &
+                               "LEFT JOIN studentgrade sg ON a.assessment_id = sg.assessment_id AND sg.enrollment_id = e.enrollment_id " &
+                               "WHERE e.enrollment_id = @EnrollmentId " &
+                               "ORDER BY a.created_at ASC"
+
+            Dim dt As DataTable = DatabaseHelper.ExecuteQuery(sql, New MySqlParameter() {New MySqlParameter("@EnrollmentId", enrollmentId)})
+
+            If dt IsNot Nothing Then
+                For Each row As DataRow In dt.Rows
+                    Dim term As String = row("term").ToString()
+                    Dim title As String = row("title").ToString()
+                    Dim weightStr As String = $"{Convert.ToDouble(row("weight")):0.#}%"
+
+                    Dim scoreStr As String = "---"
+                    Dim runningGradeStr As String = "Pending"
+                    Dim statusStr As String = "Not Yet"
+
+                    If Not IsDBNull(row("score")) AndAlso Not IsDBNull(row("total_score")) Then
+                        Dim scoreVal As Double = Convert.ToDouble(row("score"))
+                        Dim totalVal As Double = Convert.ToDouble(row("total_score"))
+
+                        scoreStr = $"{scoreVal:0.#}/{totalVal:0.#}"
+                        Dim pct As Double = (scoreVal / totalVal) * 100.0
+                        runningGradeStr = $"{pct:0.0}"
+                        statusStr = If(pct >= 75.0, "Passed", "At Risk")
+                    End If
+
+                    ' Row structure: {Term, Assessment, Score, Weight, Running Grade, Status}
+                    gradeRows.Add({term, title, scoreStr, weightStr, runningGradeStr, statusStr})
+                Next
+            End If
+        End If
 
         If cboterm.Items.Count = 0 Then
             cboterm.Items.AddRange({"Midterm", "Finals", "Combined"})
-            cboterm.SelectedIndex = 2          ' triggers ShowGrades
+            cboterm.SelectedIndex = 2 ' triggers ShowGrades
         Else
             ShowGrades()
         End If
@@ -159,7 +234,7 @@ Public Class frmStudent
 
         dgvgrades.Rows.Clear()
         For Each r In gradeRows
-            If term = "Combined" OrElse r(0) = term Then
+            If term = "Combined" OrElse r(0).Equals(term, StringComparison.OrdinalIgnoreCase) Then
                 dgvgrades.Rows.Add(r(1), r(2), r(3), r(4), r(5))
             End If
         Next
@@ -167,20 +242,20 @@ Public Class frmStudent
         UpdateStanding(term)
     End Sub
 
-    ' Weighted average of graded items in the visible rows
     Private Sub UpdateStanding(term As String)
         Dim total As Double = 0
         Dim weights As Double = 0
 
         For Each row As DataGridViewRow In dgvgrades.Rows
+            If row.Cells(1).Value Is Nothing Then Continue For
             Dim parts = Convert.ToString(row.Cells(1).Value).Split("/"c)
-            If parts.Length <> 2 Then Continue For   ' skips ungraded rows like "---"
+            If parts.Length <> 2 Then Continue For
 
             Dim score, maxScore, weight As Double
             If Double.TryParse(parts(0), score) AndAlso
-           Double.TryParse(parts(1), maxScore) AndAlso maxScore > 0 AndAlso
-           Double.TryParse(Convert.ToString(row.Cells(2).Value).TrimEnd("%"c), weight) Then
-                total += score / maxScore * 100 * weight
+               Double.TryParse(parts(1), maxScore) AndAlso maxScore > 0 AndAlso
+               Double.TryParse(Convert.ToString(row.Cells(2).Value).TrimEnd("%"c), weight) Then
+                total += (score / maxScore) * 100.0 * weight
                 weights += weight
             End If
         Next
@@ -188,10 +263,9 @@ Public Class frmStudent
         Dim label As String = If(term = "Combined", "Current Standing", term & " Standing")
         If weights > 0 Then
             Dim pct As Double = Math.Round(total / weights, 1)
-            ' 75 is an assumed passing mark. Use your school's.
-            lblstanding.Text = label & ": " & pct & "% " & If(pct >= 75, "(Passing)", "(Failing)")
+            lblstanding.Text = $"{label}: {pct}% " & If(pct >= 75.0, "(Passing)", "(At Risk)")
         Else
-            lblstanding.Text = label & ": no grades yet"
+            lblstanding.Text = $"{label}: No grades recorded yet"
         End If
     End Sub
 
@@ -202,6 +276,8 @@ Public Class frmStudent
                 e.CellStyle.BackColor = Color.FromArgb(153, 190, 165)
             ElseIf t = "Pending" OrElse t = "Not Yet" Then
                 e.CellStyle.BackColor = Color.FromArgb(238, 220, 170)
+            ElseIf t = "At Risk" OrElse t = "Failing" Then
+                e.CellStyle.BackColor = Color.FromArgb(225, 160, 160)
             End If
         End If
     End Sub
@@ -215,46 +291,80 @@ Public Class frmStudent
                 dgvHistory.Columns.Add(h, h)
             Next
         End If
-        ' Sample data. Replace with MySQL later.
-        dgvHistory.Rows.Add("2026-08-18", "Quiz 1", "16/20", "18/20", "Prof. Cruz", "Correction of misread answer")
-        dgvHistory.Rows.Add("2026-08-15", "Activity 2", "43/50", "45/50", "Prof. Cruz", "Late submission accepted")
-        dgvHistory.Rows.Add("2026-08-20", "Midterm Exam", "78/100", "82/100", "Prof. Cruz", "Recheck of Items")
-        dgvHistory.Rows.Add("2026-08-10", "Project Draft", "---", "82/100", "Prof. Cruz", "Initial Entry")
+
+        ' Force uniform collation across auditlog, student, teacher, and studentgrade string comparisons
+        Dim sql As String = "SELECT DATE_FORMAT(al.logged_at, '%Y-%m-%d') AS change_date, " &
+                           "a.title AS assessment_title, " &
+                           "IFNULL(al.old_value, '---') AS old_score, " &
+                           "IFNULL(al.new_value, '---') AS new_score, " &
+                           "IFNULL(t.full_name, 'System') AS changed_by, " &
+                           "IFNULL(al.details, 'Grade Update') AS reason " &
+                           "FROM auditlog al " &
+                           "LEFT JOIN studentgrade sg ON al.entity_id COLLATE utf8mb4_unicode_ci = CAST(sg.grade_id AS CHAR) COLLATE utf8mb4_unicode_ci " &
+                           "LEFT JOIN enrollment e ON sg.enrollment_id = e.enrollment_id " &
+                           "LEFT JOIN assessment a ON sg.assessment_id = a.assessment_id " &
+                           "LEFT JOIN teacher t ON al.teacher_id COLLATE utf8mb4_unicode_ci = t.teacher_id COLLATE utf8mb4_unicode_ci " &
+                           "WHERE e.student_id COLLATE utf8mb4_unicode_ci = @StudentId OR al.student_id COLLATE utf8mb4_unicode_ci = @StudentId " &
+                           "ORDER BY al.logged_at DESC"
+
+        Dim dt As DataTable = DatabaseHelper.ExecuteQuery(sql, New MySqlParameter() {New MySqlParameter("@StudentId", _currentStudentId)})
+
+        If dt IsNot Nothing Then
+            For Each row As DataRow In dt.Rows
+                dgvHistory.Rows.Add(row("change_date"), row("assessment_title"), row("old_score"), row("new_score"), row("changed_by"), row("reason"))
+            Next
+        End If
 
         dgvHistory.ClearSelection()
     End Sub
 
     ' ---------- REQUEST REVISION ----------
 
-    Private Sub LoadAssessments()
-        classData.Clear()
-        classData.Add("CS 103 - Object Oriented Programming", New Dictionary(Of String, String) From {
-        {"Quiz 1", "18/20"}, {"Activity 2", "45/50"},
-        {"Midterm Exam", "82/100"}, {"Project Draft", "82/100"}})
-        classData.Add("CS 101 - Intro to Computing", New Dictionary(Of String, String) From {
-        {"Quiz 1", "9/10"}, {"Seatwork 1", "18/20"}})
-
-        cboclass.Items.Clear()
-        For Each className In classData.Keys
-            cboclass.Items.Add(className)
-        Next
-        cboclass.SelectedIndex = -1
-
+    Private Sub cboClass_SelectedIndexChanged(sender As Object, e As EventArgs) Handles cboclass.SelectedIndexChanged
         cboAssessment.Items.Clear()
-        cboAssessment.Enabled = False
+        assessmentMap.Clear()
         txtCurrentGrade.Clear()
+
+        If cboclass.SelectedValue IsNot Nothing AndAlso IsNumeric(cboclass.SelectedValue) Then
+            Dim enrollmentId As Integer = Convert.ToInt32(cboclass.SelectedValue)
+
+            Dim sql As String = "SELECT sg.grade_id, a.title, sg.score, a.total_score " &
+                               "FROM studentgrade sg " &
+                               "JOIN assessment a ON sg.assessment_id = a.assessment_id " &
+                               "WHERE sg.enrollment_id = @EnrollmentId AND sg.score IS NOT NULL"
+
+            Dim dt As DataTable = DatabaseHelper.ExecuteQuery(sql, New MySqlParameter() {New MySqlParameter("@EnrollmentId", enrollmentId)})
+
+            If dt IsNot Nothing AndAlso dt.Rows.Count > 0 Then
+                For Each row As DataRow In dt.Rows
+                    Dim title As String = row("title").ToString()
+                    cboAssessment.Items.Add(title)
+                    If Not assessmentMap.ContainsKey(title) Then
+                        assessmentMap.Add(title, row)
+                    End If
+                Next
+                cboAssessment.Enabled = True
+            Else
+                cboAssessment.Enabled = False
+            End If
+        Else
+            cboAssessment.Enabled = False
+        End If
+
+        dgvRequests.CurrentCell = Nothing
+        For Each row As DataGridViewRow In dgvRequests.Rows
+            row.Visible = True
+        Next
     End Sub
 
     Private Sub cboAssessment_SelectedIndexChanged(sender As Object, e As EventArgs) Handles cboAssessment.SelectedIndexChanged
         txtCurrentGrade.Clear()
 
-        If cboclass.SelectedIndex <> -1 AndAlso cboAssessment.SelectedIndex <> -1 Then
-            Dim selectedClass As String = cboclass.Text
-            Dim selectedAssessment As String = cboAssessment.Text
-
-            If classData.ContainsKey(selectedClass) AndAlso classData(selectedClass).ContainsKey(selectedAssessment) Then
-                txtCurrentGrade.Text = classData(selectedClass)(selectedAssessment)
-            End If
+        If cboAssessment.SelectedIndex <> -1 AndAlso assessmentMap.ContainsKey(cboAssessment.Text) Then
+            Dim row As DataRow = assessmentMap(cboAssessment.Text)
+            Dim scoreVal As Double = Convert.ToDouble(row("score"))
+            Dim totalVal As Double = Convert.ToDouble(row("total_score"))
+            txtCurrentGrade.Text = $"{scoreVal:0.#}/{totalVal:0.#}"
         End If
     End Sub
 
@@ -265,47 +375,66 @@ Public Class frmStudent
                 dgvRequests.Columns.Add(h, h)
             Next
         End If
-        ' Sample data. Replace with MySQL later.
-        dgvRequests.Rows.Add("Quiz 1", "+2 pts", "Pending")
-        dgvRequests.Rows.Add("Activity 2", "+5 pts", "Approved")
-        dgvRequests.Rows.Add("Midterm Exam", "Re-check", "Under Review")
+
+        ' Queries live requests from RevisionRequestService filtered strictly by student
+        Dim dt As DataTable = _revisionService.GetRevisionRequestsByStudent(_currentStudentId)
+
+        If dt IsNot Nothing Then
+            For Each row As DataRow In dt.Rows
+                Dim title As String = row("assessment_title").ToString()
+                Dim reqPts As String = If(IsDBNull(row("requested_points")), "Re-check", "+" & row("requested_points").ToString() & " pts")
+                Dim status As String = row("status").ToString()
+
+                dgvRequests.Rows.Add(title, reqPts, status)
+            Next
+        End If
 
         dgvRequests.ClearSelection()
     End Sub
 
     Private Sub btnSubmitRequest_Click(sender As Object, e As EventArgs) Handles btnSubmitRequest.Click
-        If cboAssessment.SelectedIndex = -1 Then
-            MessageBox.Show("Please select an assessment.", "Missing info",
-                            MessageBoxButtons.OK, MessageBoxIcon.Warning)
+        If cboAssessment.SelectedIndex = -1 OrElse Not assessmentMap.ContainsKey(cboAssessment.Text) Then
+            MessageBox.Show("Please select an assessment item.", "Missing Info", MessageBoxButtons.OK, MessageBoxIcon.Warning)
             Return
         End If
 
         If String.IsNullOrWhiteSpace(txtReason.Text) Then
-            MessageBox.Show("Please enter a reason for your request.", "Missing info",
-                            MessageBoxButtons.OK, MessageBoxIcon.Warning)
+            MessageBox.Show("Please enter a reason for your request.", "Missing Info", MessageBoxButtons.OK, MessageBoxIcon.Warning)
             txtReason.Focus()
             Return
         End If
 
-        ' Block duplicate open requests for the same assessment
+        ' Block duplicate open requests for the same assessment in dgvRequests
         For Each row As DataGridViewRow In dgvRequests.Rows
-            Dim status = row.Cells(2).Value.ToString()
-            If row.Cells(0).Value.ToString() = cboAssessment.Text AndAlso
-               (status = "Pending" OrElse status = "Under Review") Then
-                MessageBox.Show("You already have an open request for this assessment.",
-                                "Duplicate request", MessageBoxButtons.OK, MessageBoxIcon.Information)
-                Return
+            If row.Cells(0).Value IsNot Nothing AndAlso row.Cells(0).Value.ToString() = cboAssessment.Text Then
+                Dim status = row.Cells(2).Value.ToString()
+                If status = "Pending" OrElse status = "Under Review" Then
+                    MessageBox.Show("You already have an open request for this assessment.", "Duplicate Request", MessageBoxButtons.OK, MessageBoxIcon.Information)
+                    Return
+                End If
             End If
         Next
 
-        ' Later: INSERT into the requests table here, then call LoadRequests()
-        dgvRequests.Rows.Add(cboAssessment.Text, "Re-check", "Pending")
-        dgvRequests.ClearSelection()
+        ' Create & submit RevisionRequest entity
+        Dim selectedRow As DataRow = assessmentMap(cboAssessment.Text)
+        Dim gradeId As Integer = Convert.ToInt32(selectedRow("grade_id"))
 
-        cboAssessment.SelectedIndex = -1
-        txtReason.Clear()
-        MessageBox.Show("Request submitted!", "Success",
-                        MessageBoxButtons.OK, MessageBoxIcon.Information)
+        Dim req As New RevisionRequest With {
+            .GradeId = gradeId,
+            .Reason = txtReason.Text.Trim()
+        }
+
+        Dim success As Boolean = _revisionService.SubmitRequest(req, _currentStudentId)
+
+        If success Then
+            MessageBox.Show("Request submitted successfully!", "Success", MessageBoxButtons.OK, MessageBoxIcon.Information)
+            cboAssessment.SelectedIndex = -1
+            txtCurrentGrade.Clear()
+            txtReason.Clear()
+            LoadRequests()
+        Else
+            MessageBox.Show("Failed to submit request to database. Please try again.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error)
+        End If
     End Sub
 
     Private Sub dgvRequests_CellFormatting(sender As Object, e As DataGridViewCellFormattingEventArgs) Handles dgvRequests.CellFormatting
@@ -326,24 +455,16 @@ Public Class frmStudent
     ' ---------- MY PERFORMANCE ----------
 
     Private Sub LoadPerformance()
-        ' Sample data. Replace with values computed from MySQL later.
-        perfData.Clear()
-        perfData.Add("CS 103 - Object Oriented Programming|Midterm", {86.0, 7, 0, 90.0, 90, 90, 82, 0})
-        perfData.Add("CS 103 - Object Oriented Programming|Finals", {82.5, 5, 2, 85.6, 0, 0, 0, 86})
-        perfData.Add("CS 103 - Object Oriented Programming|Combined", {84.2, 12, 2, 88.5, 90, 90, 83, 86})
-        perfData.Add("CS 101 - Intro to Computing|Midterm", {91.0, 4, 0, 95.0, 90, 0, 92, 0})
-        perfData.Add("CS 101 - Intro to Computing|Finals", {88.0, 3, 1, 92.0, 0, 90, 0, 88})
-        perfData.Add("CS 101 - Intro to Computing|Combined", {89.5, 7, 1, 95.0, 90, 90, 92, 88})
+        If cboperfterm.Items.Count = 0 Then
+            cboperfterm.Items.AddRange({"Midterm", "Finals", "Combined"})
+            cboperfterm.SelectedIndex = 2 ' Combined
+        End If
 
-        cboperfterm.Items.Clear()
-        cboperfterm.Items.AddRange({"Midterm", "Finals", "Combined"})
-
-        cboperfcourse.Items.Clear()
-        cboperfcourse.Items.Add(OverallLabel)
-        cboperfcourse.Items.AddRange({"CS 103 - Object Oriented Programming", "CS 101 - Intro to Computing"})
-
-        cboperfterm.SelectedIndex = 2       ' Combined
-        cboperfcourse.SelectedIndex = 0     ' Overall, triggers ShowPerformance
+        If cboperfcourse.Items.Count > 0 AndAlso cboperfcourse.SelectedIndex = -1 Then
+            cboperfcourse.SelectedIndex = 0 ' Overall, triggers ShowPerformance
+        Else
+            ShowPerformance()
+        End If
     End Sub
 
     Private Sub cboPerfTerm_SelectedIndexChanged(sender As Object, e As EventArgs) Handles cboperfterm.SelectedIndexChanged
@@ -357,22 +478,91 @@ Public Class frmStudent
     Private Sub ShowPerformance()
         If cboperfterm.SelectedIndex = -1 OrElse cboperfcourse.SelectedIndex = -1 Then Return
 
-        Dim v As Double() = Nothing
-        If cboperfcourse.Text = OverallLabel Then
-            v = CombineCourses(cboperfterm.Text)
-        Else
-            perfData.TryGetValue(cboperfcourse.Text & "|" & cboperfterm.Text, v)
+        Dim termFilter As String = cboperfterm.Text
+        Dim courseFilter As String = cboperfcourse.Text
+
+        ' Updated query selecting a.assessment_type AS type
+        Dim sql As String = "SELECT a.term, a.assessment_type AS type, sg.score, a.total_score, r.status AS req_status " &
+                           "FROM assessment a " &
+                           "JOIN enrollment e ON a.class_id = e.class_id " &
+                           "JOIN class c ON e.class_id = c.class_id " &
+                           "JOIN course co ON c.course_code = co.course_code " &
+                           "LEFT JOIN studentgrade sg ON a.assessment_id = sg.assessment_id AND sg.enrollment_id = e.enrollment_id " &
+                           "LEFT JOIN revisionrequest r ON sg.grade_id = r.grade_id " &
+                           "WHERE e.student_id = @StudentId"
+
+        Dim params As New List(Of MySqlParameter) From {New MySqlParameter("@StudentId", _currentStudentId)}
+
+        If courseFilter <> OverallLabel Then
+            sql &= " AND CONCAT(co.course_code, ' - ', co.course_name) = @CourseTitle"
+            params.Add(New MySqlParameter("@CourseTitle", courseFilter))
         End If
 
-        If v IsNot Nothing Then
-            SetStat(lblAverageValue, v(0).ToString("0.0"), "CURRENT AVERAGE")
-            SetStat(lblPassedValue, CInt(v(1)).ToString(), "ACTIVITIES PASSED")
-            SetStat(lblPendingValue, CInt(v(2)).ToString(), "PENDING")
-            SetStat(lblHighestValue, v(3).ToString("0.0"), "HIGHEST SCORE")
-            quizPct = CInt(v(4))
-            activityPct = CInt(v(5))
-            examPct = CInt(v(6))
-            projectPct = CInt(v(7))
+        If termFilter <> "Combined" Then
+            sql &= " AND a.term = @Term"
+            params.Add(New MySqlParameter("@Term", termFilter))
+        End If
+
+        Dim dt As DataTable = DatabaseHelper.ExecuteQuery(sql, params.ToArray())
+
+        If dt IsNot Nothing AndAlso dt.Rows.Count > 0 Then
+            Dim totalPct As Double = 0
+            Dim scoreCount As Integer = 0
+            Dim passedCount As Integer = 0
+            Dim pendingCount As Integer = 0
+            Dim maxPct As Double = 0
+
+            Dim quizScores As New List(Of Double)()
+            Dim actScores As New List(Of Double)()
+            Dim examScores As New List(Of Double)()
+            Dim projScores As New List(Of Double)()
+
+            For Each row As DataRow In dt.Rows
+                Dim typeStr As String = row("type").ToString().ToLower()
+                Dim reqStatus As String = If(IsDBNull(row("req_status")), "", row("req_status").ToString())
+
+                If reqStatus = "Pending" OrElse reqStatus = "Under Review" Then
+                    pendingCount += 1
+                End If
+
+                If Not IsDBNull(row("score")) AndAlso Not IsDBNull(row("total_score")) Then
+                    Dim scoreVal As Double = Convert.ToDouble(row("score"))
+                    Dim totalVal As Double = Convert.ToDouble(row("total_score"))
+
+                    If totalVal > 0 Then
+                        Dim pct As Double = (scoreVal / totalVal) * 100.0
+                        totalPct += pct
+                        scoreCount += 1
+
+                        If pct >= 75.0 Then passedCount += 1
+                        If pct > maxPct Then maxPct = pct
+
+                        Select Case typeStr
+                            Case "quiz"
+                                quizScores.Add(pct)
+                            Case "activity", "seatwork", "homework"
+                                actScores.Add(pct)
+                            Case "exam"
+                                examScores.Add(pct)
+                            Case "project"
+                                projScores.Add(pct)
+                        End Select
+                    End If
+                Else
+                    pendingCount += 1
+                End If
+            Next
+
+            Dim avgPct As Double = If(scoreCount > 0, Math.Round(totalPct / scoreCount, 1), 0.0)
+            SetStat(lblAverageValue, avgPct.ToString("0.0"), "CURRENT AVERAGE")
+            SetStat(lblPassedValue, passedCount.ToString(), "ACTIVITIES PASSED")
+            SetStat(lblPendingValue, pendingCount.ToString(), "PENDING")
+            SetStat(lblHighestValue, maxPct.ToString("0.0"), "HIGHEST SCORE")
+
+            quizPct = If(quizScores.Count > 0, CInt(quizScores.Average()), 0)
+            activityPct = If(actScores.Count > 0, CInt(actScores.Average()), 0)
+            examPct = If(examScores.Count > 0, CInt(examScores.Average()), 0)
+            projectPct = If(projScores.Count > 0, CInt(projScores.Average()), 0)
         Else
             SetStat(lblAverageValue, "--", "CURRENT AVERAGE")
             SetStat(lblPassedValue, "--", "ACTIVITIES PASSED")
@@ -380,33 +570,10 @@ Public Class frmStudent
             SetStat(lblHighestValue, "--", "HIGHEST SCORE")
             quizPct = 0 : activityPct = 0 : examPct = 0 : projectPct = 0
         End If
+
         UpdateBars()
     End Sub
 
-    ' Combines all courses for one term into the same 8 values
-    Private Function CombineCourses(term As String) As Double()
-        Dim rows = perfData.Where(Function(kv) kv.Key.EndsWith("|" & term)).
-                        Select(Function(kv) kv.Value).ToList()
-        If rows.Count = 0 Then Return Nothing
-
-        Dim result(7) As Double
-        result(0) = rows.Average(Function(r) r(0))   ' average of the course averages
-        result(1) = rows.Sum(Function(r) r(1))       ' passed: total
-        result(2) = rows.Sum(Function(r) r(2))       ' pending: total
-        result(3) = rows.Max(Function(r) r(3))       ' highest score overall
-
-        ' Category bars: average only the courses that have grades in that category
-        For i As Integer = 4 To 7
-            Dim idx As Integer = i
-            Dim withData = rows.Where(Function(r) r(idx) > 0).ToList()
-            result(i) = If(withData.Count = 0, 0, withData.Average(Function(r) r(idx)))
-        Next
-        Return result
-    End Function
-
-    ' Each stat card has two labels. This finds the pair inside the card of
-    ' "anyLabel", puts the number on the one with the bigger font and the
-    ' caption on the other, so it works whichever label is named what.
     Private Sub SetStat(anyLabel As Label, value As String, caption As String)
         Dim other As Label = Nothing
         If anyLabel.Parent IsNot Nothing Then
@@ -419,7 +586,7 @@ Public Class frmStudent
         End If
 
         If other Is Nothing Then
-            anyLabel.Text = value   ' card only has one label
+            anyLabel.Text = value
             Return
         End If
 
@@ -449,118 +616,71 @@ Public Class frmStudent
         UpdateBars()
     End Sub
 
-    Private Sub lblHighestCaption_Click(sender As Object, e As EventArgs) Handles lblHighestCaption.Click
+    ' ---------- DESIGNER EVENT STUBS (Preserved for Event Wiring) ----------
 
+    Private Sub lblHighestCaption_Click(sender As Object, e As EventArgs) Handles lblHighestCaption.Click
     End Sub
 
     Private Sub lblactivitypct_Click(sender As Object, e As EventArgs) Handles lblactivitypct.Click
-
     End Sub
 
     Private Sub lblPassedValue_Click(sender As Object, e As EventArgs) Handles lblPassedValue.Click
-
     End Sub
 
     Private Sub lblHighestValue_Click(sender As Object, e As EventArgs) Handles lblHighestValue.Click
-
     End Sub
 
     Private Sub lblAverageValue_Click(sender As Object, e As EventArgs) Handles lblAverageValue.Click
-
     End Sub
 
     Private Sub lblrole_Click(sender As Object, e As EventArgs) Handles lblrole.Click
-
     End Sub
 
     Private Sub Label3_Click(sender As Object, e As EventArgs) Handles Label3.Click
-
     End Sub
 
     Private Sub RoundedPanel1_Paint(sender As Object, e As PaintEventArgs) Handles RoundedPanel1.Paint
-
-    End Sub
-
-    Private Sub Label2_Click(sender As Object, e As EventArgs)
-
-    End Sub
-
-    Private Sub cboCourse_SelectedIndexChanged(sender As Object, e As EventArgs) Handles cboCourse.SelectedIndexChanged
-
     End Sub
 
     Private Sub Label1_Click(sender As Object, e As EventArgs) Handles Label1.Click
-
     End Sub
 
     Private Sub lblstanding_Click(sender As Object, e As EventArgs) Handles lblstanding.Click
-
     End Sub
 
     Private Sub Label5_Click(sender As Object, e As EventArgs) Handles Label5.Click
-
     End Sub
 
     Private Sub PictureBox5_Click(sender As Object, e As EventArgs) Handles PictureBox5.Click
-
     End Sub
 
     Private Sub Label9_Click(sender As Object, e As EventArgs) Handles Label9.Click
-
     End Sub
 
     Private Sub PictureBox6_Click(sender As Object, e As EventArgs) Handles PictureBox6.Click
-
     End Sub
 
     Private Sub Label10_Click(sender As Object, e As EventArgs) Handles Label10.Click
-
     End Sub
 
     Private Sub lblPendingCaption_Click(sender As Object, e As EventArgs) Handles lblPendingCaption.Click
-
     End Sub
 
     Private Sub lblPendingValue_Click(sender As Object, e As EventArgs) Handles lblPendingValue.Click
-
     End Sub
 
     Private Sub lblPassedCaption_Click(sender As Object, e As EventArgs) Handles lblPassedCaption.Click
-
     End Sub
 
     Private Sub pnlheader_Paint(sender As Object, e As PaintEventArgs) Handles pnlheader.Paint
-
     End Sub
 
-    Private Sub cboClass_SelectedIndexChanged(sender As Object, e As EventArgs) Handles cboclass.SelectedIndexChanged
-        cboAssessment.Items.Clear()
-        txtCurrentGrade.Clear()
-
-        ' 1. Populate assessment dropdown for selected class
-        Dim items As Dictionary(Of String, String) = Nothing
-        If cboclass.SelectedIndex <> -1 AndAlso classData.TryGetValue(cboclass.Text, items) Then
-            For Each assessmentName In items.Keys
-                cboAssessment.Items.Add(assessmentName)
-            Next
-            cboAssessment.Enabled = True
-        Else
-            cboAssessment.Enabled = False
-        End If
-
-        ' 2. Ensure mock request rows stay visible in dgvRequests
-        dgvRequests.CurrentCell = Nothing
-        For Each row As DataGridViewRow In dgvRequests.Rows
-            row.Visible = True
-        Next
+    Private Sub ComboBox2_SelectedIndexChanged(sender As Object, e As EventArgs) Handles cboperfterm.SelectedIndexChanged
     End Sub
 
-    ' "CS 103 - Object Oriented Programming" -> "CS 103"
     Private Function ClassCode(fullName As String) As String
+        If String.IsNullOrWhiteSpace(fullName) Then Return ""
         Return fullName.Split("-"c)(0).Trim()
     End Function
 
-    Private Sub ComboBox2_SelectedIndexChanged(sender As Object, e As EventArgs) Handles cboperfterm.SelectedIndexChanged
-
-    End Sub
 End Class

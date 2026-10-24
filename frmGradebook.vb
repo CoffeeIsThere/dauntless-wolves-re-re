@@ -2,7 +2,11 @@
 Imports MySql.Data.MySqlClient
 
 Public Class frmGradebook
-
+    Private ReadOnly _revisionService As New RevisionRequestService()
+    Private ReadOnly _exportService As New ExportService()
+    Private ReadOnly _classService As New ClassService()
+    Private ReadOnly _gradeService As New GradeService()
+    Private ReadOnly _userService As New UserService()
     ' ===== Grading setup (weights from the gradesheet; change here if needed) =====
     Private Const W_PART As Double = 5
     Private Const W_EXTRA As Double = 0
@@ -58,15 +62,45 @@ Public Class frmGradebook
         SetupGrid()
         CreateMeetingsBox()
         CreateSummaryLabel()
+        HookUpRevisionButton()
 
         cboCourse.DropDownStyle = ComboBoxStyle.DropDownList
-        cboCourse.Items.AddRange({"IT101 - Intro to Programming",
-                                  "IT102 - Data Structures",
-                                  "IT103 - Database Systems"})
+
+        ' Load real active classes from MySQL database
+        LoadClassesFromDatabase()
 
         UpdateSummary()
     End Sub
 
+    Private Sub LoadClassesFromDatabase()
+        cboCourse.Items.Clear()
+        classes.Clear()
+
+        ' Fetch classes from MySQL for current logged-in teacher
+        Dim dt As DataTable = _classService.GetClassesByTeacher(AppSession.CurrentUser.UserId)
+
+        If dt IsNot Nothing AndAlso dt.Rows.Count > 0 Then
+            For Each row As DataRow In dt.Rows
+                Dim code As String = Convert.ToString(row("class_code"))
+                Dim name As String = Convert.ToString(row("course_name"))
+                Dim term As String = Convert.ToString(row("term"))
+                Dim sy As String = Convert.ToString(row("academic_year"))
+                Dim sched As String = Convert.ToString(row("schedule"))
+
+                Dim info As New ClassInfo With {
+                    .Code = code, .Name = name, .Term = term, .SY = sy, .Schedule = sched
+                }
+                classes(code) = info
+
+                Dim displayText As String = $"{code} - {name}"
+                cboCourse.Items.Add(displayText)
+            Next
+
+            If cboCourse.Items.Count > 0 Then
+                cboCourse.SelectedIndex = 0
+            End If
+        End If
+    End Sub
     Private Sub frmGradebook_Shown(sender As Object, e As EventArgs) Handles Me.Shown
         FillEmptyRows()
         dgvGrades.ClearSelection()
@@ -424,26 +458,33 @@ Public Class frmGradebook
 
     ' Sorts all students A-Z by surname, renumbers the No. column 1..n, and refills blank rows
     Private Sub SortAndRenumber()
-        Dim students As New List(Of Object())
+        Dim studentList As New List(Of Tuple(Of Object(), String))()
+
+        Dim nameIdx As Integer = dgvGrades.Columns("StudentName").Index
+        Dim noIdx As Integer = dgvGrades.Columns("No").Index
+
         For Each r As DataGridViewRow In dgvGrades.Rows
             If IsStudentRow(r) Then
                 Dim vals(dgvGrades.Columns.Count - 1) As Object
                 For i As Integer = 0 To vals.Length - 1
                     vals(i) = r.Cells(i).Value
                 Next
-                students.Add(vals)
+                Dim sId As String = Convert.ToString(r.Cells("StudentName").Tag)
+                studentList.Add(Tuple.Create(vals, sId))
             End If
         Next
 
-        Dim nameIdx As Integer = dgvGrades.Columns("StudentName").Index
-        Dim noIdx As Integer = dgvGrades.Columns("No").Index
-        students.Sort(Function(a, b) CompareNames(Convert.ToString(a(nameIdx)), Convert.ToString(b(nameIdx))))
+        studentList.Sort(Function(a, b) CompareNames(Convert.ToString(a.Item1(nameIdx)), Convert.ToString(b.Item1(nameIdx))))
 
         dgvGrades.Rows.Clear()
 
-        For i As Integer = 0 To students.Count - 1
-            students(i)(noIdx) = i + 1
-            dgvGrades.Rows.Add(students(i))
+        For i As Integer = 0 To studentList.Count - 1
+            Dim vals() As Object = studentList(i).Item1
+            Dim sId As String = studentList(i).Item2
+
+            vals(noIdx) = i + 1
+            Dim newIdx As Integer = dgvGrades.Rows.Add(vals)
+            dgvGrades.Rows(newIdx).Cells("StudentName").Tag = sId
         Next
 
         FillEmptyRows()
@@ -643,6 +684,16 @@ Public Class frmGradebook
 
         ComputeRow(row)
         UpdateSummary()
+
+        ' PERSISTENCE TO DATABASE:
+        ' Save score to MySQL if it is an input cell with a valid numeric score
+        If CanEditCell(cell) AndAlso cell.Value IsNot Nothing AndAlso IsNumeric(cell.Value) Then
+            Dim studentNo As String = Convert.ToString(row.Cells("StudentName").Tag) ' Stored Student ID
+            Dim classId As Integer = GetClassIdFromCode(SelectedClassCode())
+
+            ' Save asynchronously/silently via GradeService
+            _gradeService.SaveScore(studentNo, classId, colName, Convert.ToDouble(cell.Value), AppSession.CurrentUser.UserId)
+        End If
     End Sub
 
     ' Excel-style keys: Delete clears, Ctrl+V pastes (Ctrl+C copy is built in)
@@ -680,7 +731,133 @@ Public Class frmGradebook
     End Sub
 
     Private Sub CustomButton1_Click(sender As Object, e As EventArgs) Handles CustomButton1.Click
+        ' Verify there are student rows to export
+        Dim studentRowCount As Integer = 0
+        For Each r As DataGridViewRow In dgvGrades.Rows
+            If IsStudentRow(r) Then studentRowCount += 1
+        Next
 
+        If studentRowCount = 0 Then
+            MessageBox.Show("No student records found in the gradebook to export.", "Export Notice", MessageBoxButtons.OK, MessageBoxIcon.Information)
+            Return
+        End If
+
+        Using sfd As New SaveFileDialog()
+            sfd.Filter = "PDF Files (*.pdf)|*.pdf|CSV Files (*.csv)|*.csv"
+            Dim courseName As String = If(cboCourse.SelectedItem IsNot Nothing, SelectedClassCode(), "Gradebook")
+            sfd.FileName = $"{courseName}_Master_Gradebook_{DateTime.Now:yyyyMMdd}.pdf"
+
+            If sfd.ShowDialog() = DialogResult.OK Then
+                If sfd.FilterIndex = 1 Then
+                    ' --- PDF EXPORT (Landscape Layout with Clean Columns) ---
+                    Dim printDoc As New Printing.PrintDocument()
+                    printDoc.DefaultPageSettings.Landscape = True
+
+                    AddHandler printDoc.PrintPage, Sub(s, args)
+                                                       Dim g As Graphics = args.Graphics
+                                                       Dim titleFont As New Font("Segoe UI", 13, FontStyle.Bold)
+                                                       Dim subFont As New Font("Segoe UI", 8.5F, FontStyle.Regular)
+                                                       Dim headerFont As New Font("Segoe UI", 8.0F, FontStyle.Bold)
+                                                       Dim bodyFont As New Font("Segoe UI", 8.0F, FontStyle.Regular)
+
+                                                       Dim startX As Integer = 35
+                                                       Dim y As Integer = 35
+                                                       Dim selectedCourseText As String = If(cboCourse.SelectedItem IsNot Nothing, cboCourse.SelectedItem.ToString(), "Master Gradebook")
+
+                                                       ' Report Title Header
+                                                       g.DrawString($"DAUNTLESS WOLVES - DIGITAL GRADEBOOK ({selectedCourseText})", titleFont, Brushes.DarkGreen, startX, y)
+                                                       y += 24
+                                                       g.DrawString($"Meetings: {Meetings()} | Total Students: {studentRowCount} | Generated: {DateTime.Now:MMM d, yyyy HH:mm}", subFont, Brushes.Gray, startX, y)
+                                                       y += 28
+
+                                                       ' Short Clean Header Label Mapper
+                                                       Dim getCleanHeader As Func(Of DataGridViewColumn, String) =
+                                                           Function(col As DataGridViewColumn)
+                                                               Select Case col.Name.ToLower()
+                                                                   Case "no" : Return "No."
+                                                                   Case "studentname" : Return "Student Name"
+                                                                   Case "drp" : Return "Drp"
+                                                                   Case "part" : Return "Abs"
+                                                                   Case "partgra" : Return "Part%"
+                                                                   Case "extra" : Return "Ext%"
+                                                                   Case "cwcomp" : Return "CW%"
+                                                                   Case "quizcomp" : Return "Quiz%"
+                                                                   Case "project" : Return "Proj"
+                                                                   Case "projectgra" : Return "Proj%"
+                                                                   Case "examraw" : Return "Exam"
+                                                                   Case "examgra" : Return "ExGrA"
+                                                                   Case "majorexam" : Return "Major%"
+                                                                   Case "total" : Return "Grade"
+                                                                   Case "remarks" : Return "Status"
+                                                                   Case Else
+                                                                       Dim lines() As String = col.HeaderText.Split({vbLf, vbCr}, StringSplitOptions.RemoveEmptyEntries)
+                                                                       Return If(lines.Length > 0, lines(0), col.HeaderText)
+                                                               End Select
+                                                           End Function
+
+                                                       ' Column Width Allocator
+                                                       Dim getColWidth As Func(Of DataGridViewColumn, Integer) =
+                                                           Function(col As DataGridViewColumn)
+                                                               Select Case col.Name.ToLower()
+                                                                   Case "no" : Return 30
+                                                                   Case "studentname" : Return 160
+                                                                   Case "drp", "part" : Return 38
+                                                                   Case "partgra", "extra", "cwcomp", "quizcomp", "project", "projectgra", "examraw", "examgra", "majorexam" : Return 52
+                                                                   Case "total", "remarks" : Return 50
+                                                                   Case Else : Return 48
+                                                               End Select
+                                                           End Function
+
+                                                       ' 1. Print Header Row
+                                                       Dim x As Integer = startX
+                                                       For Each col As DataGridViewColumn In dgvGrades.Columns
+                                                           If col.Visible Then
+                                                               Dim colW As Integer = getColWidth(col)
+                                                               Dim headerText As String = getCleanHeader(col)
+                                                               g.DrawString(headerText, headerFont, Brushes.DarkGreen, x, y)
+                                                               x += colW
+                                                           End If
+                                                       Next
+
+                                                       y += 18
+                                                       g.DrawLine(Pens.DarkGreen, startX, y, x, y)
+                                                       y += 8
+
+                                                       ' 2. Print Student Rows
+                                                       For Each row As DataGridViewRow In dgvGrades.Rows
+                                                           If IsStudentRow(row) Then
+                                                               x = startX
+                                                               For Each col As DataGridViewColumn In dgvGrades.Columns
+                                                                   If col.Visible Then
+                                                                       Dim colW As Integer = getColWidth(col)
+                                                                       Dim cellVal As String = If(row.Cells(col.Index).Value IsNot Nothing, row.Cells(col.Index).Value.ToString(), "")
+
+                                                                       g.DrawString(cellVal, bodyFont, Brushes.Black, x, y)
+                                                                       x += colW
+                                                                   End If
+                                                               Next
+                                                               y += 22
+                                                           End If
+                                                       Next
+
+                                                       ' 3. Bottom Summary Bar
+                                                       y += 10
+                                                       g.DrawLine(Pens.Gray, startX, y, x, y)
+                                                       y += 8
+                                                       g.DrawString(lblSummary.Text, headerFont, Brushes.DarkGreen, startX, y)
+                                                   End Sub
+
+                    If _exportService.ExportToPDF(printDoc, sfd.FileName) Then
+                        MessageBox.Show("Digital gradebook exported to PDF successfully!", "Export Complete", MessageBoxButtons.OK, MessageBoxIcon.Information)
+                    End If
+                Else
+                    ' --- CSV EXPORT ---
+                    If _exportService.ExportToCSV(dgvGrades, sfd.FileName) Then
+                        MessageBox.Show("Digital gradebook exported to CSV successfully!", "Export Complete", MessageBoxButtons.OK, MessageBoxIcon.Information)
+                    End If
+                End If
+            End If
+        End Using
     End Sub
 
     ' ===== Add Class =====
@@ -695,23 +872,108 @@ Public Class frmGradebook
         Dim info As ClassInfo = ShowClassDialog()
         If info Is Nothing Then Return
 
-        Dim display As String = info.Code & " - " & info.Name
-        classes(info.Code) = info
-        cboCourse.Items.Add(display)
-        cboCourse.SelectedItem = display
+        ' Persist to MySQL database
+        Dim success As Boolean = _classService.CreateClass(
+            info.Code,
+            info.Name,
+            AppSession.CurrentUser.UserId,
+            info.Term,
+            info.SY,
+            info.Schedule
+        )
 
-        ' TODO: save the class (code, name, schedule, term, SY) to your database
+        If success Then
+            LoadClassesFromDatabase()
+            cboCourse.SelectedItem = $"{info.Code} - {info.Name}"
+            MessageBox.Show("Class created and saved to database!", "Success", MessageBoxButtons.OK, MessageBoxIcon.Information)
+        Else
+            MessageBox.Show("Failed to save class to database.", "Database Error", MessageBoxButtons.OK, MessageBoxIcon.Error)
+        End If
     End Sub
 
     ' Hover over the class box to see its schedule, term and school year
     Private Sub cboCourse_SelectedIndexChanged(sender As Object, e As EventArgs) Handles cboCourse.SelectedIndexChanged
-        Dim code As String = SelectedClassCode()
-        If classes.ContainsKey(code) Then
-            Dim c As ClassInfo = classes(code)
-            classTip.SetToolTip(cboCourse, c.Schedule & vbLf & c.Term & ", SY " & c.SY)
-        Else
-            classTip.SetToolTip(cboCourse, "")
+        LoadClassData()
+    End Sub
+
+    Private Sub LoadClassData()
+        dgvGrades.Rows.Clear()
+
+        Dim classCode As String = SelectedClassCode()
+        If String.IsNullOrEmpty(classCode) Then
+            FillEmptyRows()
+            ComputeAll()
+            Return
         End If
+
+        Dim classId As Integer = GetClassIdFromCode(classCode)
+        If classId = 0 Then
+            FillEmptyRows()
+            ComputeAll()
+            Return
+        End If
+
+        ' 1. Load enrolled students
+        Dim dtStudents As DataTable = _gradeService.GetEnrolledStudents(classId)
+        If dtStudents IsNot Nothing AndAlso dtStudents.Rows.Count > 0 Then
+            For Each row As DataRow In dtStudents.Rows
+                Dim studentId As String = Convert.ToString(row("student_id"))
+                Dim fullName As String = Convert.ToString(row("full_name"))
+
+                Dim vals(dgvGrades.Columns.Count - 1) As Object
+                vals(dgvGrades.Columns("StudentName").Index) = fullName
+
+                Dim rowIndex As Integer = dgvGrades.Rows.Add(vals)
+                dgvGrades.Rows(rowIndex).Cells("StudentName").Tag = studentId
+            Next
+            SortAndRenumber()
+        End If
+
+        ' 2. Load dynamic assessment columns from database
+        Dim dtAssessments As DataTable = _gradeService.GetAssessmentsByClass(classId)
+        If dtAssessments IsNot Nothing AndAlso dtAssessments.Rows.Count > 0 Then
+            For Each row As DataRow In dtAssessments.Rows
+                Dim title As String = Convert.ToString(row("title"))
+                Dim type As String = Convert.ToString(row("assessment_type"))
+                Dim grp As String = GroupFor(type)
+                Dim maxScore As Double = Convert.ToDouble(row("total_score"))
+
+                ' Avoid adding duplicate UI columns if already created
+                Dim rawColName As String = System.Text.RegularExpressions.Regex.Replace(title, "[^A-Za-z0-9]", "") & "Raw"
+                If Not dgvGrades.Columns.Contains(rawColName) Then
+                    AddAssessment(type, grp, maxScore)
+                End If
+            Next
+        End If
+
+        ' 3. Populate existing student scores into yellow input cells
+        Dim dtScores As DataTable = _gradeService.GetScoresByClass(classId)
+        If dtScores IsNot Nothing AndAlso dtScores.Rows.Count > 0 Then
+            For Each sRow As DataRow In dtScores.Rows
+                Dim sId As String = Convert.ToString(sRow("student_id"))
+                Dim title As String = Convert.ToString(sRow("title"))
+                Dim scoreVal As Object = sRow("score")
+
+                If scoreVal IsNot DBNull.Value Then
+                    Dim colKey As String = System.Text.RegularExpressions.Regex.Replace(title, "[^A-Za-z0-9]", "") & "Raw"
+
+                    ' Find matching student row in DataGridView
+                    For Each dRow As DataGridViewRow In dgvGrades.Rows
+                        If IsStudentRow(dRow) AndAlso Convert.ToString(dRow.Cells("StudentName").Tag) = sId Then
+                            If dgvGrades.Columns.Contains(colKey) Then
+                                dRow.Cells(colKey).Value = Convert.ToDouble(scoreVal)
+                            ElseIf dgvGrades.Columns.Contains("ExamRaw") AndAlso title.StartsWith("Exam", StringComparison.OrdinalIgnoreCase) Then
+                                dRow.Cells("ExamRaw").Value = Convert.ToDouble(scoreVal)
+                            End If
+                            Exit For
+                        End If
+                    Next
+                End If
+            Next
+        End If
+
+        FillEmptyRows()
+        ComputeAll()
     End Sub
 
     ' ===== Add Student: name goes into the grid, list re-sorts A-Z and renumbers =====
@@ -742,18 +1004,36 @@ Public Class frmGradebook
     ' ===== Add Assessment: type anything, it numbers itself (Quiz 1, Quiz 2, Laboratory 1 ...) =====
     Private Sub btnAddAssessment_Click(sender As Object, e As EventArgs) Handles btnAddAssessment.Click
         If cboCourse.SelectedIndex = -1 Then
-            MessageBox.Show("Please select a course first.", "Digital Gradebook")
+            MessageBox.Show("Please select a course first.", "Digital Gradebook", MessageBoxButtons.OK, MessageBoxIcon.Warning)
             Return
         End If
 
-        Dim type As String = ""
-        Dim grp As String = ""
+        Dim type = ""
+        Dim grp = ""
         Dim maxScore As Double = 0
         If Not ShowAssessmentDialog(type, grp, maxScore) Then Return
 
-        AddAssessment(type, grp, maxScore)
+        Dim currentClassCode = SelectedClassCode()
+        Dim classId = GetClassIdFromCode(currentClassCode)
+        Dim assessmentTitle = NextTitle(type)
+        Dim term = If(classes.ContainsKey(currentClassCode), classes(currentClassCode).Term, "Midterm")
 
-        ' TODO: save the new assessment for the selected course
+        ' Create assessment in MySQL
+        Dim res = _gradeService.CreateAssessment(
+            classId,
+            assessmentTitle,
+            type,
+            maxScore,
+            term,
+            CurrentUser.UserId
+        )
+
+        If res.Success Then
+            AddAssessment(type, grp, maxScore)
+            MessageBox.Show($"Assessment '{assessmentTitle}' created and saved to database!", "Success", MessageBoxButtons.OK, MessageBoxIcon.Information)
+        Else
+            MessageBox.Show($"Could not create assessment: {res.Message}", "Database Error", MessageBoxButtons.OK, MessageBoxIcon.Error)
+        End If
     End Sub
 
     ' ===== Popups (dark green style) =====
@@ -1431,10 +1711,10 @@ Public Class frmGradebook
 
     ' "IT 112 - Information Assurance" -> "IT 112"
     Private Function SelectedClassCode() As String
-        If cboCourse.SelectedIndex = -1 Then Return ""
-        Dim s As String = Convert.ToString(cboCourse.SelectedItem)
-        Dim i As Integer = s.IndexOf(" - ")
-        Return If(i > 0, s.Substring(0, i), s)
+        If cboCourse.SelectedItem Is Nothing Then Return ""
+        Dim text As String = cboCourse.SelectedItem.ToString()
+        Dim idx As Integer = text.IndexOf(" - ")
+        Return If(idx > 0, text.Substring(0, idx).Trim(), text.Trim())
     End Function
 
     ' pairs = "@name", value, "@name", value ...
@@ -1844,4 +2124,107 @@ Public Class frmGradebook
         MessageBox.Show("Imported " & added & " assessments.", "Digital Gradebook")
         Return True
     End Function
+
+
+    Private Function GetClassIdFromCode(code As String) As Integer
+        If String.IsNullOrEmpty(code) Then Return 0
+        Dim dt As DataTable = _classService.GetClassByCode(code)
+        If dt IsNot Nothing AndAlso dt.Rows.Count > 0 Then
+            Return Convert.ToInt32(dt.Rows(0)("class_id"))
+        End If
+        Return 0
+    End Function
+
+    Public Sub ReviewPendingRevisionRequests()
+        Dim dt As DataTable = _revisionService.GetPendingRequestsByTeacher(AppSession.CurrentUser.UserId)
+
+        If dt Is Nothing OrElse dt.Rows.Count = 0 Then
+            MessageBox.Show("There are no pending grade revision requests at this time.", "Revision Requests", MessageBoxButtons.OK, MessageBoxIcon.Information)
+            Return
+        End If
+
+        ' Review top pending request
+        Dim row As DataRow = dt.Rows(0)
+        Dim reqId As Integer = Convert.ToInt32(row("request_id"))
+        Dim studentName As String = Convert.ToString(row("student_name"))
+        Dim assessmentTitle As String = Convert.ToString(row("assessment_title"))
+        Dim currentScore As String = If(row("current_score") Is DBNull.Value, "N/A", Convert.ToString(row("current_score")))
+        Dim totalScore As String = Convert.ToString(row("total_score"))
+        Dim reqPoints As String = If(row("requested_points") Is DBNull.Value, "Re-check requested", Convert.ToString(row("requested_points")))
+        Dim reason As String = Convert.ToString(row("reason"))
+
+        Dim msg As String = $"[PENDING REVISION REQUEST #{reqId}]" & vbCrLf & vbCrLf &
+                             $"Student Name: {studentName}" & vbCrLf &
+                             $"Assessment: {assessmentTitle} (Max: {totalScore})" & vbCrLf &
+                             $"Current Recorded Score: {currentScore}" & vbCrLf &
+                             $"Requested Adjustment: {reqPoints}" & vbCrLf &
+                             $"Reason: {reason}" & vbCrLf & vbCrLf &
+                             "Click YES to APPROVE and apply this revision." & vbCrLf &
+                             "Click NO to REJECT this request." & vbCrLf &
+                             "Click CANCEL to dismiss."
+
+        Dim dlg As DialogResult = MessageBox.Show(msg, "Review Student Revision Request", MessageBoxButtons.YesNoCancel, MessageBoxIcon.Question)
+
+        If dlg = DialogResult.Yes Then
+            ' Call ApproveAndApplyRevision from your service
+            Dim res As OperationResult = _revisionService.ApproveAndApplyRevision(reqId, AppSession.CurrentUser.UserId)
+
+            ' If no points were specified by the student, ask the professor for the exact corrected score
+            If Not res.Success AndAlso res.Message = "NEEDSCORE" Then
+                Dim input As String = InputBox($"Enter the corrected score for {studentName} (Max {totalScore}):", "Score Override Required", currentScore)
+                Dim overrideVal As Double
+                If Double.TryParse(input, overrideVal) AndAlso overrideVal >= 0 AndAlso overrideVal <= Convert.ToDouble(totalScore) Then
+                    res = _revisionService.ApproveAndApplyRevision(reqId, AppSession.CurrentUser.UserId, overrideVal)
+                Else
+                    MessageBox.Show("Invalid score entered. Request approval canceled.", "Canceled", MessageBoxButtons.OK, MessageBoxIcon.Warning)
+                    Return
+                End If
+            End If
+
+            If res.Success Then
+                MessageBox.Show(res.Message, "Request Approved", MessageBoxButtons.OK, MessageBoxIcon.Information)
+                LoadClassData() ' Refresh gradebook grid with updated score
+            Else
+                MessageBox.Show(res.Message, "Approval Error", MessageBoxButtons.OK, MessageBoxIcon.Error)
+            End If
+
+        ElseIf dlg = DialogResult.No Then
+            Dim rejectReason As String = InputBox("Optional: Enter reason for rejecting this request:", "Reject Revision Request", "Insufficient justification.")
+            Dim success As Boolean = _revisionService.RejectRequest(reqId, AppSession.CurrentUser.UserId, rejectReason)
+
+            If success Then
+                MessageBox.Show($"Revision request #{reqId} has been rejected.", "Request Rejected", MessageBoxButtons.OK, MessageBoxIcon.Information)
+            Else
+                MessageBox.Show("Failed to reject request.", "Database Error", MessageBoxButtons.OK, MessageBoxIcon.Error)
+            End If
+        End If
+    End Sub
+
+    Private Sub HookUpRevisionButton()
+        For Each c As Control In GetAllControls(Me)
+            If c.Name.Equals("btnRevisionRequests", StringComparison.OrdinalIgnoreCase) _
+               OrElse c.Name.Equals("btnRevision", StringComparison.OrdinalIgnoreCase) _
+               OrElse c.Text.StartsWith("Revis", StringComparison.OrdinalIgnoreCase) Then
+
+                RemoveHandler c.Click, AddressOf btnRevisionRequests_Click
+                AddHandler c.Click, AddressOf btnRevisionRequests_Click
+                Return
+            End If
+        Next
+    End Sub
+
+    Private Function GetAllControls(parent As Control) As List(Of Control)
+        Dim list As New List(Of Control)()
+        For Each c As Control In parent.Controls
+            list.Add(c)
+            If c.HasChildren Then
+                list.AddRange(GetAllControls(c))
+            End If
+        Next
+        Return list
+    End Function
+
+    Private Sub btnRevisionRequests_Click(sender As Object, e As EventArgs)
+        ReviewPendingRevisionRequests()
+    End Sub
 End Class

@@ -334,7 +334,16 @@ Public Class GradeService
     ' =========================================================
     '  CSV IMPORT (reuses RecordScore, so every row is checked and audited)
     ' =========================================================
+    Private Function ParseCsvLine(line As String) As String()
+        ' Regex splits by comma ONLY if not inside double quotes
+        Dim pattern As String = ",(?=(?:[^""]*""[^""]*"")*[^""]*$)"
+        Dim parts As String() = System.Text.RegularExpressions.Regex.Split(line, pattern)
 
+        For i As Integer = 0 To parts.Length - 1
+            parts(i) = parts(i).Trim().Trim("""".ToCharArray())
+        Next
+        Return parts
+    End Function
     Public Function BulkImportGradesFromCSV(classId As Integer, assessmentId As Integer,
                                             filePath As String, teacherId As String) As (SuccessCount As Integer, FailCount As Integer)
         Dim successCount As Integer = 0
@@ -349,7 +358,7 @@ Public Class GradeService
             Dim line As String = lines(i).Trim()
             If String.IsNullOrWhiteSpace(line) Then Continue For
 
-            Dim parts() As String = line.Split(","c)
+            Dim parts As String() = ParseCsvLine(line)
             If parts.Length < 2 Then
                 failCount += 1
                 Continue For
@@ -461,6 +470,211 @@ Public Class GradeService
             "WHERE al.teacher_id = @TeacherId " &
             "ORDER BY al.logged_at DESC, al.log_id DESC LIMIT 200"
         Return DatabaseHelper.ExecuteQuery(sql, {New MySqlParameter("@TeacherId", teacherId)})
+    End Function
+
+    Public Function CreateAssessment(classId As Integer, title As String, assessmentType As String, maxScore As Double, term As String, createdBy As String) As OperationResult
+        Try
+            Dim sql As String = "INSERT INTO assessments (class_id, title, assessment_type, total_score, term, created_by) " &
+                               "VALUES (@classId, @title, @type, @maxScore, @term, @createdBy)"
+            Dim params As MySqlParameter() = {
+                New MySqlParameter("@classId", classId),
+                New MySqlParameter("@title", title),
+                New MySqlParameter("@type", assessmentType),
+                New MySqlParameter("@maxScore", maxScore),
+                New MySqlParameter("@term", term),
+                New MySqlParameter("@createdBy", createdBy)
+            }
+
+            Dim rows As Integer = DatabaseHelper.ExecuteNonQuery(sql, params)
+            If rows > 0 Then
+                Return OperationResult.Ok("Assessment created successfully.")
+            Else
+                Return OperationResult.Fail("Failed to insert assessment record.")
+            End If
+        Catch ex As Exception
+            Return OperationResult.Fail($"Database error: {ex.Message}")
+        End Try
+    End Function
+
+    Public Function EnrollStudentInClass(studentNo As String, classId As Integer) As OperationResult
+        Try
+            Dim sql As String = "INSERT INTO enrollment (student_id, class_id) VALUES (@studentNo, @classId)"
+            Dim params As MySqlParameter() = {
+                New MySqlParameter("@studentNo", studentNo),
+                New MySqlParameter("@classId", classId)
+            }
+
+            Dim rows As Integer = DatabaseHelper.ExecuteNonQuery(sql, params)
+            If rows > 0 Then
+                Return OperationResult.Ok("Student enrolled successfully.")
+            Else
+                Return OperationResult.Fail("Failed to enroll student.")
+            End If
+        Catch ex As Exception
+            Return OperationResult.Fail($"Database error: {ex.Message}")
+        End Try
+    End Function
+
+    Public Function SaveScore(studentId As String, classId As Integer, assessmentKey As String, score As Double, updatedBy As String) As OperationResult
+        Try
+            Dim sql As String = "INSERT INTO scores (student_id, class_id, item_name, score, updated_by) " &
+                               "VALUES (@studentId, @classId, @key, @score, @updatedBy) " &
+                               "ON DUPLICATE KEY UPDATE score = @score, updated_by = @updatedBy, updated_at = NOW()"
+
+            Dim params As MySqlParameter() = {
+                New MySqlParameter("@studentId", studentId),
+                New MySqlParameter("@classId", classId),
+                New MySqlParameter("@key", assessmentKey),
+                New MySqlParameter("@score", score),
+                New MySqlParameter("@updatedBy", updatedBy)
+            }
+
+            DatabaseHelper.ExecuteNonQuery(sql, params)
+            Return OperationResult.Ok("Score saved successfully.")
+        Catch ex As Exception
+            Return OperationResult.Fail($"Failed to save score: {ex.Message}")
+        End Try
+    End Function
+
+    Public Function GetEnrolledStudents(classId As Integer) As DataTable
+        Dim sql As String = "SELECT s.student_id, s.full_name " &
+                           "FROM enrollment e " &
+                           "JOIN student s ON e.student_id = s.student_id " &
+                           "WHERE e.class_id = @classId " &
+                           "ORDER BY s.full_name"
+        Dim params As MySqlParameter() = {
+            New MySqlParameter("@classId", classId)
+        }
+        Return DatabaseHelper.ExecuteQuery(sql, params)
+    End Function
+
+    Public Function GetAssessmentsByClass(classId As Integer) As DataTable
+        Dim sql As String = "SELECT assessment_id, title, assessment_type, total_score, term, weight " &
+                           "FROM assessment " &
+                           "WHERE class_id = @classId " &
+                           "ORDER BY created_at"
+        Dim params As MySqlParameter() = {
+            New MySqlParameter("@classId", classId)
+        }
+        Return DatabaseHelper.ExecuteQuery(sql, params)
+    End Function
+
+    ''' <summary>
+    ''' Fetches all recorded student scores for a given class.
+    ''' </summary>
+    Public Function GetScoresByClass(classId As Integer) As DataTable
+        Dim sql As String = "SELECT e.student_id, a.title, sg.assessment_id, sg.score " &
+                           "FROM studentgrade sg " &
+                           "JOIN enrollment e ON sg.enrollment_id = e.enrollment_id " &
+                           "JOIN assessment a ON sg.assessment_id = a.assessment_id " &
+                           "WHERE e.class_id = @classId"
+        Dim params As MySqlParameter() = {
+            New MySqlParameter("@classId", classId)
+        }
+        Return DatabaseHelper.ExecuteQuery(sql, params)
+    End Function
+
+    Public Function GetGradesByEnrollment(enrollmentId As Integer) As DataTable
+        Dim sql As String = "SELECT sg.grade_id, a.title, sg.score, a.total_score, sg.remarks, sg.created_at " &
+                           "FROM studentgrade sg " &
+                           "JOIN assessment a ON sg.assessment_id = a.assessment_id " &
+                           "WHERE sg.enrollment_id = @EnrollmentId"
+        Dim params As MySqlParameter() = {
+            New MySqlParameter("@EnrollmentId", enrollmentId)
+        }
+        Return DatabaseHelper.ExecuteQuery(sql, params)
+    End Function
+
+    Public Function GetStudentScoresForClass(studentId As String, classId As Integer) As DataTable
+        Dim sql As String = "SELECT a.title, a.total_score, sg.score " &
+                           "FROM assessment a " &
+                           "LEFT JOIN studentgrade sg ON a.assessment_id = sg.assessment_id " &
+                           "  AND sg.enrollment_id = (SELECT enrollment_id FROM enrollment WHERE student_id = @StudentId AND class_id = @ClassId LIMIT 1) " &
+                           "WHERE a.class_id = @ClassId " &
+                           "ORDER BY a.created_at"
+        Dim params As MySqlParameter() = {
+            New MySqlParameter("@StudentId", studentId),
+            New MySqlParameter("@ClassId", classId)
+        }
+        Return DatabaseHelper.ExecuteQuery(sql, params)
+    End Function
+
+    Public Function BulkImportMultiGradeCSV(classId As Integer, filePath As String, teacherId As String) As (SuccessCount As Integer, FailCount As Integer)
+        Dim successCount As Integer = 0
+        Dim failCount As Integer = 0
+
+        If Not File.Exists(filePath) Then Return (0, 0)
+
+        Dim lines() As String = File.ReadAllLines(filePath)
+        If lines.Length < 2 Then Return (0, 0)
+
+        ' 1. Parse Header Row to map column index -> assessment_id
+        Dim headerParts() As String = lines(0).Split(","c)
+        Dim assessmentMap As New Dictionary(Of Integer, Integer)() ' ColIndex -> AssessmentId
+
+        For colIdx As Integer = 1 To headerParts.Length - 1
+            Dim assessmentTitle As String = headerParts(colIdx).Trim().Replace("""", "")
+            Dim assessmentId As Integer = GetAssessmentIdByTitle(classId, assessmentTitle)
+            If assessmentId > 0 Then
+                assessmentMap.Add(colIdx, assessmentId)
+            End If
+        Next
+
+        If assessmentMap.Count = 0 Then
+            Throw New Exception("No matching assessment titles found in database for this class section.")
+        End If
+
+        ' 2. Parse Data Rows
+        For i As Integer = 1 To lines.Length - 1
+            Dim line As String = lines(i).Trim()
+            If String.IsNullOrWhiteSpace(line) Then Continue For
+
+            Dim parts() As String = line.Split(","c)
+            If parts.Length < 1 Then Continue For
+
+            Dim studentId As String = parts(0).Trim().Replace("""", "")
+            Dim enrollmentId As Integer = GetEnrollmentIdByStudentAndClass(studentId, classId)
+
+            If enrollmentId = 0 Then
+                failCount += 1
+                Continue For
+            End If
+
+            ' 3. Loop through mapped assessment columns for this student
+            For Each kvp In assessmentMap
+                Dim colIdx As Integer = kvp.Key
+                Dim assessmentId As Integer = kvp.Value
+
+                If colIdx < parts.Length Then
+                    Dim scoreText As String = parts(colIdx).Trim().Replace("""", "")
+                    Dim scoreVal As Double
+
+                    If Double.TryParse(scoreText, scoreVal) Then
+                        Dim recorded As Boolean = RecordScore(enrollmentId, assessmentId, scoreVal, teacherId, "Multi-CSV Batch Upload").Success
+                        If recorded Then
+                            successCount += 1
+                        Else
+                            failCount += 1
+                        End If
+                    End If
+                End If
+            Next
+        Next
+
+        Return (successCount, failCount)
+    End Function
+
+    Private Function GetAssessmentIdByTitle(classId As Integer, title As String) As Integer
+        Dim sql As String = "SELECT assessment_id FROM assessment WHERE class_id = @ClassId AND LOWER(title) = LOWER(@Title) LIMIT 1"
+        Dim params As MySqlParameter() = {
+            New MySqlParameter("@ClassId", classId),
+            New MySqlParameter("@Title", title)
+        }
+        Dim result = DatabaseHelper.ExecuteScalar(sql, params)
+        If result IsNot Nothing AndAlso Not Convert.IsDBNull(result) Then
+            Return Convert.ToInt32(result)
+        End If
+        Return 0
     End Function
 
 End Class

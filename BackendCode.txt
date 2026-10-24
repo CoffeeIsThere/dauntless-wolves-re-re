@@ -1,0 +1,1469 @@
+﻿========================================
+FILE: AuditService.vb
+PATH: C:\Dauntless Wolves\dauntless-wolves-re-re\Services\AuditService.vb
+========================================
+Imports MySql.Data.MySqlClient
+Imports System.Data
+
+Public Class AuditService
+
+    ' Standalone: opens its own connection
+    Public Shared Function LogAction(actorRole As String, actorUserId As String, action As String,
+                                     entityType As String, entityId As String,
+                                     Optional oldValue As String = Nothing,
+                                     Optional newValue As String = Nothing,
+                                     Optional details As String = Nothing) As Boolean
+        Try
+            Using conn As MySqlConnection = DatabaseHelper.GetConnection()
+                Return InsertLog(conn, Nothing, actorRole, actorUserId, action, entityType, entityId, oldValue, newValue, details)
+            End Using
+        Catch ex As Exception
+            Console.WriteLine("[AUDIT LOG ERROR] " & ex.Message)
+            Return False
+        End Try
+    End Function
+
+    ' Inside an existing transaction (so the log rolls back together with the grade change)
+    Public Shared Function LogActionTx(conn As MySqlConnection, tx As MySqlTransaction,
+                                       actorRole As String, actorUserId As String, action As String,
+                                       entityType As String, entityId As String,
+                                       Optional oldValue As String = Nothing,
+                                       Optional newValue As String = Nothing,
+                                       Optional details As String = Nothing) As Boolean
+        Return InsertLog(conn, tx, actorRole, actorUserId, action, entityType, entityId, oldValue, newValue, details)
+    End Function
+
+    Private Shared Function InsertLog(conn As MySqlConnection, tx As MySqlTransaction,
+                                      actorRole As String, actorUserId As String, action As String,
+                                      entityType As String, entityId As String,
+                                      oldValue As String, newValue As String, details As String) As Boolean
+        Dim studentId As Object = DBNull.Value
+        Dim teacherId As Object = DBNull.Value
+        Dim adminId As Object = DBNull.Value
+
+        Select Case actorRole.Trim().ToLower()
+            Case "student"
+                studentId = actorUserId
+            Case "teacher"
+                teacherId = actorUserId
+            Case "admin"
+                Dim parsed As Integer
+                If Not Integer.TryParse(actorUserId, parsed) Then
+                    Throw New ArgumentException("Admin id must be numeric.")
+                End If
+                adminId = parsed
+            Case Else
+                Throw New ArgumentException("Unknown actor role: " & actorRole)
+        End Select
+
+        Dim sql As String =
+            "INSERT INTO auditlog (student_id, teacher_id, admin_id, action, entity_type, entity_id, old_value, new_value, details) " &
+            "VALUES (@StudentId, @TeacherId, @AdminId, @Action, @EntityType, @EntityId, @OldVal, @NewVal, @Details)"
+
+        Using cmd As New MySqlCommand(sql, conn, tx)
+            cmd.Parameters.AddWithValue("@StudentId", studentId)
+            cmd.Parameters.AddWithValue("@TeacherId", teacherId)
+            cmd.Parameters.AddWithValue("@AdminId", adminId)
+            cmd.Parameters.AddWithValue("@Action", Clip(action, 100))
+            cmd.Parameters.AddWithValue("@EntityType", Clip(entityType, 50))
+            cmd.Parameters.AddWithValue("@EntityId", Clip(entityId, 20))
+            cmd.Parameters.AddWithValue("@OldVal", OrNull(oldValue, 100))
+            cmd.Parameters.AddWithValue("@NewVal", OrNull(newValue, 100))
+            cmd.Parameters.AddWithValue("@Details", OrNull(details, 500))
+            Return cmd.ExecuteNonQuery() > 0
+        End Using
+    End Function
+
+    ' Trim to the column length so the insert doesn't fail with "Data too long"
+    Private Shared Function Clip(s As String, maxLen As Integer) As String
+        If s Is Nothing Then Return ""
+        Return If(s.Length > maxLen, s.Substring(0, maxLen), s)
+    End Function
+
+    Private Shared Function OrNull(s As String, maxLen As Integer) As Object
+        If String.IsNullOrEmpty(s) Then Return DBNull.Value
+        Return Clip(s, maxLen)
+    End Function
+
+    Public Shared Function GetLogsByActor(actorRole As String, actorUserId As String) As DataTable
+        Dim col As String
+        Select Case actorRole.Trim().ToLower()
+            Case "student" : col = "student_id"
+            Case "teacher" : col = "teacher_id"
+            Case "admin" : col = "admin_id"
+            Case Else : Return New DataTable()
+        End Select
+
+        Dim sql As String =
+            "SELECT log_id, student_id, teacher_id, admin_id, action, entity_type, entity_id, old_value, new_value, timestamp, details " &
+            "FROM auditlog WHERE " & col & " = @ActorId ORDER BY timestamp DESC"
+
+        Return DatabaseHelper.ExecuteQuery(sql, {New MySqlParameter("@ActorId", actorUserId)})
+    End Function
+
+End Class
+
+
+
+========================================
+FILE: AuthService.vb
+PATH: C:\Dauntless Wolves\dauntless-wolves-re-re\Services\AuthService.vb
+========================================
+Imports MySql.Data.MySqlClient
+Imports System.Data
+Imports DAUNTLESS_WOLVES_PROF.Models
+
+Public Class AuthService
+
+    Public Function VerifyLogin(login As String, rawPassword As String) As UserModel
+        Dim cleanLogin As String = ValidationHelper.CleanInput(login)
+        If cleanLogin = "" OrElse String.IsNullOrEmpty(rawPassword) Then Return Nothing
+
+        ' Cast IDs to CHAR to prevent MySQL UNION data type mismatch conflicts
+        Dim sql As String =
+            "SELECT 'Admin' AS Role, CAST(admin_id AS CHAR) AS UserId, full_name AS FullName, email, password_hash " &
+            "FROM admin WHERE email = @Login " &
+            "UNION ALL " &
+            "SELECT 'Teacher', CAST(teacher_id AS CHAR), full_name, email, password_hash " &
+            "FROM teacher WHERE (email = @Login OR teacher_id = @Login) AND status = 'Active' " &
+            "UNION ALL " &
+            "SELECT 'Student', CAST(student_id AS CHAR), full_name, email, password_hash " &
+            "FROM student WHERE (email = @Login OR student_id = @Login) AND status = 'Active'"
+
+        Dim params As MySqlParameter() = {New MySqlParameter("@Login", cleanLogin)}
+        Dim dt As DataTable = DatabaseHelper.ExecuteQuery(sql, params)
+
+        For Each row As DataRow In dt.Rows
+            If SecurityHelper.VerifyPassword(rawPassword, row("password_hash").ToString()) Then
+                Return New UserModel With {
+                    .UserId = row("UserId").ToString(),
+                    .FullName = row("FullName").ToString(),
+                    .Email = row("email").ToString(),
+                    .Role = row("Role").ToString()
+                }
+            End If
+        Next
+
+        Return Nothing
+    End Function
+
+End Class
+
+
+
+========================================
+FILE: ExportService.vb
+PATH: C:\Dauntless Wolves\dauntless-wolves-re-re\Services\ExportService.vb
+========================================
+Imports System.Data
+Imports System.Drawing
+Imports System.Drawing.Printing
+Imports System.IO
+Imports System.Text
+
+Public Class ExportService
+
+
+    Public Shared Function ExportToCSV(dt As DataTable, filePath As String) As Boolean
+        Try
+            If dt Is Nothing OrElse dt.Rows.Count = 0 Then
+                Console.WriteLine("[EXPORT WARNING] No data available to export.")
+                Return False
+            End If
+
+            Using writer As New StreamWriter(filePath, False, Encoding.UTF8)
+                ' Header Row
+                Dim columnHeaders As New List(Of String)()
+                For Each col As DataColumn In dt.Columns
+                    columnHeaders.Add($"""{col.ColumnName.Replace("""", """""")}""")
+                Next
+                writer.WriteLine(String.Join(",", columnHeaders))
+
+                ' Data Rows
+                For Each row As DataRow In dt.Rows
+                    Dim rowFields As New List(Of String)()
+                    For Each col As DataColumn In dt.Columns
+                        Dim cellValue As String = row(col).ToString().Replace("""", """""")
+                        rowFields.Add($"""{cellValue}""")
+                    Next
+                    writer.WriteLine(String.Join(",", rowFields))
+                Next
+            End Using
+            Return True
+        Catch ex As Exception
+            Console.WriteLine("[CSV EXPORT ERROR] " & ex.Message)
+            Return False
+        End Try
+    End Function
+
+
+    Public Shared Function ExportToPDF(dt As DataTable, documentTitle As String, filePath As String) As Boolean
+        If dt Is Nothing OrElse dt.Rows.Count = 0 Then Return False
+
+        Try
+            Dim printDoc As New PrintDocument()
+            printDoc.PrinterSettings.PrinterName = "Microsoft Print to PDF"
+            printDoc.PrinterSettings.PrintToFile = True
+            printDoc.PrinterSettings.PrintFileName = filePath
+
+            Dim rowIndex As Integer = 0
+
+            AddHandler printDoc.PrintPage, Sub(sender As Object, e As PrintPageEventArgs)
+                                               Dim fontHeader As New Font("Arial", 14, FontStyle.Bold)
+                                               Dim fontColumn As New Font("Arial", 10, FontStyle.Bold)
+                                               Dim fontBody As New Font("Arial", 9, FontStyle.Regular)
+
+                                               Dim x As Single = 40
+                                               Dim y As Single = 40
+                                               Dim rowHeight As Single = 25
+
+                                               ' Title
+                                               e.Graphics.DrawString(documentTitle, fontHeader, Brushes.Black, x, y)
+                                               y += 40
+
+                                               ' Table Headers
+                                               Dim colWidth As Single = (e.MarginBounds.Width - 40) / dt.Columns.Count
+                                               For c As Integer = 0 To dt.Columns.Count - 1
+                                                   e.Graphics.DrawString(dt.Columns(c).ColumnName, fontColumn, Brushes.DarkBlue, x + (c * colWidth), y)
+                                               Next
+                                               y += rowHeight
+                                               e.Graphics.DrawLine(Pens.Black, x, y, x + (dt.Columns.Count * colWidth), y)
+                                               y += 5
+
+                                               ' Data Rows
+                                               While rowIndex < dt.Rows.Count
+                                                   For c As Integer = 0 To dt.Columns.Count - 1
+                                                       Dim cellVal As String = dt.Rows(rowIndex)(c).ToString()
+                                                       e.Graphics.DrawString(cellVal, fontBody, Brushes.Black, x + (c * colWidth), y)
+                                                   Next
+                                                   y += rowHeight
+                                                   rowIndex += 1
+
+                                                   ' Check for Page Overflow
+                                                   If y + rowHeight > e.MarginBounds.Bottom Then
+                                                       e.HasMorePages = True
+                                                       Return
+                                                   End If
+                                               End While
+
+                                               e.HasMorePages = False
+                                           End Sub
+
+            printDoc.Print()
+            Return True
+        Catch ex As Exception
+            Console.WriteLine("[PDF EXPORT ERROR] " & ex.Message)
+            Return False
+        End Try
+    End Function
+
+End Class
+
+
+
+========================================
+FILE: GradeCalculator.vb
+PATH: C:\Dauntless Wolves\dauntless-wolves-re-re\Services\GradeCalculator.vb
+========================================
+' Pure grade math. No database, so it is easy to test.
+Public Class GradeCalculator
+
+    ' Passing mark. Change it here if your school uses a different one.
+    Public Const PassingGrade As Double = 75.0
+
+    Public Shared Function CalculateScorePercentage(score As Double, totalScore As Double) As Double
+        If totalScore <= 0 Then Return 0.0
+        Return Math.Round((score / totalScore) * 100, 2)
+    End Function
+
+    Public Shared Function DetermineRemarks(percentage As Double) As String
+        Return If(percentage >= PassingGrade, "Passed", "Needs Improvement")
+    End Function
+
+    ' Weighted running grade over graded items only. Nothing graded yet = Nothing.
+    Public Shared Function CalculateRunningGrade(items As IEnumerable(Of ScoreItem)) As Double?
+        Dim earned As Double = 0.0
+        Dim weightUsed As Double = 0.0
+
+        For Each it As ScoreItem In items
+            If it.Score.HasValue AndAlso it.TotalScore > 0 AndAlso it.Weight > 0 Then
+                earned += (it.Score.Value / it.TotalScore) * it.Weight
+                weightUsed += it.Weight
+            End If
+        Next
+
+        If weightUsed = 0 Then Return Nothing
+        Return Math.Round(earned / weightUsed * 100, 2)
+    End Function
+
+    Public Shared Function GetStatus(runningGrade As Double?) As String
+        If Not runningGrade.HasValue Then Return "Not Yet"
+        Return If(runningGrade.Value >= PassingGrade, "Passed", "At risk")
+    End Function
+
+End Class
+
+' One graded (or not yet graded) item, used by the calculator
+Public Class ScoreItem
+    Public ReadOnly Property Score As Double?
+    Public ReadOnly Property TotalScore As Double
+    Public ReadOnly Property Weight As Double
+
+    Public Sub New(score As Double?, totalScore As Double, weight As Double)
+        Me.Score = score
+        Me.TotalScore = totalScore
+        Me.Weight = weight
+    End Sub
+End Class
+
+
+
+========================================
+FILE: GradeService.vb
+PATH: C:\Dauntless Wolves\dauntless-wolves-re-re\Services\GradeService.vb
+========================================
+Imports System.Data
+Imports System.Globalization
+Imports System.IO
+Imports MySql.Data.MySqlClient
+
+Public Class GradeService
+
+    ' =========================================================
+    '  RECORD SCORE (one transaction: score + running grade + audit row)
+    ' =========================================================
+
+    Public Function RecordScore(enrollmentId As Integer, assessmentId As Integer,
+                                newScore As Double, teacherId As String,
+                                Optional reason As String = Nothing) As OperationResult
+        Try
+            Using conn As MySqlConnection = DatabaseHelper.GetConnection()
+                Using tx As MySqlTransaction = conn.BeginTransaction()
+                    Try
+                        Dim res As OperationResult = RecordScoreTx(conn, tx, enrollmentId, assessmentId, newScore, teacherId, reason)
+                        If res.Success Then tx.Commit() Else tx.Rollback()
+                        Return res
+                    Catch
+                        tx.Rollback()
+                        Throw
+                    End Try
+                End Using
+            End Using
+        Catch ex As Exception
+            Console.WriteLine("[RECORD SCORE ERROR] " & ex.Message)
+            Return OperationResult.Fail("Could not save the score: " & ex.Message)
+        End Try
+    End Function
+
+    ' Same logic inside a transaction somebody else owns (the clarification approval will reuse this).
+    ' It never commits or rolls back by itself.
+    Public Function RecordScoreTx(conn As MySqlConnection, tx As MySqlTransaction,
+                                  enrollmentId As Integer, assessmentId As Integer,
+                                  newScore As Double, teacherId As String,
+                                  Optional reason As String = Nothing) As OperationResult
+
+        ' 1) Who owns this class, and how many points is the assessment worth?
+        Dim totalScore As Double = 0
+        Dim title As String = ""
+        Dim ownerId As String = ""
+        Dim sameClass As Boolean = False
+
+        Dim infoSql As String =
+            "SELECT a.total_score, a.title, c.teacher_id, (a.class_id = e.class_id) AS same_class " &
+            "FROM enrollment e " &
+            "JOIN class c ON e.class_id = c.class_id " &
+            "JOIN assessment a ON a.assessment_id = @AssessmentId " &
+            "WHERE e.enrollment_id = @EnrollmentId"
+
+        Using cmd As New MySqlCommand(infoSql, conn, tx)
+            cmd.Parameters.AddWithValue("@AssessmentId", assessmentId)
+            cmd.Parameters.AddWithValue("@EnrollmentId", enrollmentId)
+            Using r As MySqlDataReader = cmd.ExecuteReader()
+                If Not r.Read() Then Return OperationResult.Fail("Enrollment or assessment not found.")
+                totalScore = Convert.ToDouble(r.GetValue(0))
+                title = r.GetValue(1).ToString()
+                ownerId = r.GetValue(2).ToString()
+                sameClass = (Convert.ToInt32(r.GetValue(3)) = 1)
+            End Using
+        End Using
+
+        If Not String.Equals(ownerId, teacherId, StringComparison.OrdinalIgnoreCase) Then
+            Return OperationResult.Fail("You can only record scores for your own classes.")
+        End If
+        If Not sameClass Then
+            Return OperationResult.Fail("That assessment belongs to a different class.")
+        End If
+        If Not ValidationHelper.IsValidScore(newScore, totalScore) Then
+            Return OperationResult.Fail("Score must be between 0 and " & Fmt(totalScore) & ".")
+        End If
+
+        ' 2) Lock the current row and read the old score (NULL = not graded yet)
+        Dim oldScore As Double? = Nothing
+        Dim lockSql As String = "SELECT score FROM studentgrade WHERE enrollment_id = @EnrollmentId AND assessment_id = @AssessmentId FOR UPDATE"
+        Using cmd As New MySqlCommand(lockSql, conn, tx)
+            cmd.Parameters.AddWithValue("@EnrollmentId", enrollmentId)
+            cmd.Parameters.AddWithValue("@AssessmentId", assessmentId)
+            oldScore = ToNullableDouble(cmd.ExecuteScalar())
+        End Using
+
+        If oldScore.HasValue AndAlso oldScore.Value = newScore Then
+            Return OperationResult.Ok("Score unchanged.")
+        End If
+
+        ' 3) Save the score (the row usually exists already; insert if it does not)
+        Dim upsertSql As String =
+            "INSERT INTO studentgrade (enrollment_id, assessment_id, score, remarks) " &
+            "VALUES (@EnrollmentId, @AssessmentId, @Score, @Remarks) " &
+            "ON DUPLICATE KEY UPDATE score = VALUES(score), remarks = VALUES(remarks)"
+        Using cmd As New MySqlCommand(upsertSql, conn, tx)
+            cmd.Parameters.AddWithValue("@EnrollmentId", enrollmentId)
+            cmd.Parameters.AddWithValue("@AssessmentId", assessmentId)
+            cmd.Parameters.AddWithValue("@Score", newScore)
+            cmd.Parameters.AddWithValue("@Remarks", GradeCalculator.DetermineRemarks(GradeCalculator.CalculateScorePercentage(newScore, totalScore)))
+            cmd.ExecuteNonQuery()
+        End Using
+
+        ' 4) Refresh the cached running grade on the enrollment
+        RefreshRunningGrade(conn, tx, enrollmentId)
+
+        ' 5) Audit row (same transaction, so it rolls back with the score)
+        Dim gradeId As String
+        Using cmd As New MySqlCommand("SELECT grade_id FROM studentgrade WHERE enrollment_id = @EnrollmentId AND assessment_id = @AssessmentId", conn, tx)
+            cmd.Parameters.AddWithValue("@EnrollmentId", enrollmentId)
+            cmd.Parameters.AddWithValue("@AssessmentId", assessmentId)
+            gradeId = cmd.ExecuteScalar().ToString()
+        End Using
+
+        Dim oldText As String = Nothing
+        If oldScore.HasValue Then oldText = Fmt(oldScore.Value) & "/" & Fmt(totalScore)
+
+        AuditService.LogActionTx(conn, tx, "Teacher", teacherId,
+                                 If(oldScore.HasValue, "Updated score", "Recorded score"),
+                                 "StudentGrade", gradeId,
+                                 oldText, Fmt(newScore) & "/" & Fmt(totalScore), reason)
+
+        Return OperationResult.Ok("Saved " & title & ": " & Fmt(newScore) & "/" & Fmt(totalScore))
+    End Function
+
+    Private Shared Function RefreshRunningGrade(conn As MySqlConnection, tx As MySqlTransaction, enrollmentId As Integer) As Double?
+        Dim items As New List(Of ScoreItem)()
+        Dim sql As String =
+            "SELECT sg.score, a.total_score, a.weight " &
+            "FROM studentgrade sg JOIN assessment a ON sg.assessment_id = a.assessment_id " &
+            "WHERE sg.enrollment_id = @EnrollmentId"
+
+        Using cmd As New MySqlCommand(sql, conn, tx)
+            cmd.Parameters.AddWithValue("@EnrollmentId", enrollmentId)
+            Using r As MySqlDataReader = cmd.ExecuteReader()
+                While r.Read()
+                    items.Add(New ScoreItem(ToNullableDouble(r.GetValue(0)),
+                                            Convert.ToDouble(r.GetValue(1)),
+                                            Convert.ToDouble(r.GetValue(2))))
+                End While
+            End Using
+        End Using
+
+        Dim running As Double? = GradeCalculator.CalculateRunningGrade(items)
+
+        Using cmd As New MySqlCommand("UPDATE enrollment SET running_grade = @Running WHERE enrollment_id = @EnrollmentId", conn, tx)
+            If running.HasValue Then
+                cmd.Parameters.AddWithValue("@Running", running.Value)
+            Else
+                cmd.Parameters.AddWithValue("@Running", DBNull.Value)
+            End If
+            cmd.Parameters.AddWithValue("@EnrollmentId", enrollmentId)
+            cmd.ExecuteNonQuery()
+        End Using
+
+        Return running
+    End Function
+
+    ' One-time helper: fills running_grade for every enrollment (the seed data has them all NULL)
+    Public Function RecalculateAllRunningGrades() As Integer
+        Using conn As MySqlConnection = DatabaseHelper.GetConnection()
+            Using tx As MySqlTransaction = conn.BeginTransaction()
+                Dim ids As New List(Of Integer)()
+                Using cmd As New MySqlCommand("SELECT enrollment_id FROM enrollment", conn, tx)
+                    Using r As MySqlDataReader = cmd.ExecuteReader()
+                        While r.Read()
+                            ids.Add(Convert.ToInt32(r.GetValue(0)))
+                        End While
+                    End Using
+                End Using
+
+                For Each id As Integer In ids
+                    RefreshRunningGrade(conn, tx, id)
+                Next
+
+                tx.Commit()
+                Return ids.Count
+            End Using
+        End Using
+    End Function
+
+    ' =========================================================
+    '  READ QUERIES (every one checks who is asking)
+    ' =========================================================
+
+    ' Teacher's class dropdown
+    Public Function GetClassesByTeacher(teacherId As String) As DataTable
+        Dim sql As String =
+            "SELECT c.class_id, c.course_code, co.course_name, c.section, c.semester, c.academic_year, " &
+            "       COUNT(e.enrollment_id) AS student_count " &
+            "FROM class c " &
+            "JOIN course co ON c.course_code = co.course_code " &
+            "LEFT JOIN enrollment e ON e.class_id = c.class_id " &
+            "WHERE c.teacher_id = @TeacherId " &
+            "GROUP BY c.class_id, c.course_code, co.course_name, c.section, c.semester, c.academic_year " &
+            "ORDER BY c.course_code, c.section"
+        Return DatabaseHelper.ExecuteQuery(sql, {New MySqlParameter("@TeacherId", teacherId)})
+    End Function
+
+    ' Students in one of the teacher's classes
+    Public Function GetEnrollmentsByClass(classId As Integer, teacherId As String) As DataTable
+        Dim sql As String =
+            "SELECT e.enrollment_id, s.student_id, s.full_name, e.running_grade " &
+            "FROM enrollment e " &
+            "JOIN student s ON e.student_id = s.student_id " &
+            "JOIN class c ON e.class_id = c.class_id " &
+            "WHERE e.class_id = @ClassId AND c.teacher_id = @TeacherId " &
+            "ORDER BY s.full_name"
+        Return DatabaseHelper.ExecuteQuery(sql, {New MySqlParameter("@ClassId", classId), New MySqlParameter("@TeacherId", teacherId)})
+    End Function
+
+    ' Student's own classes (for the course dropdown on My Grades)
+    Public Function GetEnrollmentsByStudent(studentId As String) As DataTable
+        Dim sql As String =
+            "SELECT e.enrollment_id, c.class_id, c.course_code, co.course_name, c.section, e.running_grade " &
+            "FROM enrollment e " &
+            "JOIN class c ON e.class_id = c.class_id " &
+            "JOIN course co ON c.course_code = co.course_code " &
+            "WHERE e.student_id = @StudentId " &
+            "ORDER BY c.course_code"
+        Return DatabaseHelper.ExecuteQuery(sql, {New MySqlParameter("@StudentId", studentId)})
+    End Function
+
+    ' Student's own grades for one enrollment (the student id check blocks peeking at others)
+    Public Function GetGradesForStudent(enrollmentId As Integer, studentId As String) As DataTable
+        Dim sql As String =
+            "SELECT sg.grade_id, a.term, a.title, a.type, sg.score, a.total_score, a.weight, sg.remarks, sg.updated_at " &
+            "FROM studentgrade sg " &
+            "JOIN assessment a ON sg.assessment_id = a.assessment_id " &
+            "JOIN enrollment e ON sg.enrollment_id = e.enrollment_id " &
+            "WHERE sg.enrollment_id = @EnrollmentId AND e.student_id = @StudentId " &
+            "ORDER BY a.term, a.created_at, a.assessment_id"
+        Return DatabaseHelper.ExecuteQuery(sql, {New MySqlParameter("@EnrollmentId", enrollmentId), New MySqlParameter("@StudentId", studentId)})
+    End Function
+
+    ' Grade History screen: reads score changes from auditlog
+    Public Function GetGradeHistoryForStudent(studentId As String) As DataTable
+        Dim sql As String =
+            "SELECT al.timestamp AS changed_at, a.title AS assessment, al.old_value, al.new_value, " &
+            "       COALESCE(t.full_name, al.teacher_id) AS changed_by, al.details AS reason " &
+            "FROM auditlog al " &
+            "JOIN studentgrade sg ON sg.grade_id = CAST(al.entity_id AS UNSIGNED) " &
+            "JOIN enrollment e ON sg.enrollment_id = e.enrollment_id " &
+            "JOIN assessment a ON sg.assessment_id = a.assessment_id " &
+            "LEFT JOIN teacher t ON al.teacher_id = t.teacher_id " &
+            "WHERE al.entity_type = 'StudentGrade' AND e.student_id = @StudentId " &
+            "ORDER BY al.timestamp DESC, al.log_id DESC"
+        Return DatabaseHelper.ExecuteQuery(sql, {New MySqlParameter("@StudentId", studentId)})
+    End Function
+
+    ' Class Grades table: one row per student, one column per assessment.
+    ' term = "All", "Midterm" or "Finals" ("Midterms" is accepted too).
+    ' Assessment columns are named "A<assessment_id>" and the title is in the column Caption.
+    Public Function GetClassGradeSheet(classId As Integer, teacherId As String,
+                                       Optional term As String = "All") As DataTable
+        If term = "Midterms" Then term = "Midterm"
+        Dim filterTerm As Boolean = Not String.IsNullOrEmpty(term) AndAlso
+                                    Not term.Equals("All", StringComparison.OrdinalIgnoreCase)
+
+        ' Assessment columns (empty if this teacher does not own the class)
+        Dim aSql As String =
+            "SELECT a.assessment_id, a.title FROM assessment a " &
+            "JOIN class c ON a.class_id = c.class_id " &
+            "WHERE a.class_id = @ClassId AND c.teacher_id = @TeacherId"
+        Dim aParams As New List(Of MySqlParameter) From {
+            New MySqlParameter("@ClassId", classId),
+            New MySqlParameter("@TeacherId", teacherId)}
+        If filterTerm Then
+            aSql &= " AND a.term = @Term"
+            aParams.Add(New MySqlParameter("@Term", term))
+        End If
+        aSql &= " ORDER BY a.term, a.created_at, a.assessment_id"
+        Dim assessments As DataTable = DatabaseHelper.ExecuteQuery(aSql, aParams.ToArray())
+
+        Dim students As DataTable = GetEnrollmentsByClass(classId, teacherId)
+
+        Dim gradesSql As String =
+            "SELECT sg.enrollment_id, sg.assessment_id, sg.score, a.total_score " &
+            "FROM studentgrade sg " &
+            "JOIN assessment a ON sg.assessment_id = a.assessment_id " &
+            "JOIN enrollment e ON sg.enrollment_id = e.enrollment_id " &
+            "JOIN class c ON e.class_id = c.class_id " &
+            "WHERE e.class_id = @ClassId AND c.teacher_id = @TeacherId"
+        Dim grades As DataTable = DatabaseHelper.ExecuteQuery(gradesSql,
+            {New MySqlParameter("@ClassId", classId), New MySqlParameter("@TeacherId", teacherId)})
+
+        Dim cells As New Dictionary(Of String, String)()
+        For Each g As DataRow In grades.Rows
+            Dim key As String = g("enrollment_id").ToString() & ":" & g("assessment_id").ToString()
+            If Convert.IsDBNull(g("score")) Then
+                cells(key) = "-"
+            Else
+                cells(key) = Fmt(Convert.ToDouble(g("score"))) & "/" & Fmt(Convert.ToDouble(g("total_score")))
+            End If
+        Next
+
+        Dim sheet As New DataTable()
+        sheet.Columns.Add("EnrollmentId", GetType(Integer))
+        sheet.Columns.Add("StudentId", GetType(String))
+        sheet.Columns.Add("Student", GetType(String))
+        For Each a As DataRow In assessments.Rows
+            Dim col As DataColumn = sheet.Columns.Add("A" & a("assessment_id").ToString(), GetType(String))
+            col.Caption = a("title").ToString()
+        Next
+        sheet.Columns.Add("RunningGrade", GetType(Double))
+        sheet.Columns.Add("Status", GetType(String))
+
+        For Each s As DataRow In students.Rows
+            Dim row As DataRow = sheet.NewRow()
+            row("EnrollmentId") = Convert.ToInt32(s("enrollment_id"))
+            row("StudentId") = s("student_id").ToString()
+            row("Student") = s("full_name").ToString()
+
+            For Each a As DataRow In assessments.Rows
+                Dim cell As String = Nothing
+                If Not cells.TryGetValue(s("enrollment_id").ToString() & ":" & a("assessment_id").ToString(), cell) Then
+                    cell = "-"
+                End If
+                row("A" & a("assessment_id").ToString()) = cell
+            Next
+
+            Dim rg As Double? = ToNullableDouble(s("running_grade"))
+            If rg.HasValue Then
+                row("RunningGrade") = rg.Value
+            Else
+                row("RunningGrade") = DBNull.Value
+            End If
+            row("Status") = GradeCalculator.GetStatus(rg)
+
+            sheet.Rows.Add(row)
+        Next
+
+        Return sheet
+    End Function
+
+    ' =========================================================
+    '  CSV IMPORT (reuses RecordScore, so every row is checked and audited)
+    ' =========================================================
+
+    Public Function BulkImportGradesFromCSV(classId As Integer, assessmentId As Integer,
+                                            filePath As String, teacherId As String) As (SuccessCount As Integer, FailCount As Integer)
+        Dim successCount As Integer = 0
+        Dim failCount As Integer = 0
+
+        If Not File.Exists(filePath) Then Return (0, 0)
+
+        Dim lines() As String = File.ReadAllLines(filePath)
+
+        ' Row 0 is the header
+        For i As Integer = 1 To lines.Length - 1
+            Dim line As String = lines(i).Trim()
+            If String.IsNullOrWhiteSpace(line) Then Continue For
+
+            Dim parts() As String = line.Split(","c)
+            If parts.Length < 2 Then
+                failCount += 1
+                Continue For
+            End If
+
+            Dim studentId As String = parts(0).Trim().Replace("""", "")
+            Dim scoreVal As Double
+            If Not Double.TryParse(parts(1).Trim().Replace("""", ""), NumberStyles.Float, CultureInfo.InvariantCulture, scoreVal) Then
+                failCount += 1
+                Continue For
+            End If
+
+            Dim enrollmentId As Integer = GetEnrollmentIdByStudentAndClass(studentId, classId)
+            If enrollmentId <= 0 Then
+                failCount += 1
+                Continue For
+            End If
+
+            If RecordScore(enrollmentId, assessmentId, scoreVal, teacherId, "Bulk CSV Upload").Success Then
+                successCount += 1
+            Else
+                failCount += 1
+            End If
+        Next
+
+        Return (successCount, failCount)
+    End Function
+
+    Private Function GetEnrollmentIdByStudentAndClass(studentId As String, classId As Integer) As Integer
+        Dim sql As String = "SELECT enrollment_id FROM enrollment WHERE student_id = @StudentId AND class_id = @ClassId"
+        Dim result As Object = DatabaseHelper.ExecuteScalar(sql,
+            {New MySqlParameter("@StudentId", studentId), New MySqlParameter("@ClassId", classId)})
+        If result IsNot Nothing AndAlso Not Convert.IsDBNull(result) Then
+            Return Convert.ToInt32(result)
+        End If
+        Return 0
+    End Function
+
+    ' =========================================================
+    '  SMALL HELPERS
+    ' =========================================================
+
+    Private Shared Function ToNullableDouble(o As Object) As Double?
+        If o Is Nothing OrElse Convert.IsDBNull(o) Then Return Nothing
+        Return Convert.ToDouble(o)
+    End Function
+
+    ' 18 -> "18", 92.5 -> "92.5"
+    Private Shared Function Fmt(value As Double) As String
+        Return value.ToString("0.##", CultureInfo.InvariantCulture)
+    End Function
+
+End Class
+
+
+
+========================================
+FILE: OperationResult.vb
+PATH: C:\Dauntless Wolves\dauntless-wolves-re-re\Services\OperationResult.vb
+========================================
+Public Class OperationResult
+    ' What the service methods return, so the UI can show a real message
+    Public Property Success As Boolean
+    Public Property Message As String
+
+    Public Shared Function Ok(Optional message As String = "") As OperationResult
+        Return New OperationResult With {.Success = True, .Message = message}
+    End Function
+
+    Public Shared Function Fail(message As String) As OperationResult
+        Return New OperationResult With {.Success = False, .Message = message}
+    End Function
+End Class
+
+
+
+========================================
+FILE: RevisionRequestService.vb
+PATH: C:\Dauntless Wolves\dauntless-wolves-re-re\Services\RevisionRequestService.vb
+========================================
+Imports MySql.Data.MySqlClient
+Imports System.Data
+
+Public Class RevisionRequestService
+
+    Public Function SubmitRequest(request As RevisionRequest, studentId As String) As Boolean
+        Dim sql As String = "INSERT INTO revisionrequest (grade_id, requested_points, reason, status, requested_at) " &
+                            "VALUES (@GradeId, @RequestedPoints, @Reason, 'Pending', NOW())"
+
+        Dim params As MySqlParameter() = {
+            New MySqlParameter("@GradeId", request.GradeId),
+            New MySqlParameter("@RequestedPoints", If(request.RequestedPoints.HasValue, request.RequestedPoints.Value, DBNull.Value)),
+            New MySqlParameter("@Reason", ValidationHelper.SanitizeInput(request.Reason))
+        }
+
+        Try
+            Dim rowsAffected As Integer = DatabaseHelper.ExecuteNonQuery(sql, params)
+            If rowsAffected > 0 Then
+                AuditService.LogAction("Student", studentId, "SUBMIT_CLARIFICATION_REQUEST", "studentgrade", request.GradeId.ToString(), details:=request.Reason)
+                Return True
+            End If
+            Return False
+        Catch ex As Exception
+            Console.WriteLine("[REVISION SERVICE ERROR] " & ex.Message)
+            Return False
+        End Try
+    End Function
+
+    Public Function ApproveAndApplyRevision(requestId As Integer, enrollmentId As Integer, assessmentId As Integer, newScore As Double, teacherId As String, reason As String) As OperationResult
+        Try
+            Using conn As MySqlConnection = DatabaseHelper.GetConnection()
+                Using tx As MySqlTransaction = conn.BeginTransaction()
+                    Try
+                        ' 1. Mark Revision Request as Approved
+                        Dim updateReqSql As String = "UPDATE revisionrequest " &
+                                                     "SET status = 'Approved', reviewed_at = NOW(), reviewed_by = @TeacherId " &
+                                                     "WHERE request_id = @RequestId"
+                        Using cmd As New MySqlCommand(updateReqSql, conn, tx)
+                            cmd.Parameters.AddWithValue("@TeacherId", teacherId)
+                            cmd.Parameters.AddWithValue("@RequestId", requestId)
+                            cmd.ExecuteNonQuery()
+                        End Using
+
+                        ' 2. Apply Grade Change and Recalculate via GradeService in same transaction
+                        Dim gradeSvc As New GradeService()
+                        Dim gradeRes As OperationResult = gradeSvc.RecordScoreTx(conn, tx, enrollmentId, assessmentId, newScore, teacherId, $"Approved Revision Request #{requestId}: {reason}")
+
+                        If Not gradeRes.Success Then
+                            tx.Rollback()
+                            Return gradeRes
+                        End If
+
+                        tx.Commit()
+                        Return OperationResult.Ok($"Request #{requestId} approved and new score ({newScore}) applied.")
+                    Catch ex As Exception
+                        tx.Rollback()
+                        Throw
+                    End Try
+                End Using
+            End Using
+        Catch ex As Exception
+            Console.WriteLine("[REVISION APPROVAL ERROR] " & ex.Message)
+            Return OperationResult.Fail("Failed to approve revision request: " & ex.Message)
+        End Try
+    End Function
+    Public Function ReviewRequest(requestId As Integer, status As String, teacherId As String) As Boolean
+        Dim sql As String = "UPDATE revisionrequest " &
+                            "SET status = @Status, reviewed_at = NOW(), reviewed_by = @TeacherId " &
+                            "WHERE request_id = @RequestId"
+
+        Dim params As MySqlParameter() = {
+            New MySqlParameter("@Status", status),
+            New MySqlParameter("@TeacherId", teacherId),
+            New MySqlParameter("@RequestId", requestId)
+        }
+
+        Try
+            Dim rowsAffected As Integer = DatabaseHelper.ExecuteNonQuery(sql, params)
+            If rowsAffected > 0 Then
+                AuditService.LogAction("Teacher", teacherId, $"REVISION_{status.ToUpper()}", "revisionrequest", requestId.ToString(), details:=$"Status set to {status}")
+                Return True
+            End If
+            Return False
+        Catch ex As Exception
+            Console.WriteLine("[REVISION SERVICE ERROR] " & ex.Message)
+            Return False
+        End Try
+    End Function
+
+    Public Function RejectRequest(requestId As Integer, teacherId As String, Optional reason As String = "") As Boolean
+        Dim sql As String = "UPDATE revisionrequest " &
+                            "SET status = 'Rejected', reviewed_at = NOW(), reviewed_by = @TeacherId " &
+                            "WHERE request_id = @RequestId"
+
+        Dim params As MySqlParameter() = {
+            New MySqlParameter("@TeacherId", teacherId),
+            New MySqlParameter("@RequestId", requestId)
+        }
+
+        Try
+            If DatabaseHelper.ExecuteNonQuery(sql, params) > 0 Then
+                AuditService.LogAction("Teacher", teacherId, "REJECT_REVISION_REQUEST", "revisionrequest", requestId.ToString(), details:=reason)
+                Return True
+            End If
+            Return False
+        Catch ex As Exception
+            Console.WriteLine("[REVISION REJECT ERROR] " & ex.Message)
+            Return False
+        End Try
+    End Function
+
+    Public Function GetPendingRequestsByTeacher(teacherId As String) As DataTable
+        Dim sql As String = "SELECT r.request_id, r.grade_id, s.full_name AS student_name, a.title AS assessment_title, " &
+                            "sg.score AS current_score, r.requested_points, r.reason, r.status, r.requested_at " &
+                            "FROM revisionrequest r " &
+                            "JOIN studentgrade sg ON r.grade_id = sg.grade_id " &
+                            "JOIN enrollment e ON sg.enrollment_id = e.enrollment_id " &
+                            "JOIN student s ON e.student_id = s.student_id " &
+                            "JOIN class c ON e.class_id = c.class_id " &
+                            "JOIN assessment a ON sg.assessment_id = a.assessment_id " &
+                            "WHERE c.teacher_id = @TeacherId AND r.status = 'Pending' " &
+                            "ORDER BY r.requested_at DESC"
+
+        Dim params As MySqlParameter() = {
+            New MySqlParameter("@TeacherId", teacherId)
+        }
+
+        Return DatabaseHelper.ExecuteQuery(sql, params)
+    End Function
+
+End Class
+
+
+
+========================================
+FILE: UserService.vb
+PATH: C:\Dauntless Wolves\dauntless-wolves-re-re\Services\UserService.vb
+========================================
+Imports MySql.Data.MySqlClient
+Imports System.Data
+
+
+Public Class UserService
+
+    Public Function CreateTeacher(teacherId As String, rawPassword As String, fullName As String, email As String, department As String, adminId As String) As Boolean
+        Dim hashedPassword As String = SecurityHelper.HashSHA256(rawPassword)
+        Dim sql As String = "INSERT INTO teacher (teacher_id, full_name, email, password_hash, department, status) " &
+                            "VALUES (@TeacherId, @FullName, @Email, @PasswordHash, @Department, 'Active')"
+
+        Dim params As MySqlParameter() = {
+            New MySqlParameter("@TeacherId", ValidationHelper.SanitizeInput(teacherId)),
+            New MySqlParameter("@FullName", ValidationHelper.SanitizeInput(fullName)),
+            New MySqlParameter("@Email", ValidationHelper.SanitizeInput(email)),
+            New MySqlParameter("@PasswordHash", hashedPassword),
+            New MySqlParameter("@Department", ValidationHelper.SanitizeInput(department))
+        }
+
+        Try
+            Dim rowsAffected As Integer = DatabaseHelper.ExecuteNonQuery(sql, params)
+            If rowsAffected > 0 Then
+                AuditService.LogAction("Admin", adminId, "CREATE_TEACHER", "teacher", teacherId, details:=$"Created Teacher: {email}")
+                Return True
+            End If
+            Return False
+        Catch ex As Exception
+            Console.WriteLine("[USER SERVICE ERROR] " & ex.Message)
+            Return False
+        End Try
+    End Function
+
+    Public Function CreateStudent(studentId As String, rawPassword As String, fullName As String, email As String, program As String, yearLevel As Integer, section As String, adminId As String) As Boolean
+        Dim hashedPassword As String = SecurityHelper.HashSHA256(rawPassword)
+        Dim sql As String = "INSERT INTO student (student_id, full_name, email, password_hash, program, year_level, section, status) " &
+                            "VALUES (@StudentId, @FullName, @Email, @PasswordHash, @Program, @YearLevel, @Section, 'Active')"
+
+        Dim params As MySqlParameter() = {
+            New MySqlParameter("@StudentId", ValidationHelper.SanitizeInput(studentId)),
+            New MySqlParameter("@FullName", ValidationHelper.SanitizeInput(fullName)),
+            New MySqlParameter("@Email", ValidationHelper.SanitizeInput(email)),
+            New MySqlParameter("@PasswordHash", hashedPassword),
+            New MySqlParameter("@Program", ValidationHelper.SanitizeInput(program)),
+            New MySqlParameter("@YearLevel", yearLevel),
+            New MySqlParameter("@Section", ValidationHelper.SanitizeInput(section))
+        }
+
+        Try
+            Dim rowsAffected As Integer = DatabaseHelper.ExecuteNonQuery(sql, params)
+            If rowsAffected > 0 Then
+                AuditService.LogAction("Admin", adminId, "CREATE_STUDENT", "student", studentId, details:=$"Created Student: {email}")
+                Return True
+            End If
+            Return False
+        Catch ex As Exception
+            Console.WriteLine("[USER SERVICE ERROR] " & ex.Message)
+            Return False
+        End Try
+    End Function
+
+    Public Function GetAllTeachers(Optional searchQuery As String = "", Optional department As String = "All") As DataTable
+        Dim sql As String = "SELECT teacher_id, full_name, email, department, status, " &
+                            "(SELECT COUNT(*) FROM class c WHERE c.teacher_id = t.teacher_id) AS class_count " &
+                            "FROM teacher t WHERE 1=1"
+
+        Dim params As New List(Of MySqlParameter)()
+
+        If Not String.IsNullOrWhiteSpace(searchQuery) Then
+            sql &= " AND (full_name LIKE @Search OR LOWER(teacher_id) LIKE @Search OR LOWER(email) LIKE @Search)"
+            params.Add(New MySqlParameter("@Search", "%" & searchQuery.Trim().ToLower() & "%"))
+        End If
+
+        If Not String.IsNullOrWhiteSpace(department) AndAlso Not department.Equals("All", StringComparison.OrdinalIgnoreCase) Then
+            sql &= " AND department = @Dept"
+            params.Add(New MySqlParameter("@Dept", department.Trim()))
+        End If
+
+        sql &= " ORDER BY full_name ASC"
+        Return DatabaseHelper.ExecuteQuery(sql, params.ToArray())
+    End Function
+
+    Public Function GetAllStudents(Optional searchQuery As String = "", Optional yearLevel As String = "All", Optional section As String = "All") As DataTable
+        Dim sql As String = "SELECT student_id, full_name, email, program, year_level, section, status FROM student WHERE 1=1"
+        Dim params As New List(Of MySqlParameter)()
+
+        If Not String.IsNullOrWhiteSpace(searchQuery) Then
+            sql &= " AND (LOWER(full_name) LIKE @Search OR LOWER(student_id) LIKE @Search OR LOWER(email) LIKE @Search)"
+            params.Add(New MySqlParameter("@Search", "%" & searchQuery.Trim().ToLower() & "%"))
+        End If
+
+        If Not String.IsNullOrWhiteSpace(yearLevel) AndAlso Not yearLevel.Equals("All", StringComparison.OrdinalIgnoreCase) Then
+            Dim yr As Integer
+            If Integer.TryParse(yearLevel, yr) Then
+                sql &= " AND year_level = @Yr"
+                params.Add(New MySqlParameter("@Yr", yr))
+                Return DatabaseHelper.ExecuteQuery(sql)
+            End If
+        End If
+
+        If Not String.IsNullOrWhiteSpace(section) AndAlso Not section.Equals("All", StringComparison.OrdinalIgnoreCase) Then
+            sql &= " AND section = @Sec"
+            params.Add(New MySqlParameter("@Sec", section.Trim()))
+        End If
+
+        sql &= " ORDER BY full_name ASC"
+        Return DatabaseHelper.ExecuteQuery(sql, params.ToArray())
+    End Function
+
+    Public Function UpdateTeacher(teacherId As String, fullName As String, email As String, department As String, adminId As String) As Boolean
+        Dim sql As String = "UPDATE teacher SET full_name = @FullName, email = @Email, department = @Department WHERE teacher_id = @TeacherId"
+        Dim params As MySqlParameter() = {
+            New MySqlParameter("@FullName", ValidationHelper.SanitizeInput(fullName)),
+            New MySqlParameter("@Email", ValidationHelper.SanitizeInput(email)),
+            New MySqlParameter("@Department", ValidationHelper.SanitizeInput(department)),
+            New MySqlParameter("@TeacherId", teacherId)
+        }
+
+        If DatabaseHelper.ExecuteNonQuery(sql, params) > 0 Then
+            AuditService.LogAction("Admin", adminId, "UPDATE_TEACHER", "teacher", teacherId, details:=$"Updated details for {teacherId}")
+            Return True
+        End If
+        Return False
+    End Function
+
+    Public Function UpdateStudent(studentId As String, fullName As String, email As String, program As String, yearLevel As Integer, section As String, adminId As String) As Boolean
+        Dim sql As String = "UPDATE student SET full_name = @FullName, email = @Email, program = @Program, year_level = @YearLevel, section = @Section WHERE student_id = @StudentId"
+        Dim params As MySqlParameter() = {
+            New MySqlParameter("@FullName", ValidationHelper.SanitizeInput(fullName)),
+            New MySqlParameter("@Email", ValidationHelper.SanitizeInput(email)),
+            New MySqlParameter("@Program", ValidationHelper.SanitizeInput(program)),
+            New MySqlParameter("@YearLevel", yearLevel),
+            New MySqlParameter("@Section", ValidationHelper.SanitizeInput(section)),
+            New MySqlParameter("@StudentId", studentId)
+        }
+
+        If DatabaseHelper.ExecuteNonQuery(sql, params) > 0 Then
+            AuditService.LogAction("Admin", adminId, "UPDATE_STUDENT", "student", studentId, details:=$"Updated details for {studentId}")
+            Return True
+        End If
+        Return False
+    End Function
+
+    Public Function SetUserStatus(userRole As String, userId As String, newStatus As String, adminId As String) As Boolean
+        Dim tableName As String = If(userRole.Equals("Teacher", StringComparison.OrdinalIgnoreCase), "teacher", "student")
+        Dim idColumn As String = If(userRole.Equals("Teacher", StringComparison.OrdinalIgnoreCase), "teacher_id", "student_id")
+
+        Dim sql As String = $"UPDATE {tableName} SET status = @Status WHERE {idColumn} = @UserId"
+        Dim params As MySqlParameter() = {
+            New MySqlParameter("@Status", newStatus),
+            New MySqlParameter("@UserId", userId)
+        }
+
+        If DatabaseHelper.ExecuteNonQuery(sql, params) > 0 Then
+            AuditService.LogAction("Admin", adminId, $"SET_{userRole.ToUpper()}_STATUS", tableName, userId, details:=$"Status set to {newStatus}")
+            Return True
+        End If
+        Return False
+    End Function
+
+    Public Function ToggleUserStatus(role As String, userId As String, newStatus As String, adminId As String) As Boolean
+        Dim tableName As String = If(role.Equals("Teacher", StringComparison.OrdinalIgnoreCase), "teacher", "student")
+        Dim idColumn As String = If(role.Equals("Teacher", StringComparison.OrdinalIgnoreCase), "teacher_id", "student_id")
+
+        Dim sql As String = $"UPDATE {tableName} SET status = @Status WHERE {idColumn} = @UserId"
+        Dim params As MySqlParameter() = {
+            New MySqlParameter("@Status", newStatus),
+            New MySqlParameter("@UserId", userId)
+        }
+
+        Try
+            Dim rowsAffected As Integer = DatabaseHelper.ExecuteNonQuery(sql, params)
+            If rowsAffected > 0 Then
+                AuditService.LogAction("Admin", adminId, $"SET_STATUS_{newStatus.ToUpper()}", tableName, userId, details:=$"Changed status of {role} {userId} to {newStatus}")
+                Return True
+            End If
+            Return False
+        Catch ex As Exception
+            Console.WriteLine("[USER SERVICE ERROR] " & ex.Message)
+            Return False
+        End Try
+    End Function
+
+End Class
+
+
+
+========================================
+FILE: AppSession.vb
+PATH: C:\Dauntless Wolves\dauntless-wolves-re-re\Core\AppSession.vb
+========================================
+Imports DAUNTLESS_WOLVES_PROF.Models
+
+
+Public Module AppSession
+
+        Public Property CurrentUser As UserModel
+
+        Public ReadOnly Property IsLoggedIn As Boolean
+            Get
+                Return CurrentUser IsNot Nothing
+            End Get
+        End Property
+
+        Public ReadOnly Property IsAdmin As Boolean
+            Get
+                Return IsLoggedIn AndAlso CurrentUser.Role.Equals("Admin", StringComparison.OrdinalIgnoreCase)
+            End Get
+        End Property
+
+        Public ReadOnly Property IsTeacher As Boolean
+            Get
+                Return IsLoggedIn AndAlso CurrentUser.Role.Equals("Teacher", StringComparison.OrdinalIgnoreCase)
+            End Get
+        End Property
+
+        Public ReadOnly Property IsStudent As Boolean
+            Get
+                Return IsLoggedIn AndAlso CurrentUser.Role.Equals("Student", StringComparison.OrdinalIgnoreCase)
+            End Get
+        End Property
+
+        Public Sub StartSession(user As UserModel)
+            CurrentUser = user
+        End Sub
+
+        Public Sub ClearSession()
+            CurrentUser = Nothing
+        End Sub
+
+End Module
+
+
+
+========================================
+FILE: DatabaseHelper.vb
+PATH: C:\Dauntless Wolves\dauntless-wolves-re-re\Core\DatabaseHelper.vb
+========================================
+Imports System.Data
+Imports System.IO
+Imports System.Text.Json
+Imports MySql.Data.MySqlClient
+
+Public Class DatabaseHelper
+
+    Private Shared _connString As String
+    Private Shared ReadOnly LockObj As New Object()
+
+    Private Shared Function GetConnString() As String
+        If _connString Is Nothing Then
+            SyncLock LockObj
+                If _connString Is Nothing Then
+                    _connString = BuildConnString()
+                End If
+            End SyncLock
+        End If
+        Return _connString
+    End Function
+
+    Private Shared Function BuildConnString() As String
+        Dim host As String = "127.0.0.1"
+        Dim port As Integer = 3306
+        Dim db As String = "transparent_grading_system"
+        Dim user As String = "root"
+        Dim pass As String = ""
+
+        Dim configPath As String = Path.Combine(AppContext.BaseDirectory, "dbconfig.json")
+        If File.Exists(configPath) Then
+            Try
+                Using doc As JsonDocument = JsonDocument.Parse(File.ReadAllText(configPath))
+                    Dim root As JsonElement = doc.RootElement
+                    host = ReadText(root, "Host", host)
+                    db = ReadText(root, "Database", db)
+                    user = ReadText(root, "User", user)
+                    pass = ReadText(root, "Password", pass)
+
+                    Dim portEl As JsonElement
+                    If root.TryGetProperty("Port", portEl) AndAlso portEl.ValueKind = JsonValueKind.Number Then
+                        port = portEl.GetInt32()
+                    End If
+                End Using
+            Catch ex As JsonException
+                Throw New InvalidOperationException("dbconfig.json is not valid JSON: " & ex.Message)
+            End Try
+        End If
+
+        Dim b As New MySqlConnectionStringBuilder()
+        b.Server = host
+        b.Port = CUInt(port)
+        b.Database = db
+        b.UserID = user
+        b.Password = pass
+        b.SslMode = MySqlSslMode.Preferred
+        b.AllowZeroDateTime = True
+        Return b.ConnectionString
+    End Function
+
+    Private Shared Function ReadText(root As JsonElement, key As String, fallback As String) As String
+        Dim el As JsonElement
+        If root.TryGetProperty(key, el) AndAlso el.ValueKind = JsonValueKind.String Then
+            Return el.GetString()
+        End If
+        Return fallback
+    End Function
+
+    Public Shared Function GetConnection() As MySqlConnection
+        Dim conn As New MySqlConnection(GetConnString())
+        conn.Open()
+        Return conn
+    End Function
+
+
+    Public Shared Function ExecuteQuery(sql As String, ParamArray params As MySqlParameter()) As DataTable
+        Dim dt As New DataTable()
+        Using conn As MySqlConnection = GetConnection()
+            Using cmd As New MySqlCommand(sql, conn)
+                If params IsNot Nothing AndAlso params.Length > 0 Then
+                    cmd.Parameters.AddRange(params)
+                End If
+                Using adapter As New MySqlDataAdapter(cmd)
+                    adapter.Fill(dt)
+                End Using
+            End Using
+        End Using
+        Return dt
+    End Function
+
+    Public Shared Function ExecuteNonQuery(sql As String, ParamArray params As MySqlParameter()) As Integer
+        Using conn As MySqlConnection = GetConnection()
+            Using cmd As New MySqlCommand(sql, conn)
+                If params IsNot Nothing AndAlso params.Length > 0 Then
+                    cmd.Parameters.AddRange(params)
+                End If
+                Return cmd.ExecuteNonQuery()
+            End Using
+        End Using
+    End Function
+
+    Public Shared Function ExecuteScalar(sql As String, ParamArray params As MySqlParameter()) As Object
+        Using conn As MySqlConnection = GetConnection()
+            Using cmd As New MySqlCommand(sql, conn)
+                If params IsNot Nothing AndAlso params.Length > 0 Then
+                    cmd.Parameters.AddRange(params)
+                End If
+                Return cmd.ExecuteScalar()
+            End Using
+        End Using
+    End Function
+
+End Class
+
+
+
+========================================
+FILE: PasswordHasher.vb
+PATH: C:\Dauntless Wolves\dauntless-wolves-re-re\Core\PasswordHasher.vb
+========================================
+Imports System.Security.Cryptography
+Imports System.Text
+
+Public Class PasswordHasher
+
+    ''' <summary>
+    ''' Verifies a raw password against a stored database hash or plain-text record.
+    ''' </summary>
+    Public Shared Function VerifyPassword(rawPassword As String, storedHash As String) As Boolean
+        If String.IsNullOrWhiteSpace(storedHash) OrElse String.IsNullOrWhiteSpace(rawPassword) Then
+            Return False
+        End If
+
+        ' 1. Plain-text match (for testing / unhashed seed data)
+        If rawPassword = storedHash Then Return True
+
+        ' 2. Built-in SHA256 hash verification
+        Dim hashedInput As String = HashSHA256(rawPassword)
+        If hashedInput.Equals(storedHash, StringComparison.OrdinalIgnoreCase) Then Return True
+
+        Return False
+    End Function
+
+    Public Shared Function HashSHA256(input As String) As String
+        Using sha256 As SHA256 = sha256.Create()
+            Dim bytes As Byte() = sha256.ComputeHash(Encoding.UTF8.GetBytes(input))
+            Dim sb As New StringBuilder()
+            For Each b As Byte In bytes
+                sb.Append(b.ToString("x2"))
+            Next
+            Return sb.ToString()
+        End Using
+    End Function
+
+End Class
+
+
+
+========================================
+FILE: SecurityHelper.vb
+PATH: C:\Dauntless Wolves\dauntless-wolves-re-re\Core\SecurityHelper.vb
+========================================
+Imports System.Security.Cryptography
+Imports System.Text
+
+Public Class SecurityHelper
+
+    Public Shared Function HashPassword(password As String) As String
+        Return HashSHA256(password)
+    End Function
+
+    Public Shared Function VerifyPassword(password As String, storedHash As String) As Boolean
+        If String.IsNullOrEmpty(password) OrElse String.IsNullOrEmpty(storedHash) Then Return False
+        Return String.Equals(HashSHA256(password), storedHash, StringComparison.OrdinalIgnoreCase)
+    End Function
+
+    Public Shared Function HashSHA256(input As String) As String
+        If String.IsNullOrEmpty(input) Then Return String.Empty
+        Return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(input))).ToLower()
+    End Function
+
+End Class
+
+
+
+========================================
+FILE: ValidationHelper.vb
+PATH: C:\Dauntless Wolves\dauntless-wolves-re-re\Core\ValidationHelper.vb
+========================================
+
+Imports System.Text.RegularExpressions
+
+Public Class ValidationHelper
+    Public Shared Function IsRequired(value As String) As Boolean
+        Return Not String.IsNullOrWhiteSpace(value)
+    End Function
+
+    Public Shared Function IsValidEmail(email As String) As Boolean
+        If String.IsNullOrWhiteSpace(email) Then Return False
+        Dim pattern As String = "^[^@\s]+@[^@\s]+\.[^@\s]+$"
+        Return Regex.IsMatch(email.Trim(), pattern, RegexOptions.IgnoreCase)
+    End Function
+
+    Public Shared Function IsStrongPassword(password As String) As Boolean
+        If String.IsNullOrEmpty(password) OrElse password.Length < 8 Then Return False
+        Dim hasUpper As Boolean = Regex.IsMatch(password, "[A-Z]")
+        Dim hasLower As Boolean = Regex.IsMatch(password, "[a-z]")
+        Dim hasNumber As Boolean = Regex.IsMatch(password, "[0-9]")
+        Dim hasSpecial As Boolean = Regex.IsMatch(password, "[!@#$%^&*(),.?:{}""'|<>]")
+        Return hasUpper AndAlso hasLower AndAlso hasNumber AndAlso hasSpecial
+    End Function
+
+    Public Shared Function CleanInput(input As String) As String
+        If String.IsNullOrEmpty(input) Then Return String.Empty
+        Return input.Trim()
+
+
+    End Function
+
+    Public Shared Function SanitizeInput(Input As String) As String
+        If String.IsNullOrWhiteSpace(Input) Then
+            Return String.Empty
+        End If
+        Return Input.Trim()
+    End Function
+
+    Public Shared Function IsValidScore(score As Double, maxScore As Double) As Boolean
+        Return score >= 0.0 AndAlso score <= maxScore
+    End Function
+
+    Public Shared Function IsValidWeight(weight As Double) As Boolean
+        Return weight >= 0.0 AndAlso weight <= 100.0
+    End Function
+End Class
+
+
+
+========================================
+FILE: Assessment.vb
+PATH: C:\Dauntless Wolves\dauntless-wolves-re-re\Models\Assessment.vb
+========================================
+Public Class Assessment
+    Public Property AssessmentId As Integer
+    Public Property ClassId As Integer
+    Public Property Term As String
+    Public Property Title As String
+    Public Property Type As String
+    Public Property TotalScore As Double
+    Public Property Weight As Double
+    Public Property CreatedAt As DateTime
+
+End Class
+
+
+
+========================================
+FILE: AuditLog.vb
+PATH: C:\Dauntless Wolves\dauntless-wolves-re-re\Models\AuditLog.vb
+========================================
+Public Class AuditLog
+
+    Public Property LogId As Long
+    Public Property StudentId As String
+    Public Property TeacherId As String
+    Public Property AdminId As Nullable(Of Integer)
+    Public Property Action As String
+    Public Property EntityType As String
+    Public Property EntityId As String
+    Public Property OldValue As String
+    Public Property NewValue As String
+    Public Property Timestamp As DateTime
+    Public Property Details As String
+
+
+End Class
+
+
+
+========================================
+FILE: RevisionRequest.vb
+PATH: C:\Dauntless Wolves\dauntless-wolves-re-re\Models\RevisionRequest.vb
+========================================
+Public Class RevisionRequest
+    Public Property RequestId As Integer
+    Public Property GradeId As Integer
+    Public Property RequestedPoints As Nullable(Of Double)
+    Public Property Reason As String
+    Public Property Status As String
+    Public Property RequestedAt As DateTime
+    Public Property ReviewedAt As Nullable(Of DateTime)
+    Public Property ReviewedBy As String
+
+End Class
+
+
+
+========================================
+FILE: StudentGrade.vb
+PATH: C:\Dauntless Wolves\dauntless-wolves-re-re\Models\StudentGrade.vb
+========================================
+Public Class StudentGrade
+    Public Property GradeId As Integer
+    Public Property EnrollmentId As Integer
+    Public Property AssessmentId As Integer
+    Public Property Score As Nullable(Of Double)
+    Public Property Remarks As String
+    Public Property CreatedAt As DateTime
+    Public Property UpdatedAt As DateTime
+End Class
+
+
+
+========================================
+FILE: UserModel.vb
+PATH: C:\Dauntless Wolves\dauntless-wolves-re-re\Models\UserModel.vb
+========================================
+Namespace Models
+    Public Class UserModel
+        Public Property UserId As String
+        Public Property FullName As String
+        Public Property Email As String
+        Public Property Role As String
+        Public Property DepartmentOrProgram As String
+
+        Public Sub New()
+        End Sub
+
+        Public Sub New(id As String, fullName As String, email As String, role As String, Optional deptOrProg As String = "")
+            Me.UserId = id
+            Me.FullName = fullName
+            Me.Email = email
+            Me.Role = role
+            Me.DepartmentOrProgram = deptOrProg
+        End Sub
+    End Class
+End Namespace
+
+
+

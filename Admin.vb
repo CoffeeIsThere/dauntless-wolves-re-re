@@ -1,15 +1,12 @@
 ﻿Imports System.Drawing.Drawing2D
+Imports System.Drawing.Printing
 
 Public Class Admin
 
     ' Instantiate backend service
     Private ReadOnly _userService As New UserService()
 
-    ' Store logged-in admin ID
-
-
     Private tabButtons As Button()
-
 
     Private Sub Admin_Load(sender As Object, e As EventArgs) Handles MyBase.Load
 
@@ -32,7 +29,6 @@ Public Class Admin
         InitStudentPage()
         InitDashboardPage()
     End Sub
-
 
     Private Sub ShowPanel(p As Panel, activeBtn As Button)
         pnlDashboard.Visible = False
@@ -134,7 +130,7 @@ Public Class Admin
             .Columns.Add("colStatus", "Status")
             .Columns.Add("colActions", "Actions")
 
-            ' Fixed-width columns (never get squeezed)
+            ' Fixed-width columns
             For Each item In {("colCheck", 45), ("colType", 110), ("colStatus", 110), ("colActions", 130)}
                 With .Columns(item.Item1)
                     .AutoSizeMode = DataGridViewAutoSizeColumnMode.None
@@ -143,7 +139,7 @@ Public Class Admin
                 End With
             Next
 
-            ' Stretching columns (share the leftover space)
+            ' Stretching columns
             .Columns("colName").FillWeight = 30
             .Columns("colEmpId").FillWeight = 18
             .Columns("colDept").FillWeight = 18
@@ -168,14 +164,19 @@ Public Class Admin
         Dim dt As DataTable = _userService.GetAllTeachers()
 
         For Each row As DataRow In dt.Rows
+            Dim classCount As Integer = 0
+            If dt.Columns.Contains("class_count") AndAlso Not IsDBNull(row("class_count")) Then
+                classCount = Convert.ToInt32(row("class_count"))
+            End If
+
             allProfs.Add(New ProfessorInfo With {
-            .Name = row("full_name").ToString(),
-            .EmployeeID = row("teacher_id").ToString(),
-            .Department = row("department").ToString(),
-            .Classes = If(IsDBNull(row("class_count")), 0, Convert.ToInt32(row("class_count"))),
-            .EmploymentType = row("employment_type").ToString(),
-            .Status = row("status").ToString()
-        })
+                .Name = row("full_name").ToString(),
+                .EmployeeID = row("teacher_id").ToString(),
+                .Department = row("department").ToString(),
+                .Classes = classCount,
+                .EmploymentType = If(dt.Columns.Contains("employment_type"), row("employment_type").ToString(), "Full-time"),
+                .Status = row("status").ToString()
+            })
         Next
 
         ApplyProfFilter()
@@ -203,7 +204,6 @@ Public Class Admin
         BuildProfPager()
     End Sub
 
-    ' Always shows at least 5 page buttons; slides a window of 5 when there are more pages
     Private Sub BuildProfPager()
         flowProfPager.SuspendLayout()
         flowProfPager.Controls.Clear()
@@ -221,7 +221,7 @@ Public Class Admin
         ' Previous
         flowProfPager.Controls.Add(MakePagerButton("<", Math.Max(1, profPage - 1), False, profPage > 1))
 
-        ' Number buttons (pages that don't exist are shown disabled)
+        ' Number buttons
         For i As Integer = 0 To MinButtons - 1
             Dim pageNo As Integer = startPage + i
             Dim exists As Boolean = pageNo <= totalPages
@@ -231,7 +231,6 @@ Public Class Admin
         ' Next
         flowProfPager.Controls.Add(MakePagerButton(">", Math.Min(totalPages, profPage + 1), False, profPage < totalPages))
 
-        ' Make sure all buttons fit (fixes the clipped pager)
         flowProfPager.AutoSize = False
         flowProfPager.Width = flowProfPager.Controls.Count * 32 + 8
 
@@ -286,7 +285,6 @@ Public Class Admin
         End Using
     End Sub
 
-    ' Edit / Delete rectangles inside a cell
     Private Function ActionRects(cell As Rectangle) As Rectangle()
         Const w As Integer = 52, h As Integer = 24, gap As Integer = 6
         Dim startX As Integer = cell.X + (cell.Width - (w * 2 + gap)) \ 2
@@ -340,10 +338,10 @@ Public Class Admin
         Dim empId As String = dgvProf.Rows(e.RowIndex).Cells("colEmpId").Value.ToString()
 
         If rects(0).Contains(e.Location) Then
-            MessageBox.Show("Edit " & empId)             ' open your edit form here
+            MessageBox.Show("Edit " & empId)
         ElseIf rects(1).Contains(e.Location) Then
             If MessageBox.Show("Deactivate " & empId & "? They will no longer be able to log in.", "Confirm",
-                   MessageBoxButtons.YesNo, MessageBoxIcon.Question) = DialogResult.Yes Then
+                               MessageBoxButtons.YesNo, MessageBoxIcon.Question) = DialogResult.Yes Then
                 If _userService.SetUserStatus("Teacher", empId, "Inactive", AppSession.CurrentUser.UserId) Then
                     LoadProfsFromDb()
                 End If
@@ -356,19 +354,11 @@ Public Class Admin
     End Sub
 
     Private Sub pnlStudents_Paint(sender As Object, e As PaintEventArgs) Handles pnlStudents.Paint
-
     End Sub
-
-
 
     Private Sub Label3_Click(sender As Object, e As EventArgs) Handles Label3.Click
-
     End Sub
 
-
-    Private Sub CustomButton3_Click(sender As Object, e As EventArgs) Handles btnaddstudent.Click
-
-    End Sub
     ' ===== STUDENT PAGE =====
     Private allStudents As New List(Of StudentInfo)
     Private filteredStudents As New List(Of StudentInfo)
@@ -394,8 +384,6 @@ Public Class Admin
         cboSection.SelectedIndex = 0
 
         ApplyStudentFilter()
-
-
     End Sub
 
     Private Sub SetupStudentGrid()
@@ -485,13 +473,13 @@ Public Class Admin
 
         For Each row As DataRow In dt.Rows
             allStudents.Add(New StudentInfo With {
-            .StudentID = row("student_id").ToString(),
-            .FullName = row("full_name").ToString(),
-            .YearLevel = Convert.ToInt32(row("year_level")),
-            .Section = row("section").ToString(),
-            .Program = row("program").ToString(),
-            .Status = row("status").ToString()
-        })
+                .StudentID = row("student_id").ToString(),
+                .FullName = row("full_name").ToString(),
+                .YearLevel = Convert.ToInt32(row("year_level")),
+                .Section = row("section").ToString(),
+                .Program = row("program").ToString(),
+                .Status = row("status").ToString()
+            })
         Next
 
         ApplyStudentFilter()
@@ -524,7 +512,6 @@ Public Class Admin
         BuildStudentPager()
     End Sub
 
-    ' Same pager logic as the professor page: always 5 number buttons
     Private Sub BuildStudentPager()
         flowstudentpager.SuspendLayout()
         flowstudentpager.Controls.Clear()
@@ -570,7 +557,6 @@ Public Class Admin
         Return b
     End Function
 
-    ' ----- search / filter / reset -----
     Private Sub txtStudentSearch_TextChanged(sender As Object, e As EventArgs) Handles txtStudentSearch.TextChanged
         ApplyStudentFilter()
     End Sub
@@ -598,7 +584,6 @@ Public Class Admin
         MessageBox.Show("Open Add Student form here")
     End Sub
 
-    ' ----- pills for Status and Actions (reuses DrawPill and ActionRects) -----
     Private Sub dgvStudents_CellPainting(sender As Object, e As DataGridViewCellPaintingEventArgs) Handles dgvstudents.CellPainting
         If e.RowIndex < 0 Then Return
         Dim col As String = dgvstudents.Columns(e.ColumnIndex).Name
@@ -634,10 +619,10 @@ Public Class Admin
         Dim id As String = dgvstudents.Rows(e.RowIndex).Cells("colStudentId").Value.ToString()
 
         If rects(0).Contains(e.Location) Then
-            MessageBox.Show("Edit " & id)             ' open your edit form here
+            MessageBox.Show("Edit " & id)
         ElseIf rects(1).Contains(e.Location) Then
             If MessageBox.Show("Deactivate " & id & "? They will no longer be able to log in.", "Confirm",
-                       MessageBoxButtons.YesNo, MessageBoxIcon.Question) = DialogResult.Yes Then
+                               MessageBoxButtons.YesNo, MessageBoxIcon.Question) = DialogResult.Yes Then
                 If _userService.SetUserStatus("Student", id, "Inactive", AppSession.CurrentUser.UserId) Then
                     LoadStudentsFromDb()
                     ApplyStudentFilter()
@@ -647,35 +632,22 @@ Public Class Admin
     End Sub
 
     Private Sub Label5_Click(sender As Object, e As EventArgs) Handles lbltotalstudents.Click
-
     End Sub
 
     Private Sub pnlDashboard_Paint(sender As Object, e As PaintEventArgs) Handles pnlDashboard.Paint
-
-    End Sub
-
-    Private Sub Label7_Click(sender As Object, e As EventArgs)
-
     End Sub
 
     Private Sub Label7_Click_1(sender As Object, e As EventArgs) Handles Label7.Click
-
     End Sub
 
     Private Sub Label12_Click(sender As Object, e As EventArgs) Handles lblStatClasses.Click
-
     End Sub
 
-
-
     Private Sub Label11_Click(sender As Object, e As EventArgs) Handles Label11.Click
-
     End Sub
 
     Private Sub PictureBox4_Click(sender As Object, e As EventArgs) Handles PictureBox4.Click
-
     End Sub
-
 
     ' ===== DASHBOARD PAGE =====
 
@@ -698,7 +670,7 @@ Public Class Admin
             .CellBorderStyle = DataGridViewCellBorderStyle.None
             .AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill
             .RowTemplate.Height = 26
-            .DefaultCellStyle.Font = New Font("Consolas", 9)
+            .DefaultCellStyle.Font = New Font("Segoe UI", 9)
             .DefaultCellStyle.ForeColor = Color.FromArgb(0, 100, 50)
             .DefaultCellStyle.BackColor = Color.White
             .DefaultCellStyle.SelectionBackColor = Color.White
@@ -713,18 +685,23 @@ Public Class Admin
     Private Sub LoadDashboard()
         lblStatStudents.Text = allStudents.Count.ToString("N0")
         lblStatProfs.Text = allProfs.Count.ToString("N0")
-        lblStatClasses.Text = Convert.ToInt32(DatabaseHelper.ExecuteScalar("SELECT COUNT(*) FROM class")).ToString("N0")
-        lblStatPending.Text = Convert.ToInt32(DatabaseHelper.ExecuteScalar(
-        "SELECT COUNT(*) FROM revisionrequest WHERE status IN ('Pending','Under Review')")).ToString("N0")
+
+        Dim classCountObj As Object = DatabaseHelper.ExecuteScalar("SELECT COUNT(*) FROM class")
+        lblStatClasses.Text = If(classCountObj IsNot Nothing AndAlso Not IsDBNull(classCountObj), Convert.ToInt32(classCountObj).ToString("N0"), "0")
+
+        Dim pendingObj As Object = DatabaseHelper.ExecuteScalar("SELECT COUNT(*) FROM revisionrequest WHERE status IN ('Pending','Under Review')")
+        lblStatPending.Text = If(pendingObj IsNot Nothing AndAlso Not IsDBNull(pendingObj), Convert.ToInt32(pendingObj).ToString("N0"), "0")
 
         dgvupdates.Rows.Clear()
         Dim dt As DataTable = DatabaseHelper.ExecuteQuery(
-        "SELECT action, details, logged_at FROM auditlog ORDER BY logged_at DESC, log_id DESC LIMIT 6")
-        For Each r As DataRow In dt.Rows
-            Dim text As String = r("action").ToString()
-            If r("details").ToString() <> "" Then text &= " - " & r("details").ToString()
-            dgvupdates.Rows.Add(text, "-" & CDate(r("logged_at")).ToString("MMM d, HH:mm"))
-        Next
+            "SELECT action, details, logged_at FROM auditlog ORDER BY logged_at DESC, log_id DESC LIMIT 6")
+        If dt IsNot Nothing Then
+            For Each r As DataRow In dt.Rows
+                Dim text As String = r("action").ToString()
+                If r("details").ToString() <> "" Then text &= " - " & r("details").ToString()
+                dgvupdates.Rows.Add(text, "-" & CDate(r("logged_at")).ToString("MMM d, HH:mm"))
+            Next
+        End If
         dgvupdates.ClearSelection()
     End Sub
 
@@ -732,22 +709,16 @@ Public Class Admin
         MessageBox.Show("Updates filter goes here")
     End Sub
 
-    ' Quick Actions (placeholders until the dialogs are built)
+    ' Quick Actions
     Private Sub btnAddClass_Click(sender As Object, e As EventArgs) Handles btnAddClass.Click
         Using dlg As New frmAddClass()
             dlg.LoadProfessors(allProfs.Select(Function(p) p.Name))
             If dlg.ShowDialog(Me) = DialogResult.OK Then
-                ' Sample behaviour: bump the Active Classes count.
-                ' Replace with a database reload later.
-                Dim n As Integer = CInt(lblStatClasses.Text.Replace(",", "")) + 1
-                lblStatClasses.Text = n.ToString("N0")
-                dgvupdates.Rows.Insert(0, "Class added- " & dlg.SubjectName, "-" & dlg.SectionName)
-                dgvupdates.ClearSelection()
+                LoadDashboard()
             End If
         End Using
     End Sub
 
-    ' One shared dialog for Enter Grades, View Requests and Audit Logs
     Private ReadOnly quickForm As New quickactions()
 
     Private Sub OpenQuickAction(mode As quickactions.FormMode)
@@ -767,23 +738,104 @@ Public Class Admin
         OpenQuickAction(quickactions.FormMode.ViewAuditLogs)
     End Sub
 
-
-    Private Sub Admin_FormClosed(sender As Object, e As FormClosedEventArgs) Handles MyBase.FormClosed
-        quickForm.Dispose()
-    End Sub
-
-    ' Add to Admin.vb, frmprof.vb, and frmstudent.vb
     Private Sub btnLogout_Click(sender As Object, e As EventArgs) Handles btnLogout.Click
-        ' 1. Clear active global session
-        AppSession.ClearSession()
+        If MessageBox.Show("Are you sure you want to log out?", "Confirm Logout",
+                           MessageBoxButtons.YesNo, MessageBoxIcon.Question) = DialogResult.Yes Then
 
-        ' 2. Re-open login form and close current dashboard
-        Dim loginForm As New frmlogin()
-        loginForm.Show()
-        Me.Close()
+            ' 1. Clear session
+            AppSession.ClearSession()
+
+            ' 2. Show login form
+            Dim loginForm As New frmlogin()
+            loginForm.Show()
+
+            ' 3. Close Admin dashboard
+            Me.Close()
+        End If
     End Sub
 
-    Private Sub dgvProf_CellContentClick(sender As Object, e As DataGridViewCellEventArgs) Handles dgvProf.CellContentClick
+    ' ===== EXPORT HELPER METHODS FOR ADMIN =====
 
+    Private ReadOnly _exportService As New ExportService()
+
+    ''' <summary>
+    ''' Exports the currently visible Students table to a CSV file.
+    ''' </summary>
+    Public Sub ExportStudentsCSV()
+        If dgvstudents.Rows.Count = 0 Then
+            MessageBox.Show("There are no student records to export.", "Export Notice", MessageBoxButtons.OK, MessageBoxIcon.Information)
+            Return
+        End If
+
+        Using sfd As New SaveFileDialog()
+            sfd.Filter = "CSV Files (*.csv)|*.csv"
+            sfd.FileName = $"Students_Export_{DateTime.Now:yyyyMMdd}.csv"
+
+            If sfd.ShowDialog() = DialogResult.OK Then
+                If _exportService.ExportToCSV(dgvstudents, sfd.FileName) Then
+                    MessageBox.Show("Student list successfully exported to CSV!", "Export Complete", MessageBoxButtons.OK, MessageBoxIcon.Information)
+                End If
+            End If
+        End Using
     End Sub
+
+    ''' <summary>
+    ''' Exports the currently visible Students table to a PDF report.
+    ''' </summary>
+    Public Sub ExportStudentsPDF()
+        If dgvstudents.Rows.Count = 0 Then
+            MessageBox.Show("There are no student records to export.", "Export Notice", MessageBoxButtons.OK, MessageBoxIcon.Information)
+            Return
+        End If
+
+        Using sfd As New SaveFileDialog()
+            sfd.Filter = "PDF Files (*.pdf)|*.pdf"
+            sfd.FileName = $"Students_Report_{DateTime.Now:yyyyMMdd}.pdf"
+
+            If sfd.ShowDialog() = DialogResult.OK Then
+                Dim printDoc As New PrintDocument()
+                AddHandler printDoc.PrintPage, Sub(s, args)
+                                                   Dim g As Graphics = args.Graphics
+                                                   Dim titleFont As New Font("Segoe UI", 14, FontStyle.Bold)
+                                                   Dim bodyFont As New Font("Segoe UI", 9, FontStyle.Regular)
+                                                   Dim startY As Integer = 50
+
+                                                   g.DrawString("DAUNTLESS WOLVES - STUDENT DIRECTORY", titleFont, Brushes.DarkGreen, 50, startY)
+                                                   startY += 40
+
+                                                   g.DrawString("Student ID", bodyFont, Brushes.Black, 50, startY)
+                                                   g.DrawString("Full Name", bodyFont, Brushes.Black, 180, startY)
+                                                   g.DrawString("Year/Sec", bodyFont, Brushes.Black, 400, startY)
+                                                   g.DrawString("Status", bodyFont, Brushes.Black, 520, startY)
+                                                   startY += 25
+                                                   g.DrawLine(Pens.Gray, 50, startY, 650, startY)
+                                                   startY += 10
+
+                                                   For Each row As DataGridViewRow In dgvstudents.Rows
+                                                       If Not row.IsNewRow Then
+                                                           Dim sid As String = Convert.ToString(row.Cells("colStudentId").Value)
+                                                           Dim name As String = Convert.ToString(row.Cells("colFullName").Value)
+                                                           Dim yrSec As String = $"{row.Cells("colYear").Value} - {row.Cells("colSection").Value}"
+                                                           Dim st As String = Convert.ToString(row.Cells("colStatus").Value)
+
+                                                           g.DrawString(sid, bodyFont, Brushes.Black, 50, startY)
+                                                           g.DrawString(name, bodyFont, Brushes.Black, 180, startY)
+                                                           g.DrawString(yrSec, bodyFont, Brushes.Black, 400, startY)
+                                                           g.DrawString(st, bodyFont, Brushes.Black, 520, startY)
+                                                           startY += 22
+                                                       End If
+                                                   Next
+                                               End Sub
+
+                If _exportService.ExportToPDF(printDoc, sfd.FileName) Then
+                    MessageBox.Show("Student PDF report generated successfully!", "Export Complete", MessageBoxButtons.OK, MessageBoxIcon.Information)
+                End If
+            End If
+        End Using
+    End Sub
+
+    ' ===== LOGOUT HANDLER =====
+
+
+
 End Class

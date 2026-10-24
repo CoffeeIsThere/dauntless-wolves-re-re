@@ -1,101 +1,94 @@
-﻿Imports System.Data
-Imports System.Drawing
+﻿Imports System.Drawing
 Imports System.Drawing.Printing
 Imports System.IO
-Imports System.Text
+Imports System.Windows.Forms
 
 Public Class ExportService
 
-
-    Public Shared Function ExportToCSV(dt As DataTable, filePath As String) As Boolean
+    ''' <summary>
+    ''' Exports a DataGridView or grade report using Microsoft Print to PDF if installed,
+    ''' or gracefully falls back to the system's default printer or a file save fallback.
+    ''' </summary>
+    Public Function ExportToPDF(printDoc As PrintDocument, targetFilePath As String) As Boolean
         Try
-            If dt Is Nothing OrElse dt.Rows.Count = 0 Then
-                Console.WriteLine("[EXPORT WARNING] No data available to export.")
-                Return False
+            Dim targetPrinter As String = "Microsoft Print to PDF"
+            Dim printerFound As Boolean = False
+
+            ' 1. Check all installed printers on the local host machine
+            For Each installedPrinter As String In PrinterSettings.InstalledPrinters
+                If installedPrinter.Equals(targetPrinter, StringComparison.OrdinalIgnoreCase) Then
+                    printDoc.PrinterSettings.PrinterName = installedPrinter
+                    printerFound = True
+                    Exit For
+                End If
+            Next
+
+            ' 2. Fallback: If "Microsoft Print to PDF" is missing, assign system default printer
+            If Not printerFound Then
+                Dim defaultSettings As New PrinterSettings()
+                If String.IsNullOrEmpty(defaultSettings.PrinterName) Then
+                    Throw New InvalidPrinterException(New PrinterSettings())
+                End If
+                printDoc.PrinterSettings.PrinterName = defaultSettings.PrinterName
             End If
 
-            Using writer As New StreamWriter(filePath, False, Encoding.UTF8)
-                ' Header Row
-                Dim columnHeaders As New List(Of String)()
-                For Each col As DataColumn In dt.Columns
-                    columnHeaders.Add($"""{col.ColumnName.Replace("""", """""")}""")
-                Next
-                writer.WriteLine(String.Join(",", columnHeaders))
+            ' 3. Configure print-to-file destination if path provided
+            If Not String.IsNullOrEmpty(targetFilePath) Then
+                printDoc.PrinterSettings.PrintToFile = True
+                printDoc.PrinterSettings.PrintFileName = targetFilePath
+            End If
 
-                ' Data Rows
-                For Each row As DataRow In dt.Rows
-                    Dim rowFields As New List(Of String)()
-                    For Each col As DataColumn In dt.Columns
-                        Dim cellValue As String = row(col).ToString().Replace("""", """""")
-                        rowFields.Add($"""{cellValue}""")
-                    Next
-                    writer.WriteLine(String.Join(",", rowFields))
-                Next
-            End Using
+            ' 4. Execute print job safely
+            printDoc.Print()
             Return True
+
+        Catch ex As InvalidPrinterException
+            MessageBox.Show("No valid printer driver installed on this machine. Please install 'Microsoft Print to PDF' or connect a printer.",
+                            "PDF Export Error", MessageBoxButtons.OK, MessageBoxIcon.Error)
+            Return False
+
         Catch ex As Exception
-            Console.WriteLine("[CSV EXPORT ERROR] " & ex.Message)
+            MessageBox.Show("Failed to generate PDF: " & ex.Message,
+                            "Export Error", MessageBoxButtons.OK, MessageBoxIcon.Error)
             Return False
         End Try
     End Function
 
-
-    Public Shared Function ExportToPDF(dt As DataTable, documentTitle As String, filePath As String) As Boolean
-        If dt Is Nothing OrElse dt.Rows.Count = 0 Then Return False
-
+    ''' <summary>
+    ''' CSV Export Helper function for DataGridView tables
+    ''' </summary>
+    Public Function ExportToCSV(dgv As DataGridView, filePath As String) As Boolean
         Try
-            Dim printDoc As New PrintDocument()
-            printDoc.PrinterSettings.PrinterName = "Microsoft Print to PDF"
-            printDoc.PrinterSettings.PrintToFile = True
-            printDoc.PrinterSettings.PrintFileName = filePath
+            Dim lines As New List(Of String)()
 
-            Dim rowIndex As Integer = 0
+            ' Header row
+            Dim headers As New List(Of String)()
+            For Each col As DataGridViewColumn In dgv.Columns
+                If col.Visible Then
+                    headers.Add($"""{col.HeaderText.Replace("""", """")}""")
+                End If
+            Next
+            lines.Add(String.Join(",", headers))
 
-            AddHandler printDoc.PrintPage, Sub(sender As Object, e As PrintPageEventArgs)
-                                               Dim fontHeader As New Font("Arial", 14, FontStyle.Bold)
-                                               Dim fontColumn As New Font("Arial", 10, FontStyle.Bold)
-                                               Dim fontBody As New Font("Arial", 9, FontStyle.Regular)
+            ' Data rows
+            For Each row As DataGridViewRow In dgv.Rows
+                If Not row.IsNewRow Then
+                    Dim cells As New List(Of String)()
+                    For Each col As DataGridViewColumn In dgv.Columns
+                        If col.Visible Then
+                            Dim val As String = If(row.Cells(col.Index).Value IsNot Nothing, row.Cells(col.Index).Value.ToString(), "")
+                            cells.Add($"""{val.Replace("""", """")}""")
+                        End If
+                    Next
+                    lines.Add(String.Join(",", cells))
+                End If
+            Next
 
-                                               Dim x As Single = 40
-                                               Dim y As Single = 40
-                                               Dim rowHeight As Single = 25
-
-                                               ' Title
-                                               e.Graphics.DrawString(documentTitle, fontHeader, Brushes.Black, x, y)
-                                               y += 40
-
-                                               ' Table Headers
-                                               Dim colWidth As Single = (e.MarginBounds.Width - 40) / dt.Columns.Count
-                                               For c As Integer = 0 To dt.Columns.Count - 1
-                                                   e.Graphics.DrawString(dt.Columns(c).ColumnName, fontColumn, Brushes.DarkBlue, x + (c * colWidth), y)
-                                               Next
-                                               y += rowHeight
-                                               e.Graphics.DrawLine(Pens.Black, x, y, x + (dt.Columns.Count * colWidth), y)
-                                               y += 5
-
-                                               ' Data Rows
-                                               While rowIndex < dt.Rows.Count
-                                                   For c As Integer = 0 To dt.Columns.Count - 1
-                                                       Dim cellVal As String = dt.Rows(rowIndex)(c).ToString()
-                                                       e.Graphics.DrawString(cellVal, fontBody, Brushes.Black, x + (c * colWidth), y)
-                                                   Next
-                                                   y += rowHeight
-                                                   rowIndex += 1
-
-                                                   ' Check for Page Overflow
-                                                   If y + rowHeight > e.MarginBounds.Bottom Then
-                                                       e.HasMorePages = True
-                                                       Return
-                                                   End If
-                                               End While
-
-                                               e.HasMorePages = False
-                                           End Sub
-
-            printDoc.Print()
+            File.WriteAllLines(filePath, lines, System.Text.Encoding.UTF8)
             Return True
+
         Catch ex As Exception
-            Console.WriteLine("[PDF EXPORT ERROR] " & ex.Message)
+            MessageBox.Show("Error saving CSV file: " & ex.Message, "CSV Export Error", MessageBoxButtons.OK, MessageBoxIcon.Error)
             Return False
         End Try
     End Function

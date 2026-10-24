@@ -1,4 +1,6 @@
-﻿
+﻿Imports System.Data
+Imports MySql.Data.MySqlClient
+
 Public Class quickactions
 
     Public Enum FormMode
@@ -7,196 +9,156 @@ Public Class quickactions
         ViewAuditLogs
     End Enum
 
-    Private _mode As FormMode
+    Private Sub quickactions_Load(sender As Object, e As EventArgs) Handles MyBase.Load
+        ' Safely attach click listener to close button without requiring designer WithEvents
+        Dim btn = FindControl(Of Button)("btnClose")
+        If btn Is Nothing Then btn = FindControl(Of Button)("btnCancel")
+        If btn IsNot Nothing Then
+            RemoveHandler btn.Click, AddressOf CloseForm
+            AddHandler btn.Click, AddressOf CloseForm
+        End If
+    End Sub
 
-    ' ===== Switch between the three panels =====
+    Private Sub CloseForm(sender As Object, e As EventArgs)
+        Me.Close()
+    End Sub
+
+    ' Helper method to resolve controls safely from the designer form
+    Private Function FindControl(Of T As Control)(varName As String) As T
+        Dim matches = Me.Controls.Find(varName, True)
+        If matches.Length > 0 AndAlso TypeOf matches(0) Is T Then
+            Return DirectCast(matches(0), T)
+        End If
+        Return Nothing
+    End Function
+
     Public Sub ShowMode(mode As FormMode)
-        _mode = mode
-        Me.DialogResult = DialogResult.None
+        Dim lblTitle = FindControl(Of Label)("lblTitle")
+        If lblTitle Is Nothing Then lblTitle = FindControl(Of Label)("lblHeader")
 
-        pnlGrades.Visible = False
-        pnlRequests.Visible = False
-        pnlLogs.Visible = False
-
-        btnPrimary.Visible = True
+        Dim pnlGrades = FindControl(Of Panel)("pnlGrades")
+        Dim pnlRequests = FindControl(Of Panel)("pnlRequests")
+        Dim pnlLogs = FindControl(Of Panel)("pnlLogs")
 
         Select Case mode
             Case FormMode.EnterGrades
-                Me.Text = "Enter Grades"
-                Me.ClientSize = New Size(460, 470)
-                pnlGrades.Visible = True
-                btnPrimary.Text = "Save Grade"
-                txtGrade.Clear()
-                LoadStudents()
-                LoadSubjects()
-                cboStudent.SelectedIndex = -1
-                cboSubject.SelectedIndex = -1
+                If lblTitle IsNot Nothing Then lblTitle.Text = "Quick Grade Entry"
+                If pnlGrades IsNot Nothing Then
+                    pnlGrades.Visible = True
+                    pnlGrades.BringToFront()
+                End If
+                LoadClassesForGradeEntry()
 
             Case FormMode.ViewRequests
-                Me.Text = "Pending Requests"
-                Me.ClientSize = New Size(700, 420)
-                pnlRequests.Visible = True
-                btnPrimary.Text = "Approve"
-
-                LoadRequests()
+                If lblTitle IsNot Nothing Then lblTitle.Text = "Pending Revision Requests"
+                If pnlRequests IsNot Nothing Then
+                    pnlRequests.Visible = True
+                    pnlRequests.BringToFront()
+                End If
+                LoadLiveRequests()
 
             Case FormMode.ViewAuditLogs
-                Me.Text = "Audit Logs"
-                Me.ClientSize = New Size(780, 450)
-                pnlLogs.Visible = True
-                btnPrimary.Visible = False
-                LoadLogs()
-        End Select
-
-        Me.CenterToParent()
-    End Sub
-
-    ' ===== Bottom bar buttons =====
-    Private Sub btnPrimary_Click(sender As Object, e As EventArgs) Handles btnPrimary.Click
-        Select Case _mode
-            Case FormMode.EnterGrades : SaveGrade()
-            Case FormMode.ViewRequests : ApproveSelected()
+                If lblTitle IsNot Nothing Then lblTitle.Text = "System Audit Logs"
+                If pnlLogs IsNot Nothing Then
+                    pnlLogs.Visible = True
+                    pnlLogs.BringToFront()
+                End If
+                LoadLiveAuditLogs()
         End Select
     End Sub
 
+    ' ==========================================
+    ' 1. LIVE REVISION REQUESTS (MariaDB)
+    ' ==========================================
+    Private Sub LoadLiveRequests()
+        Dim dgvRequests = FindControl(Of DataGridView)("dgvRequests")
+        If dgvRequests Is Nothing Then Return
 
+        Dim sql As String = "SELECT " &
+                           "    r.request_id, " &
+                           "    s.full_name AS student_name, " &
+                           "    a.title AS assessment_title, " &
+                           "    IF(sg.score IS NULL, '--', CONCAT(CAST(sg.score AS CHAR), '/', CAST(a.total_score AS CHAR))) AS current_grade, " &
+                           "    IF(r.requested_points IS NULL, 'Recheck', CONCAT('+', CAST(r.requested_points AS CHAR), ' pts')) AS requested, " &
+                           "    r.reason, " &
+                           "    r.status " &
+                           "FROM revisionrequest r " &
+                           "JOIN studentgrade sg ON r.grade_id = sg.grade_id " &
+                           "JOIN assessment a ON sg.assessment_id = a.assessment_id " &
+                           "JOIN enrollment e ON sg.enrollment_id = e.enrollment_id " &
+                           "JOIN student s ON e.student_id = s.student_id " &
+                           "ORDER BY r.requested_at DESC"
 
+        Dim dt As DataTable = DatabaseHelper.ExecuteQuery(sql)
 
+        If dt IsNot Nothing Then
+            dgvRequests.DataSource = dt
 
-    ' ===== Enter Grades =====
-    Private Sub SaveGrade()
-        Dim grade As Decimal
-        If cboStudent.SelectedIndex = -1 OrElse cboSubject.SelectedIndex = -1 Then
-            MessageBox.Show("Select a student and a subject.")
-            Return
+            ' Format Header Column Titles
+            If dgvRequests.Columns.Contains("student_name") Then
+                dgvRequests.Columns("student_name").HeaderText = "Student"
+                dgvRequests.Columns("assessment_title").HeaderText = "Assessment"
+                dgvRequests.Columns("current_grade").HeaderText = "Current Grade"
+                dgvRequests.Columns("requested").HeaderText = "Requested"
+                dgvRequests.Columns("reason").HeaderText = "Reason"
+                dgvRequests.Columns("status").HeaderText = "Status"
+            End If
+
+            If dgvRequests.Columns.Contains("request_id") Then
+                dgvRequests.Columns("request_id").Visible = False
+            End If
+
+            dgvRequests.ClearSelection()
         End If
-        If Not Decimal.TryParse(txtGrade.Text, grade) Then
-            MessageBox.Show("Enter a valid numeric grade.")
-            Return
+    End Sub
+
+    ' ==========================================
+    ' 2. LIVE AUDIT LOGS (MariaDB)
+    ' ==========================================
+    Private Sub LoadLiveAuditLogs()
+        Dim dgvAuditLogs = FindControl(Of DataGridView)("dgvAuditLogs")
+        If dgvAuditLogs Is Nothing Then dgvAuditLogs = FindControl(Of DataGridView)("dgvLogs")
+        If dgvAuditLogs Is Nothing Then dgvAuditLogs = FindControl(Of DataGridView)("dgvAudit")
+        If dgvAuditLogs Is Nothing Then Return
+
+        Dim sql As String = "SELECT " &
+                           "    al.log_id AS `Log ID`, " &
+                           "    IFNULL(s.full_name, IFNULL(t.full_name, IFNULL(adm.full_name, 'System'))) AS `User`, " &
+                           "    al.action AS `Action`, " &
+                           "    al.entity_type AS `Target Entity`, " &
+                           "    IFNULL(al.old_value, '---') AS `Old Value`, " &
+                           "    IFNULL(al.new_value, '---') AS `New Value`, " &
+                           "    DATE_FORMAT(al.logged_at, '%Y-%m-%d %H:%i:%s') AS `Timestamp`, " &
+                           "    IFNULL(al.details, 'N/A') AS `Details` " &
+                           "FROM auditlog al " &
+                           "LEFT JOIN student s ON al.student_id = s.student_id " &
+                           "LEFT JOIN teacher t ON al.teacher_id = t.teacher_id " &
+                           "LEFT JOIN admin adm ON al.admin_id = adm.admin_id " &
+                           "ORDER BY al.logged_at DESC"
+
+        Dim dt As DataTable = DatabaseHelper.ExecuteQuery(sql)
+
+        If dt IsNot Nothing Then
+            dgvAuditLogs.DataSource = dt
+            dgvAuditLogs.ClearSelection()
         End If
-        ' TODO: save to MySQL + audit log row
-        MessageBox.Show("Grade saved!")
-        Me.DialogResult = DialogResult.OK
     End Sub
 
-    Private Sub LoadStudents()
-        cboStudent.Items.Clear()
-        cboStudent.Items.AddRange(New String() {
-            "Mariano, Geoff Andreii",
-            "Condes, Hope Gian D.",
-            "Lalata, Carl Jade",
-            "Santos, Maria Angelica",
-            "Oropilla, Charles",
-            "Puyat, Ron Jacob",
-            "Buluran, Family I.",
-            "Rodas, Rodas P.",
-            "Ramos, Reago W.",
-            "Salceda, Poknat X."
-        })
-    End Sub
+    ' ==========================================
+    ' 3. CLASS SELECTOR FOR QUICK GRADE ENTRY
+    ' ==========================================
+    Private Sub LoadClassesForGradeEntry()
+        Dim cmbClasses = FindControl(Of ComboBox)("cmbClasses")
+        If cmbClasses Is Nothing Then cmbClasses = FindControl(Of ComboBox)("cboclass")
+        If cmbClasses Is Nothing Then Return
 
-    Private Sub LoadSubjects()
-        cboSubject.Items.Clear()
-        cboSubject.Items.AddRange(New String() {"DBMS2", "IT101"})   ' temporary test data
-    End Sub
-
-    ' ===== View Requests =====
-    Private Sub ApproveSelected()
-        If dgvrequests.CurrentRow Is Nothing Then Return
-        ' TODO: approve + audit log row
-        LoadRequests()
-    End Sub
-
-    Private Sub RejectSelected()
-        If dgvrequests.CurrentRow Is Nothing Then Return
-        ' TODO: reject + audit log row
-        LoadRequests()
-    End Sub
-
-    Private Sub LoadRequests()
-        dgvrequests.AutoGenerateColumns = True
-
-        Dim dt As New DataTable()
-        For Each c In {"Student", "Assessment", "Current Grade", "Requested", "Reason", "Status"}
-            dt.Columns.Add(c)
-        Next
-        dt.Rows.Add("Lalata, Carl Jade", "Quiz#1", "18/20", "+2pts", "Misread Answer", "Pending")
-        dt.Rows.Add("Condes, Hope Gian D.", "Final Exam", "--", "Recheck", "Item 7 correct", "Pending")
-        dt.Rows.Add("Mariano, Geoff Andreii", "Activity#2", "43/50", "+5pts", "Late Submission", "Approved")
-
-        dgvrequests.DataSource = dt
-        StyleGrid(dgvrequests)
-        dgvrequests.ClearSelection()
-    End Sub
-
-    ' ===== Audit Logs =====
-    Private Sub LoadLogs()
-        dgvLogs.AutoGenerateColumns = True
-
-        Dim dt As New DataTable()
-        For Each c In {"Action", "Student", "Item", "Date & Time", "Changed By"}
-            dt.Columns.Add(c)
-        Next
-        dt.Rows.Add("Grades Updated", "Condes, Hope Gian D.", "Midterms", "2026-08-24 09:14", "Prof. Jhun")
-        dt.Rows.Add("Revision Approved", "Mariano, Geoff Andreii", "Activity#2", "2026-08-23 15:40", "Prof. Jhun")
-        dt.Rows.Add("Grades Updated", "Lalata, Carl Jade", "Quiz#1", "2026-08-22 11:05", "Prof. Jhun")
-
-        dgvLogs.DataSource = dt
-        StyleGrid(dgvLogs)
-        dgvLogs.ClearSelection()
-    End Sub
-
-    ' ===== Shared grid styling =====
-    Private Sub StyleGrid(g As DataGridView)
-        With g
-            .AllowUserToAddRows = False          ' removes the empty * row
-            .AllowUserToDeleteRows = False
-            .AllowUserToResizeRows = False
-            .ReadOnly = True                     ' no editing
-            .RowHeadersVisible = False           ' removes the left gray column
-            .MultiSelect = False
-            .SelectionMode = DataGridViewSelectionMode.FullRowSelect
-
-            .BackgroundColor = Color.White       ' removes the gray area
-            .BorderStyle = BorderStyle.None
-            .CellBorderStyle = DataGridViewCellBorderStyle.SingleHorizontal
-            .GridColor = Color.Gainsboro
-            .AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill   ' fills the width
-            .RowTemplate.Height = 32
-
-            .EnableHeadersVisualStyles = False
-            .ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.DisableResizing
-            .ColumnHeadersHeight = 34
-            .ColumnHeadersBorderStyle = DataGridViewHeaderBorderStyle.None
-            With .ColumnHeadersDefaultCellStyle
-                .BackColor = Color.FromArgb(224, 247, 250)
-                .ForeColor = Color.FromArgb(0, 80, 0)
-                .Font = New Font("Segoe UI", 9, FontStyle.Bold)
-                .SelectionBackColor = Color.FromArgb(224, 247, 250)
-                .SelectionForeColor = Color.FromArgb(0, 80, 0)
-            End With
-
-            With .DefaultCellStyle
-                .BackColor = Color.White
-                .ForeColor = Color.FromArgb(0, 100, 0)
-                .Font = New Font("Segoe UI", 9)
-                .SelectionBackColor = Color.FromArgb(235, 250, 240)
-                .SelectionForeColor = Color.FromArgb(0, 100, 0)
-            End With
-
-            For Each c As DataGridViewColumn In .Columns
-                c.SortMode = DataGridViewColumnSortMode.NotSortable
-            Next
-        End With
-    End Sub
-
-    Private Sub AddLogColumn(name As String, header As String, weight As Single)
-        Dim c As New DataGridViewTextBoxColumn()
-        c.Name = name
-        c.DataPropertyName = name
-        c.HeaderText = header
-        c.FillWeight = weight
-        dgvLogs.Columns.Add(c)
+        Dim sql As String = "SELECT c.class_id, CONCAT(co.course_code, ' - ', co.course_name, ' (', c.section, ')') AS class_title " &
+                           "FROM class c " &
+                           "JOIN course co ON c.course_code = co.course_code"
+        Dim dt As DataTable = DatabaseHelper.ExecuteQuery(sql)
+        cmbClasses.DataSource = dt
+        cmbClasses.DisplayMember = "class_title"
+        cmbClasses.ValueMember = "class_id"
     End Sub
 
 End Class

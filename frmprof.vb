@@ -1,6 +1,8 @@
 ﻿Imports System.Globalization
-Public Class frmprof
+Imports MySql.Data.MySqlClient
 
+Public Class frmprof
+    Private ReadOnly _exportService As New ExportService()
     Private ReadOnly _gradeService As New GradeService()
     Private ReadOnly _revisionService As New RevisionRequestService()
     Private ReadOnly _auditService As New AuditService()
@@ -19,6 +21,12 @@ Public Class frmprof
     Private lblPassing As Label
     Private lblAtRisk As Label
     Private lblTopScore As Label
+
+    ' Right Panel Controls Cache
+    Private _lblRightStudentName As Label = Nothing
+    Private _lblRightStudentId As Label = Nothing
+    Private _pnlRightScoresContainer As Control = Nothing
+    Private _isRightPanelInitialized As Boolean = False
 
     Private Sub frmprof_Load(sender As Object, e As EventArgs) Handles MyBase.Load
         If AppSession.CurrentUser Is Nothing Then
@@ -49,8 +57,6 @@ Public Class frmprof
         ' Show Record Scores by default
         ShowPage(btnRecordScores)
 
-        ' Select the first item in all ComboBoxes (including inside panels)
-        ' Replace SetAllComboBoxes(Me) with this call:
         LoadTeacherInfo()
 
         isLoading = False
@@ -70,7 +76,6 @@ Public Class frmprof
                 End If
             End If
 
-            ' If the control contains children (Panel, GroupBox, TabPage, etc.), check inside too
             If ctrl.HasChildren Then
                 SetAllComboBoxes(ctrl)
             End If
@@ -123,7 +128,7 @@ Public Class frmprof
             .AllowUserToResizeColumns = False
             .ReadOnly = True
             .RowHeadersVisible = False
-            .ColumnHeadersVisible = False          ' the green bar is the header
+            .ColumnHeadersVisible = False
             .BackgroundColor = Color.White
             .BorderStyle = BorderStyle.None
             .CellBorderStyle = DataGridViewCellBorderStyle.SingleHorizontal
@@ -137,20 +142,29 @@ Public Class frmprof
     End Sub
 
     Private Sub LoadClassGrades()
-        Dim dt As New DataTable()
-        For Each c In {"Student", "SW1", "HW1", "Quiz1", "Act4", "Act5", "Act6",
-                       "Midterms", "Running Grade", "Status"}
-            dt.Columns.Add(c)
-        Next
+        Dim classId As Integer = SelectedClassId()
+        If classId = 0 Then
+            Dim emptyDt As New DataTable()
+            For Each c In {"Student", "SW1", "HW1", "Quiz1", "Act4", "Act5", "Act6", "Midterms", "Running Grade", "Status"}
+                emptyDt.Columns.Add(c)
+            Next
+            dgvClassGrades.DataSource = emptyDt
+            AlignGridToHeader()
+            Return
+        End If
 
-        dt.Rows.Add("Oropilla, Charles", "20/20", "45/50", "96/100", "–", "–", "–", "95/100", "94.2", "Passed")
-        dt.Rows.Add("Puyat, Ron Jacob", "19/20", "47/50", "94/100", "–", "–", "–", "92/100", "91.8", "Passed")
-        dt.Rows.Add("Lalata, Carl Jade", "18/20", "46/50", "90/100", "–", "–", "–", "90/100", "88.5", "Passed")
-        dt.Rows.Add("Mariano, Geoff Andrei", "17/20", "44/50", "88/100", "–", "–", "–", "88/100", "86.0", "Passed")
-        dt.Rows.Add("Condes, Hope Gian", "18/20", "45/50", "88/100", "–", "–", "–", "88/100", "84.2", "Passed")
-        dt.Rows.Add("Dela Cruz, Juan", "12/20", "32/50", "70/100", "–", "–", "–", "70/100", "68.5", "At risk")
+        Dim dt As DataTable = _gradeService.GetClassGradeSheet(classId, _currentTeacherId)
 
-        dgvClassGrades.DataSource = dt
+        If dt IsNot Nothing AndAlso dt.Rows.Count > 0 Then
+            dgvClassGrades.DataSource = dt
+        Else
+            Dim emptyDt As New DataTable()
+            For Each c In {"Student", "SW1", "HW1", "Quiz1", "Act4", "Act5", "Act6", "Midterms", "Running Grade", "Status"}
+                emptyDt.Columns.Add(c)
+            Next
+            dgvClassGrades.DataSource = emptyDt
+        End If
+
         AlignGridToHeader()
     End Sub
 
@@ -163,6 +177,12 @@ Public Class frmprof
     Private Sub AlignGridToHeader()
         If dgvClassGrades.Columns.Count = 0 Then Exit Sub
 
+        Dim names() As String = {"Student", "SW1", "HW1", "Quiz1", "Act4", "Act5", "Act6", "Midterms", "Running Grade", "Status"}
+
+        For Each colName As String In names
+            If Not dgvClassGrades.Columns.Contains(colName) Then Exit Sub
+        Next
+
         Dim cSW1 As Integer = HeaderCenterX(cboSW1)
         Dim cHW1 As Integer = HeaderCenterX(cboHW1)
         Dim cQuiz As Integer = HeaderCenterX(cboQuiz1)
@@ -171,17 +191,15 @@ Public Class frmprof
         Dim cStat As Integer = HeaderCenterX(lblStatus)
         Dim gap As Double = (cMid - cQuiz) / 4
 
-        Dim names() As String = {"Student", "SW1", "HW1", "Quiz1", "Act4", "Act5", "Act6",
-                                 "Midterms", "Running Grade", "Status"}
         Dim centers() As Double = {0, cSW1, cHW1, cQuiz,
                                    cQuiz + gap, cQuiz + 2 * gap, cQuiz + 3 * gap,
                                    cMid, cRun, cStat}
 
         Dim startX As Double = 0
-        For i As Integer = 0 To names.Length - 2          ' every column except Status
+        For i As Integer = 0 To names.Length - 2
             Dim endX As Double
             If i = 0 Then
-                endX = cSW1 - 55                          ' Student column width
+                endX = cSW1 - 55
             Else
                 endX = (centers(i) + centers(i + 1)) / 2
             End If
@@ -196,7 +214,6 @@ Public Class frmprof
             startX = endX
         Next
 
-        ' Status takes whatever space is left, so no horizontal scrollbar
         With dgvClassGrades.Columns("Status")
             .AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill
             .DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter
@@ -229,7 +246,6 @@ Public Class frmprof
         End If
     End Sub
 
-    ' Clears the default selection every time data is bound
     Private Sub dgvClassGrades_DataBindingComplete(sender As Object, e As DataGridViewBindingCompleteEventArgs) _
         Handles dgvClassGrades.DataBindingComplete
         dgvClassGrades.ClearSelection()
@@ -258,7 +274,6 @@ Public Class frmprof
             .DefaultCellStyle.SelectionBackColor = Color.White
             .DefaultCellStyle.SelectionForeColor = Color.FromArgb(0, 100, 0)
 
-            ' header (replaces your old label row)
             .EnableHeadersVisualStyles = False
             .ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.DisableResizing
             .ColumnHeadersHeight = 45
@@ -303,17 +318,14 @@ Public Class frmprof
     End Sub
 
     Private Sub LoadRequests()
-        ' 1. Fetch live pending requests from MySQL
         Dim dtDb As DataTable = _revisionService.GetPendingRequestsByTeacher(_currentTeacherId)
 
-        ' 2. Build the DataTable structure expected by dgvRequests
         Dim dt As New DataTable()
         For Each col In {"RequestId", "EnrollmentId", "AssessmentId", "RequestedPointsVal",
-                 "Student", "Assessment", "CurrentGrade", "Requested", "Reason", "Status", "Action"}
+                         "Student", "Assessment", "CurrentGrade", "Requested", "Reason", "Status", "Action"}
             dt.Columns.Add(col)
         Next
 
-        ' 3. Populate rows from database query results
         For Each row As DataRow In dtDb.Rows
             Dim reqId As Integer = Convert.ToInt32(row("request_id"))
             Dim enrolId As Integer = Convert.ToInt32(row("enrollment_id"))
@@ -321,7 +333,6 @@ Public Class frmprof
             Dim studentName As String = row("student_name").ToString()
             Dim assessTitle As String = row("assessment_title").ToString()
 
-            ' Format Current Score nicely (e.g. 9/20 instead of 9.00/20.00)
             Dim currScore As String = "--"
             If Not IsDBNull(row("current_score")) AndAlso Not IsDBNull(row("total_score")) Then
                 Dim cScore As Double = Convert.ToDouble(row("current_score"))
@@ -329,7 +340,6 @@ Public Class frmprof
                 currScore = $"{cScore:0.##}/{tScore:0.##}"
             End If
 
-            ' Show "Re-check" if requested_points is NULL, otherwise "+Xpts"
             Dim reqPtsVal As Double = If(IsDBNull(row("requested_points")), 0, Convert.ToDouble(row("requested_points")))
             Dim reqPtsStr As String = If(IsDBNull(row("requested_points")), "Re-check", "+" & reqPtsVal.ToString("0.##") & "pts")
 
@@ -344,7 +354,6 @@ Public Class frmprof
         dgvRequests.ClearSelection()
     End Sub
 
-    ' Pending = yellow, Approved = green, Approve button = gray, Closed = dark gray
     Private Sub dgvRequests_CellFormatting(sender As Object, e As DataGridViewCellFormattingEventArgs) _
         Handles dgvRequests.CellFormatting
 
@@ -375,9 +384,8 @@ Public Class frmprof
         End If
     End Sub
 
-    ' Approve button click
     Private Sub dgvRequests_CellContentClick(sender As Object, e As DataGridViewCellEventArgs) _
-    Handles dgvRequests.CellContentClick
+        Handles dgvRequests.CellContentClick
 
         If e.RowIndex < 0 Then Exit Sub
         If dgvRequests.Columns(e.ColumnIndex).Name <> "Action" Then Exit Sub
@@ -386,22 +394,20 @@ Public Class frmprof
         If row.Cells("Action").Value.ToString() <> "Approve" Then Exit Sub
 
         If MessageBox.Show("Approve this revision request and update the student's grade?", "Confirm Revision Approval",
-                   MessageBoxButtons.YesNo, MessageBoxIcon.Question) = DialogResult.Yes Then
+                           MessageBoxButtons.YesNo, MessageBoxIcon.Question) = DialogResult.Yes Then
 
             Dim drv As DataRowView = DirectCast(row.DataBoundItem, DataRowView)
             If drv Is Nothing Then Exit Sub
 
             Dim requestId As Integer = Convert.ToInt32(drv("RequestId"))
 
-            ' Call updated Fix 5 method using requestId and teacherId
             Dim result As OperationResult = _revisionService.ApproveAndApplyRevision(requestId, _currentTeacherId)
 
-            ' If "re-check" request (no points specified), prompt professor for corrected score
             If Not result.Success AndAlso result.Message = "NEEDSCORE" Then
                 Dim txt As String = InputBox("Enter the corrected score for this assessment:", "Re-check")
                 Dim fixedScore As Double
                 If txt = "" OrElse Not Double.TryParse(txt, Globalization.NumberStyles.Float,
-                                                   Globalization.CultureInfo.InvariantCulture, fixedScore) Then Exit Sub
+                                                       Globalization.CultureInfo.InvariantCulture, fixedScore) Then Exit Sub
                 result = _revisionService.ApproveAndApplyRevision(requestId, _currentTeacherId, fixedScore)
             End If
 
@@ -470,16 +476,29 @@ Public Class frmprof
     End Sub
 
     Private Sub LoadAuditLogs()
+        Dim dtDb As DataTable = AuditService.GetLogsByActor("Teacher", _currentTeacherId)
+
         Dim dt As New DataTable()
         For Each c In {"Action", "Student", "Item", "DateTime", "ChangedBy"}
             dt.Columns.Add(c)
         Next
 
-        ' newest first
-        dt.Rows.Add("Grades Updated", "Condes, Hope Gian", "Midterms", "2026-08-24 09:14", "Prof. Jhun")
-        dt.Rows.Add("Revision Approved", "Mariano, Geoff Andrei", "Activity#2", "2026-08-23 15:40", "Prof. Jhun")
-        dt.Rows.Add("Grades Updated", "Lalata, Carl Jade", "Quiz#1", "2026-08-22 11:05", "Prof. Jhun")
-        dt.Rows.Add("Score Recorded", "Dela Cruz, Juan", "SW1", "2026-08-21 10:30", "Prof. Jhun")
+        If dtDb IsNot Nothing AndAlso dtDb.Rows.Count > 0 Then
+            For Each row As DataRow In dtDb.Rows
+                Dim actionName As String = Convert.ToString(row("action"))
+                Dim studentName As String = If(dtDb.Columns.Contains("student_name") AndAlso Not IsDBNull(row("student_name")), Convert.ToString(row("student_name")), "System")
+                Dim itemTitle As String = If(dtDb.Columns.Contains("item") AndAlso Not IsDBNull(row("item")), Convert.ToString(row("item")), "N/A")
+
+                Dim dtFormatted As String = DateTime.Now.ToString("yyyy-MM-dd HH:mm")
+                If dtDb.Columns.Contains("created_at") AndAlso Not IsDBNull(row("created_at")) Then
+                    dtFormatted = Convert.ToDateTime(row("created_at")).ToString("yyyy-MM-dd HH:mm")
+                End If
+
+                Dim changedBy As String = If(dtDb.Columns.Contains("actor_name") AndAlso Not IsDBNull(row("actor_name")), Convert.ToString(row("actor_name")), _currentTeacherId)
+
+                dt.Rows.Add(actionName, studentName, itemTitle, dtFormatted, changedBy)
+            Next
+        End If
 
         dgvAuditLogs.DataSource = dt
         dgvAuditLogs.ClearSelection()
@@ -495,17 +514,15 @@ Public Class frmprof
     '  ANALYTICS
     ' =====================================================
 
-    ' Sizes the two cards to fill the page and spreads the four tiles in one row
     Private Sub LayoutAnalytics()
         Const margin As Integer = 20
         Const gap As Integer = 20
-        Const minCardH As Integer = 400        ' never shorter than this (normal window size)
-        Const maxHeightRatio As Double = 0.5   ' 0.5 = cards end at the middle of the page
+        Const minCardH As Integer = 400
+        Const maxHeightRatio As Double = 0.5
 
-        ' visible height = bottom of the screen's working area minus where the form's client area starts
         Dim clientTopOnScreen As Integer = Me.PointToScreen(Point.Empty).Y
         Dim visibleH As Integer = Math.Min(Me.ClientSize.Height,
-            Screen.FromControl(Me).WorkingArea.Bottom - clientTopOnScreen)
+                               Screen.FromControl(Me).WorkingArea.Bottom - clientTopOnScreen)
 
         pnlAnalytics.SetBounds(pnlAnalytics.Left, pnlAnalytics.Top,
                                Me.ClientSize.Width - pnlAnalytics.Left,
@@ -513,8 +530,6 @@ Public Class frmprof
 
         Dim cardW As Integer = (pnlAnalytics.ClientSize.Width - 2 * margin - gap) \ 2
 
-        ' height: stop at the middle of the page, but never below minCardH
-        ' and never taller than the space that is actually available
         Dim availH As Integer = pnlAnalytics.ClientSize.Height - RoundedPanel4.Top - margin
         Dim cardH As Integer = CInt(pnlAnalytics.ClientSize.Height * maxHeightRatio) - RoundedPanel4.Top
         cardH = Math.Min(Math.Max(cardH, minCardH), availH)
@@ -524,7 +539,6 @@ Public Class frmprof
         RoundedPanel4.SetBounds(margin, RoundedPanel4.Top, cardW, cardH)
         RoundedPanel5.SetBounds(margin + cardW + gap, RoundedPanel4.Top, cardW, cardH)
 
-        ' four tiles in one row inside the left card
         Const tMargin As Integer = 12
         Const tGap As Integer = 12
         Dim tiles() As Control = {RoundedPanel6, RoundedPanel7, RoundedPanel8, RoundedPanel9}
@@ -538,7 +552,6 @@ Public Class frmprof
         Next
     End Sub
 
-    ' Creates one big number label inside a tile
     Private Function AddValueLabel(tile As Control, textColor As Color) As Label
         Dim l As New Label()
         l.AutoSize = False
@@ -560,7 +573,6 @@ Public Class frmprof
         lblAtRisk = AddValueLabel(RoundedPanel8, Color.DarkRed)
         lblTopScore = AddValueLabel(RoundedPanel9, green)
 
-        ' make each tile's caption (CLASS AVERAGE, PASSING, ...) fit and stay centered
         Dim tiles() As Control = {RoundedPanel6, RoundedPanel7, RoundedPanel8, RoundedPanel9}
         Dim valueLabels() As Label = {lblClassAvg, lblPassing, lblAtRisk, lblTopScore}
         For i As Integer = 0 To tiles.Length - 1
@@ -578,21 +590,189 @@ Public Class frmprof
     End Sub
 
     Private Sub LoadAnalytics()
-        ' sample data for now (matches the six students in Class Grades)
-        lblClassAvg.Text = "85.5"
-        lblPassing.Text = "5"
-        lblAtRisk.Text = "1"
-        lblTopScore.Text = "94.2"
+        Dim classId As Integer = SelectedClassId()
+        If classId = 0 Then
+            ResetAnalyticsUI()
+            Return
+        End If
+
+        ' 1. Query Class Performance Summary Tiles
+        Dim sqlSummary As String = "SELECT " &
+                                  "    IFNULL(AVG(running_grade), 0) AS class_avg, " &
+                                  "    IFNULL(SUM(CASE WHEN running_grade >= 75.0 THEN 1 ELSE 0 END), 0) AS passing_count, " &
+                                  "    IFNULL(SUM(CASE WHEN running_grade < 75.0 AND running_grade IS NOT NULL THEN 1 ELSE 0 END), 0) AS at_risk_count, " &
+                                  "    IFNULL(MAX(running_grade), 0) AS top_score " &
+                                  "FROM enrollment " &
+                                  "WHERE class_id = @ClassId"
+
+        Dim dtSummary As DataTable = DatabaseHelper.ExecuteQuery(sqlSummary, New MySqlParameter() {New MySqlParameter("@ClassId", classId)})
+
+        If dtSummary IsNot Nothing AndAlso dtSummary.Rows.Count > 0 Then
+            Dim row As DataRow = dtSummary.Rows(0)
+            Dim avgVal As Double = Convert.ToDouble(row("class_avg"))
+            Dim passVal As Integer = Convert.ToInt32(row("passing_count"))
+            Dim riskVal As Integer = Convert.ToInt32(row("at_risk_count"))
+            Dim topVal As Double = Convert.ToDouble(row("top_score"))
+
+            If lblClassAvg IsNot Nothing Then lblClassAvg.Text = If(avgVal > 0, avgVal.ToString("0.0"), "--")
+            If lblPassing IsNot Nothing Then lblPassing.Text = passVal.ToString()
+            If lblAtRisk IsNot Nothing Then lblAtRisk.Text = riskVal.ToString()
+            If lblTopScore IsNot Nothing Then lblTopScore.Text = If(topVal > 0, topVal.ToString("0.0"), "--")
+        Else
+            ResetAnalyticsUI()
+        End If
+
+        ' 2. Query Averages by Assessment Type
+        Dim sqlTypes As String = "SELECT " &
+                                "    LOWER(a.assessment_type) AS type_name, " &
+                                "    IFNULL(AVG((sg.score / a.total_score) * 100.0), 0) AS avg_pct " &
+                                "FROM studentgrade sg " &
+                                "JOIN assessment a ON sg.assessment_id = a.assessment_id " &
+                                "WHERE a.class_id = @ClassId AND sg.score IS NOT NULL AND a.total_score > 0 " &
+                                "GROUP BY LOWER(a.assessment_type)"
+
+        Dim dtTypes As DataTable = DatabaseHelper.ExecuteQuery(sqlTypes, New MySqlParameter() {New MySqlParameter("@ClassId", classId)})
+
+        Dim quizAvg As Integer = 0
+        Dim actAvg As Integer = 0
+        Dim examAvg As Integer = 0
+        Dim projAvg As Integer = 0
+
+        If dtTypes IsNot Nothing Then
+            For Each r As DataRow In dtTypes.Rows
+                Dim tName As String = r("type_name").ToString().ToLower()
+                Dim pct As Integer = CInt(Math.Round(Convert.ToDouble(r("avg_pct"))))
+
+                If tName.Contains("quiz") Then
+                    quizAvg = pct
+                ElseIf tName.Contains("act") OrElse tName.Contains("seatwork") OrElse tName.Contains("homework") OrElse tName.Contains("lab") Then
+                    actAvg = pct
+                ElseIf tName.Contains("exam") OrElse tName.Contains("midterm") OrElse tName.Contains("final") OrElse tName.Contains("test") Then
+                    examAvg = pct
+                ElseIf tName.Contains("proj") Then
+                    projAvg = pct
+                End If
+            Next
+        End If
+
+        SetTypeBars(quizAvg, actAvg, examAvg, projAvg)
     End Sub
 
+    Private Sub ResetAnalyticsUI()
+        If lblClassAvg IsNot Nothing Then lblClassAvg.Text = "--"
+        If lblPassing IsNot Nothing Then lblPassing.Text = "0"
+        If lblAtRisk IsNot Nothing Then lblAtRisk.Text = "0"
+        If lblTopScore IsNot Nothing Then lblTopScore.Text = "--"
+        SetTypeBars(0, 0, 0, 0)
+    End Sub
+    Private Sub SetAnalyticsTiles(avgVal As Double, passCount As Integer, riskCount As Integer, topVal As Double)
+        If lblClassAvg IsNot Nothing Then lblClassAvg.Text = If(avgVal > 0, avgVal.ToString("0.0"), "--")
+        If lblPassing IsNot Nothing Then lblPassing.Text = passCount.ToString()
+        If lblAtRisk IsNot Nothing Then lblAtRisk.Text = riskCount.ToString()
+        If lblTopScore IsNot Nothing Then lblTopScore.Text = If(topVal > 0, topVal.ToString("0.0"), "--")
+    End Sub
+
+    Private Sub SetTypeBars(quizPct As Integer, actPct As Integer, examPct As Integer, projPct As Integer)
+        Dim container As Control = If(RoundedPanel5, pnlAnalytics)
+        If container Is Nothing Then Return
+
+        Dim targetPcts() As Integer = {quizPct, actPct, examPct, projPct}
+        Dim catKeys() As String = {"quiz", "act", "exam", "proj"}
+        Dim allControls As List(Of Control) = GetAllNestedControls(container)
+
+        ' 1. Check for CustomProgressBar controls if present
+        Dim progressControls = allControls.Where(Function(c) _
+            c.GetType().Name.ToLower().Contains("progress") OrElse
+            c.GetType().GetProperty("Value") IsNot Nothing
+        ).OrderBy(Function(c) c.PointToScreen(Point.Empty).Y).ToList()
+
+        If progressControls.Count >= 4 Then
+            For i As Integer = 0 To 3
+                Dim ctrl = progressControls(i)
+                Dim val = Math.Max(0, Math.Min(100, targetPcts(i)))
+                Dim propValue = ctrl.GetType().GetProperty("Value")
+                If propValue IsNot Nothing AndAlso propValue.CanWrite Then
+                    Try
+                        propValue.SetValue(ctrl, Convert.ChangeType(val, propValue.PropertyType), Nothing)
+                    Catch
+                    End Try
+                End If
+                ctrl.Text = $"{val}%"
+                ctrl.Visible = True
+                ctrl.Refresh()
+            Next
+        End If
+
+        ' 2. Screen Coordinate Row-Matching via PointToScreen
+        For i As Integer = 0 To 3
+            Dim key As String = catKeys(i)
+            Dim val As Integer = targetPcts(i)
+
+            ' Locate Category Title ("Quizzes", "Activities", "Exams", "Projects")
+            Dim headerLbl As Label = Nothing
+            For Each c As Control In allControls
+                If TypeOf c Is Label Then
+                    Dim t As String = c.Text.ToLower()
+                    If t.Contains(key) AndAlso Not t.Contains("%") AndAlso Not IsNumeric(t.Trim()) Then
+                        headerLbl = DirectCast(c, Label)
+                        Exit For
+                    End If
+                End If
+            Next
+
+            If headerLbl IsNot Nothing Then
+                Dim headerY As Integer = headerLbl.PointToScreen(Point.Empty).Y
+
+                ' Update controls on the exact same row (within 30px screen height)
+                For Each c As Control In allControls
+                    If c IsNot headerLbl Then
+                        Dim cY As Integer = c.PointToScreen(Point.Empty).Y
+                        If Math.Abs(cY - headerY) <= 30 Then
+                            c.Visible = True
+
+                            ' Update Percentage Text Label
+                            If TypeOf c Is Label Then
+                                Dim lbl As Label = DirectCast(c, Label)
+                                Dim lt As String = lbl.Text.ToLower()
+                                If Not lt.Contains(key) OrElse lt.Contains("%") OrElse IsNumeric(lt) OrElse lt = "--" Then
+                                    lbl.Text = $"{val}%"
+                                End If
+                            End If
+
+                            ' Resize Fill Bar Panel
+                            If TypeOf c Is Panel AndAlso c.Parent IsNot Nothing AndAlso c.Parent IsNot container Then
+                                Dim maxW As Integer = c.Parent.ClientSize.Width - c.Parent.Padding.Horizontal
+                                If maxW > 20 Then
+                                    c.Width = Math.Max(5, CInt(maxW * val / 100.0))
+                                End If
+                            End If
+                        End If
+                    End If
+                Next
+            End If
+        Next
+    End Sub
+
+    Private Function GetAllNestedControls(parent As Control) As List(Of Control)
+        Dim list As New List(Of Control)()
+        If parent Is Nothing Then Return list
+        For Each c As Control In parent.Controls
+            list.Add(c)
+            If c.HasChildren Then list.AddRange(GetAllNestedControls(c))
+        Next
+        Return list
+    End Function
+
+
+
+
+
     ' =====================================================
-    '  GENERAL
+    '  GENERAL & CLASS LOADING
     ' =====================================================
 
     Private Sub btnLogout_Click(sender As Object, e As EventArgs) Handles btnLogout.Click
         AppSession.ClearSession()
-
-        ' 2. Re-open login form and close current dashboard
         Dim loginForm As New frmlogin()
         loginForm.Show()
         Me.Close()
@@ -604,40 +784,24 @@ Public Class frmprof
         LayoutAnalytics()
     End Sub
 
-    ' =====================================================
-    '  Designer-generated stubs (safe to leave as they are)
-    ' =====================================================
-
-    Private Sub ComboBox1_SelectedIndexChanged(sender As Object, e As EventArgs) Handles ComboBox1.SelectedIndexChanged
-        Dim classId As Integer = SelectedClassId()
-        If classId = 0 Then Exit Sub
-
-        ' Load students enrolled in the selected class
-        Dim students As DataTable = _gradeService.GetEnrollmentsByClass(classId, _currentTeacherId)
-        students.Columns.Add("Display", GetType(String), "student_id + ' - ' + full_name")
-        ComboBox2.DataSource = students
-        ComboBox2.DisplayMember = "Display"
-        ComboBox2.ValueMember = "enrollment_id"
-
-        ' Load assessments created for the selected class
-        Dim assessments As DataTable = _gradeService.GetAssessmentsByClass(classId, _currentTeacherId)
-        assessments.Columns.Add("Display", GetType(String), "term + ' - ' + title")
-        ComboBox4.DataSource = assessments
-        ComboBox4.DisplayMember = "Display"
-        ComboBox4.ValueMember = "assessment_id"
-
-        TextBox1.Clear()
-        If Not isLoading Then LoadClassGrades()
-    End Sub
-
     Private Sub LoadTeacherInfo()
         lblProfName.Text = AppSession.CurrentUser.FullName
 
         Dim classes As DataTable = _gradeService.GetClassesByTeacher(_currentTeacherId)
-        classes.Columns.Add("Display", GetType(String), "course_code + ' - ' + section")
-        ComboBox1.DataSource = classes
-        ComboBox1.DisplayMember = "Display"
-        ComboBox1.ValueMember = "class_id"
+        If classes IsNot Nothing Then
+            If Not classes.Columns.Contains("Display") Then
+                classes.Columns.Add("Display", GetType(String), "course_code + ' - ' + section")
+            End If
+            ComboBox1.DataSource = classes
+            ComboBox1.DisplayMember = "Display"
+            ComboBox1.ValueMember = "class_id"
+
+            ' Force initial load of students & assessments for the first class
+            If ComboBox1.Items.Count > 0 Then
+                ComboBox1.SelectedIndex = 0
+                ComboBox1_SelectedIndexChanged(Nothing, EventArgs.Empty)
+            End If
+        End If
     End Sub
 
     Private Function SelectedClassId() As Integer
@@ -646,59 +810,199 @@ Public Class frmprof
         Return Convert.ToInt32(drv("class_id"))
     End Function
 
-    Private Sub lblEntryTitle_Click(sender As Object, e As EventArgs)
+    Private Sub ComboBox1_SelectedIndexChanged(sender As Object, e As EventArgs) Handles ComboBox1.SelectedIndexChanged
+        Dim classId As Integer = SelectedClassId()
+        If classId = 0 Then Exit Sub
 
+        ' 1. Load enrolled students
+        Dim students As DataTable = _gradeService.GetEnrollmentsByClass(classId, _currentTeacherId)
+        If students IsNot Nothing Then
+            If Not students.Columns.Contains("Display") Then
+                students.Columns.Add("Display", GetType(String), "student_id + ' - ' + full_name")
+            End If
+            ComboBox2.DataSource = students
+            ComboBox2.DisplayMember = "Display"
+            ComboBox2.ValueMember = "enrollment_id"
+        Else
+            ComboBox2.DataSource = Nothing
+        End If
+
+        ' 2. Load assessments
+        Dim assessments As DataTable = _gradeService.GetAssessmentsByClass(classId)
+        If assessments IsNot Nothing AndAlso assessments.Rows.Count > 0 Then
+            ComboBox4.DataSource = assessments
+            ComboBox4.DisplayMember = "title"
+            ComboBox4.ValueMember = "assessment_id"
+        Else
+            ComboBox4.DataSource = Nothing
+        End If
+
+        ' 3. Refresh right-side student profile card & class analytics
+        UpdateSelectedStudentDisplay()
+        LoadAnalytics()
     End Sub
 
-    Private Sub Label2_Click(sender As Object, e As EventArgs)
+    ' =====================================================
+    '  RECORD SCORES & RIGHT PANEL SCORE CARD
+    ' =====================================================
 
+    Private Sub InitRightPanelReferences()
+        If _isRightPanelInitialized Then Return
+
+        For Each ctrl As Control In GetAllControls(pnlRecordScores)
+            If TypeOf ctrl Is Label Then
+                Dim lbl As Label = DirectCast(ctrl, Label)
+                If _lblRightStudentName Is Nothing AndAlso (lbl.Text.Contains("Lalata") OrElse lbl.Name.Equals("lblStudentNameDisplay", StringComparison.OrdinalIgnoreCase)) Then
+                    _lblRightStudentName = lbl
+                ElseIf _lblRightStudentId Is Nothing AndAlso (lbl.Text.Contains("25-0676") OrElse lbl.Name.Equals("lblStudentIdDisplay", StringComparison.OrdinalIgnoreCase)) Then
+                    _lblRightStudentId = lbl
+                ElseIf _pnlRightScoresContainer Is Nothing AndAlso (lbl.Text.StartsWith("SW1") OrElse lbl.Text.StartsWith("Quiz") OrElse lbl.Text.StartsWith("18/20")) Then
+                    _pnlRightScoresContainer = lbl.Parent
+                End If
+            End If
+        Next
+
+        If _pnlRightScoresContainer Is Nothing Then
+            For Each ctrl As Control In pnlRecordScores.Controls
+                If ctrl.HasChildren AndAlso ctrl.Width > 200 AndAlso Not ContainsControl(ctrl, ComboBox2) Then
+                    Dim innerPanels = ctrl.Controls.OfType(Of Panel)().ToList()
+                    If innerPanels.Count > 0 Then
+                        _pnlRightScoresContainer = innerPanels(0)
+                    Else
+                        _pnlRightScoresContainer = ctrl
+                    End If
+                    Exit For
+                End If
+            Next
+        End If
+
+        _isRightPanelInitialized = True
     End Sub
 
-    Private Sub cboStudent_SelectedIndexChanged(sender As Object, e As EventArgs)
-
+    Private Sub ComboBox2_SelectedIndexChanged(sender As Object, e As EventArgs) Handles ComboBox2.SelectedIndexChanged
+        UpdateSelectedStudentDisplay()
     End Sub
 
-    Private Sub Label18_Click(sender As Object, e As EventArgs)
+    Private Sub UpdateSelectedStudentDisplay()
+        If ComboBox2.SelectedItem Is Nothing Then Return
 
+        InitRightPanelReferences()
+
+        Dim studentId As String = ""
+        Dim fullName As String = ""
+        Dim enrollmentId As Integer = 0
+
+        If TypeOf ComboBox2.SelectedItem Is DataRowView Then
+            Dim drv As DataRowView = DirectCast(ComboBox2.SelectedItem, DataRowView)
+            studentId = Convert.ToString(drv("student_id"))
+            fullName = Convert.ToString(drv("full_name"))
+            If drv.Row.Table.Columns.Contains("enrollment_id") AndAlso Not IsDBNull(drv("enrollment_id")) Then
+                enrollmentId = Convert.ToInt32(drv("enrollment_id"))
+            End If
+        Else
+            Dim text As String = ComboBox2.SelectedItem.ToString()
+            Dim parts As String() = text.Split(New String() {" - "}, StringSplitOptions.None)
+            If parts.Length >= 2 Then
+                studentId = parts(0).Trim()
+                fullName = parts(1).Trim()
+            Else
+                studentId = text.Trim()
+                fullName = text.Trim()
+            End If
+        End If
+
+        If String.IsNullOrEmpty(studentId) Then Return
+
+        If _lblRightStudentName IsNot Nothing Then _lblRightStudentName.Text = fullName
+        If _lblRightStudentId IsNot Nothing Then _lblRightStudentId.Text = studentId
+
+        Dim classId As Integer = SelectedClassId()
+        RefreshRightScoresList(studentId, classId, enrollmentId)
     End Sub
 
-    Private Sub Label26_Click(sender As Object, e As EventArgs)
+    Private Sub RefreshRightScoresList(studentId As String, classId As Integer, enrollmentId As Integer)
+        If _pnlRightScoresContainer Is Nothing Then Return
 
+        _pnlRightScoresContainer.Controls.Clear()
+
+        Dim dt As DataTable = Nothing
+        If classId > 0 Then
+            dt = _gradeService.GetStudentScoresForClass(studentId, classId)
+        End If
+
+        If (dt Is Nothing OrElse dt.Rows.Count = 0) AndAlso enrollmentId > 0 Then
+            dt = _gradeService.GetGradesByEnrollment(enrollmentId)
+        End If
+
+        Dim topOffset As Integer = 10
+
+        If dt IsNot Nothing AndAlso dt.Rows.Count > 0 Then
+            For Each row As DataRow In dt.Rows
+                Dim title As String = Convert.ToString(row("title"))
+                Dim totalScore As Double = If(dt.Columns.Contains("total_score") AndAlso Not IsDBNull(row("total_score")), Convert.ToDouble(row("total_score")), 100)
+                Dim hasScore As Boolean = dt.Columns.Contains("score") AndAlso Not row("score") Is DBNull.Value
+                Dim scoreVal As Double = If(hasScore, Convert.ToDouble(row("score")), 0)
+
+                Dim scoreText As String = If(hasScore, $"{scoreVal:0.##}/{totalScore:0.##}", "N/A")
+
+                Dim lblTitle As New Label With {
+                    .Text = title,
+                    .Font = New Font("Segoe UI", 9.5F, FontStyle.Bold),
+                    .ForeColor = Color.FromArgb(40, 110, 50),
+                    .Location = New Point(15, topOffset + 3),
+                    .AutoSize = True
+                }
+
+                Dim lblBadge As New Label With {
+                    .Text = scoreText,
+                    .Font = New Font("Segoe UI", 9.0F, FontStyle.Bold),
+                    .BackColor = If(hasScore, Color.FromArgb(40, 167, 69), Color.FromArgb(70, 150, 80)),
+                    .ForeColor = Color.White,
+                    .TextAlign = ContentAlignment.MiddleCenter,
+                    .Size = New Size(80, 24),
+                    .Location = New Point(280, topOffset)
+                }
+
+                _pnlRightScoresContainer.Controls.Add(lblTitle)
+                _pnlRightScoresContainer.Controls.Add(lblBadge)
+                topOffset += 36
+            Next
+        Else
+            Dim lblEmpty As New Label With {
+                .Text = "No assessment scores recorded yet.",
+                .Font = New Font("Segoe UI", 9.0F, FontStyle.Italic),
+                .ForeColor = Color.Gray,
+                .Location = New Point(15, 15),
+                .AutoSize = True
+            }
+            _pnlRightScoresContainer.Controls.Add(lblEmpty)
+        End If
     End Sub
 
-    Private Sub Label47_Click(sender As Object, e As EventArgs) Handles Label47.Click
+    Private Function ContainsControl(parent As Control, target As Control) As Boolean
+        If parent Is Nothing OrElse target Is Nothing Then Return False
+        If parent Is target Then Return True
+        For Each c As Control In parent.Controls
+            If ContainsControl(c, target) Then Return True
+        Next
+        Return False
+    End Function
 
-    End Sub
+    Private Function GetAllControls(parent As Control) As List(Of Control)
+        Dim list As New List(Of Control)()
+        If parent Is Nothing Then Return list
+        For Each c As Control In parent.Controls
+            list.Add(c)
+            If c.HasChildren Then
+                list.AddRange(GetAllControls(c))
+            End If
+        Next
+        Return list
+    End Function
 
-    Private Sub Label55_Click(sender As Object, e As EventArgs) Handles Label55.Click
-
-    End Sub
-
-    Private Sub AssesmentTypetxt_Click(sender As Object, e As EventArgs)
-
-    End Sub
-
-    Private Sub Cmbo_BoxSW_SelectedIndexChanged(sender As Object, e As EventArgs) Handles cboSW1.SelectedIndexChanged
-
-    End Sub
-
-    Private Sub Label16_Click(sender As Object, e As EventArgs)
-
-    End Sub
-
-    Private Sub RoundedPanel1_Paint(sender As Object, e As PaintEventArgs) Handles RoundedPanel1.Paint
-
-    End Sub
-
-    Private Sub Label19_Click(sender As Object, e As EventArgs) Handles Label19.Click
-
-    End Sub
-
+    ' Action Buttons
     Private Sub CustomButton4_Click(sender As Object, e As EventArgs) Handles CustomButton4.Click
         frmGradebook.Show()
-    End Sub
-
-    Private Sub CustomButton6_Click(sender As Object, e As EventArgs) Handles CustomButton6.Click
     End Sub
 
     Private Sub CustomButton5_Click(sender As Object, e As EventArgs) Handles CustomButton5.Click
@@ -716,7 +1020,6 @@ Public Class frmprof
             Return
         End If
 
-        ' RecordScore saves the score, recalculates running grade, and logs audit in ONE transaction
         Dim res As OperationResult = _gradeService.RecordScore(
             Convert.ToInt32(stu("enrollment_id")), Convert.ToInt32(asm("assessment_id")),
             score, _currentTeacherId, "Recorded via Record Scores page")
@@ -724,8 +1027,122 @@ Public Class frmprof
         If res.Success Then
             MessageBox.Show(res.Message, "Saved", MessageBoxButtons.OK, MessageBoxIcon.Information)
             TextBox1.Clear()
+            UpdateSelectedStudentDisplay()
         Else
             MessageBox.Show(res.Message, "Could not save", MessageBoxButtons.OK, MessageBoxIcon.Error)
         End If
+    End Sub
+
+    Private Sub CustomButton6_Click(sender As Object, e As EventArgs) Handles CustomButton6.Click
+        If dgvClassGrades.Rows.Count = 0 Then
+            LoadClassGrades()
+        End If
+
+        If dgvClassGrades.Rows.Count = 0 Then
+            MessageBox.Show("No class grade records available to export.", "Export Notice", MessageBoxButtons.OK, MessageBoxIcon.Information)
+            Return
+        End If
+
+        Using sfd As New SaveFileDialog()
+            sfd.Filter = "CSV Files (*.csv)|*.csv|PDF Files (*.pdf)|*.pdf"
+            sfd.FileName = $"Class_Grades_{DateTime.Now:yyyyMMdd}.csv"
+
+            If sfd.ShowDialog() = DialogResult.OK Then
+                If sfd.FilterIndex = 1 Then
+                    ' CSV Export
+                    If _exportService.ExportToCSV(dgvClassGrades, sfd.FileName) Then
+                        MessageBox.Show("Class grades exported to CSV successfully!", "Export Complete", MessageBoxButtons.OK, MessageBoxIcon.Information)
+                    End If
+                Else
+                    ' PDF Export
+                    Dim printDoc As New Printing.PrintDocument()
+                    AddHandler printDoc.PrintPage, Sub(s, args)
+                                                       Dim g As Graphics = args.Graphics
+                                                       Dim titleFont As New Font("Segoe UI", 14, FontStyle.Bold)
+                                                       Dim headerFont As New Font("Segoe UI", 9, FontStyle.Bold)
+                                                       Dim bodyFont As New Font("Segoe UI", 9, FontStyle.Regular)
+
+                                                       Dim y As Integer = 40
+                                                       g.DrawString("DAUNTLESS WOLVES - CLASS GRADE REPORT", titleFont, Brushes.DarkGreen, 40, y)
+                                                       y += 28
+                                                       g.DrawString($"Faculty ID: {_currentTeacherId} | Generated: {DateTime.Now:MMM d, yyyy HH:mm}", bodyFont, Brushes.Gray, 40, y)
+                                                       y += 30
+
+                                                       ' Headers
+                                                       Dim x As Integer = 40
+                                                       For Each col As DataGridViewColumn In dgvClassGrades.Columns
+                                                           If col.Visible Then
+                                                               g.DrawString(col.HeaderText, headerFont, Brushes.DarkGreen, x, y)
+                                                               x += 75
+                                                           End If
+                                                       Next
+
+                                                       y += 20
+                                                       g.DrawLine(Pens.DarkGreen, 40, y, Math.Max(x, 650), y)
+                                                       y += 10
+
+                                                       ' Data Rows
+                                                       For Each row As DataGridViewRow In dgvClassGrades.Rows
+                                                           If Not row.IsNewRow Then
+                                                               x = 40
+                                                               For Each col As DataGridViewColumn In dgvClassGrades.Columns
+                                                                   If col.Visible Then
+                                                                       Dim cellVal As String = If(row.Cells(col.Index).Value IsNot Nothing, row.Cells(col.Index).Value.ToString(), "")
+                                                                       g.DrawString(cellVal, bodyFont, Brushes.Black, x, y)
+                                                                       x += 75
+                                                                   End If
+                                                               Next
+                                                               y += 22
+                                                           End If
+                                                       Next
+                                                   End Sub
+
+                    If _exportService.ExportToPDF(printDoc, sfd.FileName) Then
+                        MessageBox.Show("Class grades exported to PDF successfully!", "Export Complete", MessageBoxButtons.OK, MessageBoxIcon.Information)
+                    End If
+                End If
+            End If
+        End Using
+    End Sub
+
+    ' Designer stubs
+    Private Sub lblEntryTitle_Click(sender As Object, e As EventArgs)
+    End Sub
+
+    Private Sub Label2_Click(sender As Object, e As EventArgs)
+    End Sub
+
+    Private Sub cboStudent_SelectedIndexChanged(sender As Object, e As EventArgs)
+    End Sub
+
+    Private Sub Label18_Click(sender As Object, e As EventArgs)
+    End Sub
+
+    Private Sub Label26_Click(sender As Object, e As EventArgs)
+    End Sub
+
+    Private Sub Label47_Click(sender As Object, e As EventArgs) Handles Label47.Click
+    End Sub
+
+    Private Sub Label55_Click(sender As Object, e As EventArgs) Handles Label55.Click
+    End Sub
+
+    Private Sub AssesmentTypetxt_Click(sender As Object, e As EventArgs)
+    End Sub
+
+    Private Sub Cmbo_BoxSW_SelectedIndexChanged(sender As Object, e As EventArgs) Handles cboSW1.SelectedIndexChanged
+    End Sub
+
+    Private Sub Label16_Click(sender As Object, e As EventArgs)
+    End Sub
+
+    Private Sub RoundedPanel1_Paint(sender As Object, e As PaintEventArgs) Handles RoundedPanel1.Paint
+    End Sub
+
+    Private Sub Label19_Click(sender As Object, e As EventArgs) Handles Label19.Click
+    End Sub
+
+    Private Sub CustomButton7_Click(sender As Object, e As EventArgs) Handles CustomButton7.Click
+
     End Sub
 End Class
