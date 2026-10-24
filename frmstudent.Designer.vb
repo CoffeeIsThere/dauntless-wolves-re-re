@@ -176,7 +176,7 @@ Partial Class frmstudent
         ' Label3
         ' 
         Label3.AutoSize = True
-        Label3.Font = New Font("Segoe UI", 9.0F, FontStyle.Bold, GraphicsUnit.Point, CByte(0))
+        Label3.Font = New Font("Segoe UI", 9F, FontStyle.Bold, GraphicsUnit.Point, CByte(0))
         Label3.ForeColor = Color.White
         Label3.Location = New Point(7, 7)
         Label3.Name = "Label3"
@@ -220,7 +220,7 @@ Partial Class frmstudent
         ' 
         btnMyPerformance.BackColor = Color.Gainsboro
         btnMyPerformance.FlatStyle = FlatStyle.Flat
-        btnMyPerformance.Font = New Font("Segoe UI", 9.0F, FontStyle.Bold, GraphicsUnit.Point, CByte(0))
+        btnMyPerformance.Font = New Font("Segoe UI", 9F, FontStyle.Bold, GraphicsUnit.Point, CByte(0))
         btnMyPerformance.ForeColor = Color.DarkGreen
         btnMyPerformance.ImageAlign = ContentAlignment.MiddleLeft
         btnMyPerformance.Location = New Point(417, 14)
@@ -235,14 +235,14 @@ Partial Class frmstudent
         ' 
         btnRequestRevision.BackColor = Color.Gainsboro
         btnRequestRevision.FlatStyle = FlatStyle.Flat
-        btnRequestRevision.Font = New Font("Segoe UI", 9.0F, FontStyle.Bold, GraphicsUnit.Point, CByte(0))
+        btnRequestRevision.Font = New Font("Segoe UI", 9F, FontStyle.Bold, GraphicsUnit.Point, CByte(0))
         btnRequestRevision.ForeColor = Color.DarkGreen
         btnRequestRevision.ImageAlign = ContentAlignment.MiddleLeft
         btnRequestRevision.Location = New Point(259, 14)
         btnRequestRevision.Name = "btnRequestRevision"
         btnRequestRevision.Size = New Size(145, 35)
         btnRequestRevision.TabIndex = 6
-        btnRequestRevision.Text = "Request Revision"
+        btnRequestRevision.Text = "Request Clarification"
         btnRequestRevision.TextImageRelation = TextImageRelation.ImageBeforeText
         btnRequestRevision.UseVisualStyleBackColor = False
         ' 
@@ -281,9 +281,9 @@ Partial Class frmstudent
         ' pnlContent
         ' 
         pnlContent.BackColor = Color.White
+        pnlContent.Controls.Add(pnlRequestRevision)
         pnlContent.Controls.Add(pnlMyPerformance)
         pnlContent.Controls.Add(pnlMyGrades)
-        pnlContent.Controls.Add(pnlRequestRevision)
         pnlContent.Controls.Add(pnlGradeHistory)
         pnlContent.Controls.Add(Panel7)
         pnlContent.Dock = DockStyle.Fill
@@ -322,8 +322,8 @@ Partial Class frmstudent
         ' tlpbars
         ' 
         tlpbars.ColumnCount = 2
-        tlpbars.ColumnStyles.Add(New ColumnStyle(SizeType.Absolute, 110.0F))
-        tlpbars.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 100.0F))
+        tlpbars.ColumnStyles.Add(New ColumnStyle(SizeType.Absolute, 110F))
+        tlpbars.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 100F))
         tlpbars.Controls.Add(trackProject, 1, 3)
         tlpbars.Controls.Add(trackExam, 1, 2)
         tlpbars.Controls.Add(trackActivity, 1, 1)
@@ -337,11 +337,11 @@ Partial Class frmstudent
         tlpbars.Margin = New Padding(0)
         tlpbars.Name = "tlpbars"
         tlpbars.RowCount = 5
-        tlpbars.RowStyles.Add(New RowStyle(SizeType.Percent, 25.0F))
-        tlpbars.RowStyles.Add(New RowStyle(SizeType.Percent, 25.0F))
-        tlpbars.RowStyles.Add(New RowStyle(SizeType.Percent, 25.0F))
-        tlpbars.RowStyles.Add(New RowStyle(SizeType.Percent, 25.0F))
-        tlpbars.RowStyles.Add(New RowStyle(SizeType.Absolute, 20.0F))
+        tlpbars.RowStyles.Add(New RowStyle(SizeType.Percent, 25F))
+        tlpbars.RowStyles.Add(New RowStyle(SizeType.Percent, 25F))
+        tlpbars.RowStyles.Add(New RowStyle(SizeType.Percent, 25F))
+        tlpbars.RowStyles.Add(New RowStyle(SizeType.Percent, 25F))
+        tlpbars.RowStyles.Add(New RowStyle(SizeType.Absolute, 20F))
         tlpbars.Size = New Size(1164, 265)
         tlpbars.TabIndex = 18
         ' 
@@ -545,10 +545,10 @@ Partial Class frmstudent
         ' tlpstats
         ' 
         tlpstats.ColumnCount = 4
-        tlpstats.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 25.0F))
-        tlpstats.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 25.0F))
-        tlpstats.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 25.0F))
-        tlpstats.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 25.0F))
+        tlpstats.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 25F))
+        tlpstats.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 25F))
+        tlpstats.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 25F))
+        tlpstats.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 25F))
         tlpstats.Controls.Add(RoundedPanel6, 0, 0)
         tlpstats.Controls.Add(RoundedPanel8, 1, 0)
         tlpstats.Controls.Add(RoundedPanel7, 2, 0)
@@ -557,7 +557,7 @@ Partial Class frmstudent
         tlpstats.Location = New Point(20, 80)
         tlpstats.Name = "tlpstats"
         tlpstats.RowCount = 1
-        tlpstats.RowStyles.Add(New RowStyle(SizeType.Percent, 100.0F))
+        tlpstats.RowStyles.Add(New RowStyle(SizeType.Percent, 100F))
         tlpstats.Size = New Size(1164, 112)
         tlpstats.TabIndex = 21
         ' 
@@ -757,7 +757,7 @@ Partial Class frmstudent
         ' 
         Label10.AutoSize = True
         Label10.BackColor = Color.White
-        Label10.Font = New Font("Segoe UI", 18.0F, FontStyle.Bold, GraphicsUnit.Point, CByte(0))
+        Label10.Font = New Font("Segoe UI", 18F, FontStyle.Bold, GraphicsUnit.Point, CByte(0))
         Label10.ForeColor = Color.DarkGreen
         Label10.Location = New Point(72, 12)
         Label10.Name = "Label10"
@@ -798,7 +798,7 @@ Partial Class frmstudent
         ' 
         Label1.AutoSize = True
         Label1.BackColor = Color.WhiteSmoke
-        Label1.Font = New Font("Segoe UI", 18.0F, FontStyle.Bold, GraphicsUnit.Point, CByte(0))
+        Label1.Font = New Font("Segoe UI", 18F, FontStyle.Bold, GraphicsUnit.Point, CByte(0))
         Label1.ForeColor = Color.DarkGreen
         Label1.Location = New Point(144, 4)
         Label1.Name = "Label1"
@@ -870,7 +870,7 @@ Partial Class frmstudent
         ' cboterm
         ' 
         cboterm.DropDownStyle = ComboBoxStyle.DropDownList
-        cboterm.Font = New Font("Segoe UI Semibold", 9.0F, FontStyle.Bold, GraphicsUnit.Point, CByte(0))
+        cboterm.Font = New Font("Segoe UI Semibold", 9F, FontStyle.Bold, GraphicsUnit.Point, CByte(0))
         cboterm.ForeColor = Color.DarkGreen
         cboterm.FormattingEnabled = True
         cboterm.Location = New Point(370, 14)
@@ -915,16 +915,16 @@ Partial Class frmstudent
         ' 
         tlprevision.BackColor = Color.WhiteSmoke
         tlprevision.ColumnCount = 2
-        tlprevision.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 50.0F))
-        tlprevision.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 50.0F))
+        tlprevision.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 50F))
+        tlprevision.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 50F))
         tlprevision.Controls.Add(cardSubmit, 0, 0)
         tlprevision.Controls.Add(cardStatus, 1, 0)
         tlprevision.Dock = DockStyle.Fill
         tlprevision.Location = New Point(30, 40)
         tlprevision.Name = "tlprevision"
         tlprevision.RowCount = 1
-        tlprevision.RowStyles.Add(New RowStyle(SizeType.Percent, 100.0F))
-        tlprevision.RowStyles.Add(New RowStyle(SizeType.Absolute, 480.0F))
+        tlprevision.RowStyles.Add(New RowStyle(SizeType.Percent, 100F))
+        tlprevision.RowStyles.Add(New RowStyle(SizeType.Absolute, 480F))
         tlprevision.Size = New Size(1204, 467)
         tlprevision.TabIndex = 1
         ' 
@@ -1156,14 +1156,13 @@ Partial Class frmstudent
         ' cboclass
         ' 
         cboclass.BackColor = Color.White
-        cboclass.Font = New Font("Segoe UI Semibold", 9.0F, FontStyle.Bold, GraphicsUnit.Point, CByte(0))
+        cboclass.Font = New Font("Segoe UI Semibold", 9F, FontStyle.Bold, GraphicsUnit.Point, CByte(0))
         cboclass.ForeColor = Color.FromArgb(CByte(0), CByte(64), CByte(0))
         cboclass.FormattingEnabled = True
         cboclass.Location = New Point(71, 2)
         cboclass.Name = "cboclass"
         cboclass.Size = New Size(265, 23)
         cboclass.TabIndex = 0
-        cboclass.Text = "CS - 103 OBJECT ORIENTED PROGRAMMING"
         ' 
         ' pnlGradeHistory
         ' 
@@ -1322,7 +1321,7 @@ Partial Class frmstudent
         ' 
         ' frmstudent
         ' 
-        AutoScaleDimensions = New SizeF(7.0F, 15.0F)
+        AutoScaleDimensions = New SizeF(7F, 15F)
         AutoScaleMode = AutoScaleMode.Font
         ClientSize = New Size(1264, 681)
         Controls.Add(pnlContent)
