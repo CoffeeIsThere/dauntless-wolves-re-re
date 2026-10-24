@@ -16,6 +16,7 @@
     <None Remove="combined5.txt" />
     <None Remove="designer.txt" />
     <None Remove="New Text Document.txt" />
+    <None Remove="README.md" />
   </ItemGroup>
 
   <ItemGroup>

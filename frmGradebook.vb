@@ -1,4 +1,7 @@
-﻿Public Class frmGradebook
+﻿Imports System.Data
+Imports MySql.Data.MySqlClient
+
+Public Class frmGradebook
 
     ' ===== Grading setup (weights from the gradesheet; change here if needed) =====
     Private Const W_PART As Double = 5
@@ -21,6 +24,17 @@
         Public Group As String    ' "Quiz" or "CW"
     End Class
     Private items As New List(Of AssessItem)
+
+    ' Class info (from Add Class / imports)
+    Private Class ClassInfo
+        Public Code As String
+        Public Name As String
+        Public Schedule As String
+        Public Term As String
+        Public SY As String
+    End Class
+    Private classes As New Dictionary(Of String, ClassInfo)(StringComparer.OrdinalIgnoreCase)
+    Private classTip As New ToolTip()
 
     ' Highest possible score per Raw column (double-click a Raw header to change it)
     Private maxScores As New Dictionary(Of String, Double) From {{"ExamRaw", 100}}
@@ -86,7 +100,7 @@
 
             .EnableHeadersVisualStyles = False
             .ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.DisableResizing
-            .ColumnHeadersHeight = 56                                  ' CHANGED: fits 3-line headers like "Class Work (10%)"
+            .ColumnHeadersHeight = 56
             .ColumnHeadersBorderStyle = DataGridViewHeaderBorderStyle.Single
             With .ColumnHeadersDefaultCellStyle
                 .BackColor = DarkGreen
@@ -669,8 +683,35 @@
 
     End Sub
 
-    Private Sub btnAddClass_Click(sender As Object, e As EventArgs) Handles btnAddClass.Click
+    ' ===== Add Class =====
+    Private Function CodeExists(code As String) As Boolean
+        For Each it As Object In cboCourse.Items
+            If CStr(it).StartsWith(code & " - ", StringComparison.OrdinalIgnoreCase) Then Return True
+        Next
+        Return False
+    End Function
 
+    Private Sub btnAddClass_Click(sender As Object, e As EventArgs) Handles btnAddClass.Click
+        Dim info As ClassInfo = ShowClassDialog()
+        If info Is Nothing Then Return
+
+        Dim display As String = info.Code & " - " & info.Name
+        classes(info.Code) = info
+        cboCourse.Items.Add(display)
+        cboCourse.SelectedItem = display
+
+        ' TODO: save the class (code, name, schedule, term, SY) to your database
+    End Sub
+
+    ' Hover over the class box to see its schedule, term and school year
+    Private Sub cboCourse_SelectedIndexChanged(sender As Object, e As EventArgs) Handles cboCourse.SelectedIndexChanged
+        Dim code As String = SelectedClassCode()
+        If classes.ContainsKey(code) Then
+            Dim c As ClassInfo = classes(code)
+            classTip.SetToolTip(cboCourse, c.Schedule & vbLf & c.Term & ", SY " & c.SY)
+        Else
+            classTip.SetToolTip(cboCourse, "")
+        End If
     End Sub
 
     ' ===== Add Student: name goes into the grid, list re-sorts A-Z and renumbers =====
@@ -746,6 +787,9 @@
                 .Location = New Point(18, 12)
             }
             header.Controls.Add(lblTitle)
+            header.Controls.Add(MakeImportButton(dlg,
+                {"From file (CSV)...", "From MySQL (this class)..."},
+                Function(choice) ImportStudents(choice)))
 
             ' Surname
             Dim lblSurname As New Label() With {
@@ -928,6 +972,163 @@
         Return accepted
     End Function
 
+    Private Function ShowClassDialog() As ClassInfo
+        Dim dark As Color = Color.FromArgb(0, 100, 0)
+        Dim green As Color = Color.FromArgb(0, 191, 99)
+        Dim result As ClassInfo = Nothing
+
+        ' Default school year: June onward = this year to next year (Oct 2026 -> 2026-2027)
+        Dim y As Integer = Date.Today.Year
+        If Date.Today.Month < 6 Then y -= 1
+        Dim defaultSY As String = y & "-" & (y + 1)
+
+        Using dlg As New Form()
+            dlg.FormBorderStyle = FormBorderStyle.None
+            dlg.StartPosition = FormStartPosition.CenterParent
+            dlg.Size = New Size(380, 430)
+            dlg.BackColor = Color.White
+            dlg.ShowInTaskbar = False
+
+            AddHandler dlg.Paint,
+                Sub(s, ev)
+                    Using pen As New Pen(dark, 2)
+                        ev.Graphics.DrawRectangle(pen, 1, 1, dlg.Width - 2, dlg.Height - 2)
+                    End Using
+                End Sub
+
+            Dim header As New Panel() With {.Dock = DockStyle.Top, .Height = 48, .BackColor = dark}
+            header.Controls.Add(New Label() With {
+                .Text = "Add Class",
+                .ForeColor = Color.White,
+                .Font = New Font("Segoe UI Semibold", 12.0F),
+                .AutoSize = True,
+                .Location = New Point(18, 12)
+            })
+            header.Controls.Add(MakeImportButton(dlg,
+                {"From file (CSV)...", "From MySQL (approved classes)...", "Admin requests (approve / decline)..."},
+                Function(choice) ImportClasses(choice)))
+
+            Dim grey As Color = Color.Gray
+            Dim small As New Font("Segoe UI", 9.0F)
+            Dim big As New Font("Segoe UI", 12.0F)
+
+            ' Class Code
+            Dim lblCode As New Label() With {.Text = "Class Code (e.g. IT 112)", .ForeColor = grey, .Font = small, .AutoSize = True, .Location = New Point(24, 62)}
+            Dim txtCode As New TextBox() With {.BorderStyle = BorderStyle.None, .Font = big, .Location = New Point(24, 84), .Width = 332, .MaxLength = 20}
+            Dim lineCode As New Panel() With {.BackColor = green, .Location = New Point(24, 112), .Size = New Size(332, 2)}
+
+            ' Class Name
+            Dim lblName As New Label() With {.Text = "Class Name", .ForeColor = grey, .Font = small, .AutoSize = True, .Location = New Point(24, 128)}
+            Dim txtName As New TextBox() With {.BorderStyle = BorderStyle.None, .Font = big, .Location = New Point(24, 150), .Width = 332, .MaxLength = 80}
+            Dim lineName As New Panel() With {.BackColor = green, .Location = New Point(24, 178), .Size = New Size(332, 2)}
+
+            ' Schedule
+            Dim lblSched As New Label() With {.Text = "Schedule (e.g. MWF 8:00-9:30 AM)", .ForeColor = grey, .Font = small, .AutoSize = True, .Location = New Point(24, 194)}
+            Dim txtSched As New TextBox() With {.BorderStyle = BorderStyle.None, .Font = big, .Location = New Point(24, 216), .Width = 332, .MaxLength = 60}
+            Dim lineSched As New Panel() With {.BackColor = green, .Location = New Point(24, 244), .Size = New Size(332, 2)}
+
+            ' Term (pick or type) + SY side by side
+            Dim lblTerm As New Label() With {.Text = "Term", .ForeColor = grey, .Font = small, .AutoSize = True, .Location = New Point(24, 260)}
+            Dim cboTerm As New ComboBox() With {
+                .DropDownStyle = ComboBoxStyle.DropDown,
+                .FlatStyle = FlatStyle.Flat,
+                .BackColor = Color.White,
+                .Font = New Font("Segoe UI", 11.0F),
+                .Location = New Point(24, 282),
+                .Width = 190,
+                .MaxLength = 20
+            }
+            cboTerm.Items.AddRange({"1st Semester", "2nd Semester", "Midyear", "Summer"})
+            Dim lineTerm As New Panel() With {.BackColor = green, .Location = New Point(24, 312), .Size = New Size(190, 2)}
+
+            Dim lblSY As New Label() With {.Text = "SY", .ForeColor = grey, .Font = small, .AutoSize = True, .Location = New Point(232, 260)}
+            Dim txtSY As New TextBox() With {.Text = defaultSY, .BorderStyle = BorderStyle.None, .Font = big, .Location = New Point(232, 284), .Width = 124, .MaxLength = 9}
+            Dim lineSY As New Panel() With {.BackColor = green, .Location = New Point(232, 312), .Size = New Size(124, 2)}
+
+            Dim lblError As New Label() With {.Text = "", .ForeColor = Color.Firebrick, .Font = small, .AutoSize = True, .Location = New Point(24, 326)}
+
+            Dim btnOk As New Button() With {
+                .Text = "Add",
+                .FlatStyle = FlatStyle.Flat,
+                .BackColor = dark,
+                .ForeColor = Color.White,
+                .Font = New Font("Segoe UI Semibold", 10.0F),
+                .Size = New Size(100, 36),
+                .Location = New Point(256, 372),
+                .Cursor = Cursors.Hand
+            }
+            btnOk.FlatAppearance.BorderSize = 0
+
+            Dim btnCancel As New Button() With {
+                .Text = "Cancel",
+                .DialogResult = DialogResult.Cancel,
+                .FlatStyle = FlatStyle.Flat,
+                .BackColor = Color.White,
+                .ForeColor = dark,
+                .Font = New Font("Segoe UI Semibold", 10.0F),
+                .Size = New Size(100, 36),
+                .Location = New Point(146, 372),
+                .Cursor = Cursors.Hand
+            }
+            btnCancel.FlatAppearance.BorderColor = dark
+            btnCancel.FlatAppearance.BorderSize = 1
+
+            AddHandler btnOk.Click,
+                Sub(s, ev)
+                    Dim code As String = System.Text.RegularExpressions.Regex.Replace(txtCode.Text.Trim(), "\s+", " ").ToUpper()
+                    Dim sy As String = txtSY.Text.Trim()
+                    Dim m As System.Text.RegularExpressions.Match =
+                        System.Text.RegularExpressions.Regex.Match(sy, "^(\d{4})-(\d{4})$")
+
+                    If code = "" Then
+                        lblError.Text = "Please enter the class code."
+                        txtCode.Focus()
+                    ElseIf code.Contains(" - ") Then
+                        lblError.Text = "Class code can't contain "" - ""."
+                        txtCode.Focus()
+                    ElseIf CodeExists(code) Then
+                        lblError.Text = "That class code already exists."
+                        txtCode.Focus()
+                    ElseIf txtName.Text.Trim() = "" Then
+                        lblError.Text = "Please enter the class name."
+                        txtName.Focus()
+                    ElseIf txtSched.Text.Trim() = "" Then
+                        lblError.Text = "Please enter the schedule."
+                        txtSched.Focus()
+                    ElseIf cboTerm.Text.Trim() = "" Then
+                        lblError.Text = "Please enter the term."
+                        cboTerm.Focus()
+                    ElseIf Not m.Success OrElse CInt(m.Groups(2).Value) <> CInt(m.Groups(1).Value) + 1 Then
+                        lblError.Text = "SY must look like 2026-2027."
+                        txtSY.Focus()
+                    Else
+                        result = New ClassInfo With {
+                            .Code = code,
+                            .Name = txtName.Text.Trim(),
+                            .Schedule = txtSched.Text.Trim(),
+                            .Term = cboTerm.Text.Trim(),
+                            .SY = sy
+                        }
+                        dlg.DialogResult = DialogResult.OK
+                    End If
+                End Sub
+
+            dlg.Controls.AddRange({lblCode, txtCode, lineCode,
+                                   lblName, txtName, lineName,
+                                   lblSched, txtSched, lineSched,
+                                   lblTerm, cboTerm, lineTerm,
+                                   lblSY, txtSY, lineSY,
+                                   lblError, btnOk, btnCancel, header})
+            dlg.AcceptButton = btnOk
+            dlg.CancelButton = btnCancel
+            dlg.ActiveControl = txtCode
+
+            dlg.ShowDialog(Me)
+        End Using
+
+        Return result
+    End Function
+
     Private Function ShowAssessmentDialog(ByRef type As String, ByRef grp As String,
                                           ByRef maxScore As Double) As Boolean
         Dim dark As Color = Color.FromArgb(0, 100, 0)
@@ -960,6 +1161,9 @@
                 .Location = New Point(18, 12)
             }
             header.Controls.Add(lblTitle)
+            header.Controls.Add(MakeImportButton(dlg,
+                {"From file (CSV)...", "From MySQL (this class)..."},
+                Function(choice) ImportAssessments(choice)))
 
             ' Type: pick a suggestion OR type your own
             Dim lblType As New Label() With {
@@ -1217,5 +1421,427 @@
             End If
             Return ""
         End Using
+    End Function
+
+    ' ================= IMPORT / MYSQL / ADMIN =================
+    Private Function GetConnectionString() As String
+        ' TODO: replace with your real connection (or read it from dbconfig.json)
+        Return "Server=localhost;Port=3306;Database=gradebook;Uid=root;Pwd=;"
+    End Function
+
+    ' "IT 112 - Information Assurance" -> "IT 112"
+    Private Function SelectedClassCode() As String
+        If cboCourse.SelectedIndex = -1 Then Return ""
+        Dim s As String = Convert.ToString(cboCourse.SelectedItem)
+        Dim i As Integer = s.IndexOf(" - ")
+        Return If(i > 0, s.Substring(0, i), s)
+    End Function
+
+    ' pairs = "@name", value, "@name", value ...
+    Private Function RunQuery(sql As String, ParamArray pairs() As Object) As DataTable
+        Try
+            Using con As New MySqlConnection(GetConnectionString())
+                Using cmd As New MySqlCommand(sql, con)
+                    For i As Integer = 0 To pairs.Length - 2 Step 2
+                        cmd.Parameters.AddWithValue(CStr(pairs(i)), pairs(i + 1))
+                    Next
+                    Dim dt As New DataTable()
+                    Using da As New MySqlDataAdapter(cmd)
+                        da.Fill(dt)
+                    End Using
+                    Return dt
+                End Using
+            End Using
+        Catch ex As Exception
+            MessageBox.Show("Could not read from MySQL: " & ex.Message, "Digital Gradebook")
+            Return Nothing
+        End Try
+    End Function
+
+    Private Function RunNonQuery(sql As String, ParamArray pairs() As Object) As Boolean
+        Try
+            Using con As New MySqlConnection(GetConnectionString())
+                Using cmd As New MySqlCommand(sql, con)
+                    For i As Integer = 0 To pairs.Length - 2 Step 2
+                        cmd.Parameters.AddWithValue(CStr(pairs(i)), pairs(i + 1))
+                    Next
+                    con.Open()
+                    cmd.ExecuteNonQuery()
+                End Using
+            End Using
+            Return True
+        Catch ex As Exception
+            MessageBox.Show("Could not update MySQL: " & ex.Message, "Digital Gradebook")
+            Return False
+        End Try
+    End Function
+
+    ' ----- CSV from File Explorer -----
+    Private Function PickCsv() As String
+        Using ofd As New OpenFileDialog()
+            ofd.Title = "Import from file"
+            ofd.Filter = "CSV files (*.csv)|*.csv|Text files (*.txt)|*.txt"
+            If ofd.ShowDialog() = DialogResult.OK Then Return ofd.FileName
+        End Using
+        Return ""
+    End Function
+
+    Private Function ReadCsv(path As String) As List(Of String())
+        Dim rows As New List(Of String())
+        For Each line As String In System.IO.File.ReadAllLines(path, System.Text.Encoding.UTF8)
+            If line.Trim() = "" Then Continue For
+            Dim fields As New List(Of String)
+            Dim sb As New System.Text.StringBuilder()
+            Dim inQuotes As Boolean = False
+            Dim i As Integer = 0
+            Do While i < line.Length
+                Dim ch As Char = line(i)
+                If ch = """"c Then
+                    If inQuotes AndAlso i + 1 < line.Length AndAlso line(i + 1) = """"c Then
+                        sb.Append(""""c)
+                        i += 1
+                    Else
+                        inQuotes = Not inQuotes
+                    End If
+                ElseIf ch = ","c AndAlso Not inQuotes Then
+                    fields.Add(sb.ToString().Trim())
+                    sb.Clear()
+                Else
+                    sb.Append(ch)
+                End If
+                i += 1
+            Loop
+            fields.Add(sb.ToString().Trim())
+            rows.Add(fields.ToArray())
+        Next
+        Return rows
+    End Function
+
+    ' Picks a file, reads it, and drops the header row if the first cell matches one of headerWords
+    Private Function LoadCsvRows(ParamArray headerWords() As String) As List(Of String())
+        Dim path As String = PickCsv()
+        If path = "" Then Return Nothing
+        Try
+            Dim rows As List(Of String()) = ReadCsv(path)
+            If rows.Count > 0 Then
+                Dim first As String = rows(0)(0).Replace(" ", "").ToLower()
+                If Array.IndexOf(headerWords, first) >= 0 Then rows.RemoveAt(0)
+            End If
+            Return rows
+        Catch ex As Exception
+            MessageBox.Show("Could not read the file: " & ex.Message, "Digital Gradebook")
+            Return Nothing
+        End Try
+    End Function
+
+    ' ----- The "Import" button that goes inside each popup header -----
+    Private Function MakeImportButton(dlg As Form, choices As String(),
+                                      onPick As Func(Of String, Boolean)) As Button
+        Dim btn As New Button() With {
+            .Text = "Import " & ChrW(9662),
+            .FlatStyle = FlatStyle.Flat,
+            .BackColor = DarkGreen,
+            .ForeColor = Color.White,
+            .Font = New Font("Segoe UI Semibold", 9.0F),
+            .Size = New Size(92, 28),
+            .Location = New Point(dlg.Width - 92 - 18, 10),
+            .Cursor = Cursors.Hand
+        }
+        btn.FlatAppearance.BorderColor = Color.White
+        btn.FlatAppearance.BorderSize = 1
+        btn.FlatAppearance.MouseOverBackColor = Color.FromArgb(0, 130, 60)
+
+        AddHandler btn.Click,
+            Sub(s, ev)
+                Dim menu As New ContextMenuStrip()
+                menu.Font = New Font("Segoe UI", 10.0F)
+                For Each c As String In choices
+                    Dim choice As String = c
+                    Dim item As ToolStripItem = menu.Items.Add(choice)
+                    AddHandler item.Click,
+                        Sub(s2, e2)
+                            If onPick(choice) Then dlg.DialogResult = DialogResult.Cancel
+                        End Sub
+                Next
+                menu.Show(btn, New Point(0, btn.Height))
+            End Sub
+        Return btn
+    End Function
+
+    ' ----- Students -----
+    ' Adds many names at once (skips duplicates), then sorts A-Z and renumbers
+    Private Function AddStudentNames(names As List(Of String)) As Integer
+        Dim existing As New HashSet(Of String)(StringComparer.OrdinalIgnoreCase)
+        For Each r As DataGridViewRow In dgvGrades.Rows
+            If IsStudentRow(r) Then existing.Add(Convert.ToString(r.Cells("StudentName").Value))
+        Next
+
+        Dim added As Integer = 0
+        For Each n As String In names
+            If existing.Add(n) Then
+                Dim vals(dgvGrades.Columns.Count - 1) As Object
+                vals(dgvGrades.Columns("StudentName").Index) = n
+                dgvGrades.Rows.Add(vals)
+                added += 1
+            End If
+        Next
+
+        If added > 0 Then SortAndRenumber()
+        Return added
+    End Function
+
+    ' File columns: Surname, First Name, M.I., Student Number
+    Private Function ImportStudents(choice As String) As Boolean
+        Dim names As New List(Of String)
+
+        If choice.StartsWith("From file") Then
+            Dim rows As List(Of String()) = LoadCsvRows("surname")
+            If rows Is Nothing Then Return False
+            For Each f As String() In rows
+                If f.Length < 2 OrElse f(0).Trim() = "" OrElse f(1).Trim() = "" Then Continue For
+                names.Add(BuildName(f(0), f(1), If(f.Length > 2, f(2), "")))
+            Next
+        Else
+            Dim code As String = SelectedClassCode()
+            If code = "" Then
+                MessageBox.Show("Please select a class first.", "Digital Gradebook")
+                Return False
+            End If
+            Dim dt As DataTable = RunQuery("SELECT surname, first_name, mi FROM students WHERE class_code = @c", "@c", code)
+            If dt Is Nothing Then Return False
+            For Each r As DataRow In dt.Rows
+                names.Add(BuildName(Convert.ToString(r("surname")), Convert.ToString(r("first_name")),
+                                    Convert.ToString(r("mi"))))
+            Next
+        End If
+
+        Dim added As Integer = AddStudentNames(names)
+        If added = 0 Then
+            MessageBox.Show("No new students were found (empty, incomplete or already in the list).", "Digital Gradebook")
+            Return False
+        End If
+        MessageBox.Show("Imported " & added & " of " & names.Count & " students.", "Digital Gradebook")
+        Return True
+    End Function
+
+    ' ----- Classes -----
+    ' Each row = code, name, schedule, term, SY
+    Private Function AddClassRows(rows As List(Of String())) As Integer
+        Dim added As Integer = 0
+        For Each f As String() In rows
+            If f.Length < 5 Then Continue For
+            Dim code As String = System.Text.RegularExpressions.Regex.Replace(f(0).Trim(), "\s+", " ").ToUpper()
+            If code = "" OrElse code.Contains(" - ") OrElse CodeExists(code) OrElse f(1).Trim() = "" Then Continue For
+
+            Dim info As New ClassInfo With {
+                .Code = code, .Name = f(1).Trim(), .Schedule = f(2).Trim(),
+                .Term = f(3).Trim(), .SY = f(4).Trim()
+            }
+            classes(code) = info
+            cboCourse.Items.Add(code & " - " & info.Name)
+            added += 1
+        Next
+        If added > 0 Then cboCourse.SelectedIndex = cboCourse.Items.Count - 1
+        Return added
+    End Function
+
+    ' File columns: Class Code, Class Name, Schedule, Term, SY
+    Private Function ImportClasses(choice As String) As Boolean
+        If choice.StartsWith("Admin") Then Return ImportFromAdmin()
+
+        Dim rows As New List(Of String())
+        If choice.StartsWith("From file") Then
+            Dim loaded As List(Of String()) = LoadCsvRows("code", "classcode")
+            If loaded Is Nothing Then Return False
+            rows = loaded
+        Else
+            Dim dt As DataTable = RunQuery("SELECT class_code, class_name, schedule, term, sy FROM classes WHERE status = 'approved'")
+            If dt Is Nothing Then Return False
+            For Each r As DataRow In dt.Rows
+                rows.Add(New String() {Convert.ToString(r("class_code")), Convert.ToString(r("class_name")),
+                                       Convert.ToString(r("schedule")), Convert.ToString(r("term")),
+                                       Convert.ToString(r("sy"))})
+            Next
+        End If
+
+        Dim added As Integer = AddClassRows(rows)
+        If added = 0 Then
+            MessageBox.Show("No new classes were found (empty, incomplete or already in the list).", "Digital Gradebook")
+            Return False
+        End If
+        MessageBox.Show("Imported " & added & " of " & rows.Count & " classes.", "Digital Gradebook")
+        Return True
+    End Function
+
+    ' Pending classes sent by the admin: select one, then Approve or Decline
+    Private Function ImportFromAdmin() As Boolean
+        Dim dt As DataTable = RunQuery("SELECT class_code, class_name, schedule, term, sy FROM classes WHERE status = 'pending'")
+        If dt Is Nothing Then Return False
+        If dt.Rows.Count = 0 Then
+            MessageBox.Show("There are no pending class requests from the admin.", "Digital Gradebook")
+            Return False
+        End If
+
+        Dim approvedAny As Boolean = False
+
+        Using dlg As New Form()
+            dlg.FormBorderStyle = FormBorderStyle.None
+            dlg.StartPosition = FormStartPosition.CenterParent
+            dlg.Size = New Size(600, 420)
+            dlg.BackColor = Color.White
+            dlg.ShowInTaskbar = False
+
+            AddHandler dlg.Paint,
+                Sub(s, ev)
+                    Using pen As New Pen(DarkGreen, 2)
+                        ev.Graphics.DrawRectangle(pen, 1, 1, dlg.Width - 2, dlg.Height - 2)
+                    End Using
+                End Sub
+
+            Dim header As New Panel() With {.Dock = DockStyle.Top, .Height = 48, .BackColor = DarkGreen}
+            header.Controls.Add(New Label() With {
+                .Text = "Class Requests from Admin",
+                .ForeColor = Color.White,
+                .Font = New Font("Segoe UI Semibold", 12.0F),
+                .AutoSize = True,
+                .Location = New Point(18, 12)
+            })
+
+            Dim lv As New ListView() With {
+                .View = View.Details,
+                .FullRowSelect = True,
+                .MultiSelect = False,
+                .HideSelection = False,
+                .GridLines = True,
+                .Font = New Font("Segoe UI", 10.0F),
+                .Location = New Point(24, 64),
+                .Size = New Size(552, 262)
+            }
+            lv.Columns.Add("Code", 80)
+            lv.Columns.Add("Class Name", 190)
+            lv.Columns.Add("Schedule", 110)
+            lv.Columns.Add("Term", 90)
+            lv.Columns.Add("SY", 80)
+            For Each r As DataRow In dt.Rows
+                Dim row As New ListViewItem(Convert.ToString(r("class_code")))
+                row.SubItems.Add(Convert.ToString(r("class_name")))
+                row.SubItems.Add(Convert.ToString(r("schedule")))
+                row.SubItems.Add(Convert.ToString(r("term")))
+                row.SubItems.Add(Convert.ToString(r("sy")))
+                lv.Items.Add(row)
+            Next
+
+            Dim lblInfo As New Label() With {
+                .Text = "Select a class, then Approve or Decline.",
+                .ForeColor = Color.Gray,
+                .Font = New Font("Segoe UI", 9.0F),
+                .AutoSize = True,
+                .Location = New Point(24, 336)
+            }
+
+            Dim btnApprove As New Button() With {
+                .Text = "Approve", .FlatStyle = FlatStyle.Flat, .BackColor = DarkGreen, .ForeColor = Color.White,
+                .Font = New Font("Segoe UI Semibold", 10.0F), .Size = New Size(100, 36),
+                .Location = New Point(366, 368), .Cursor = Cursors.Hand
+            }
+            btnApprove.FlatAppearance.BorderSize = 0
+
+            Dim btnDecline As New Button() With {
+                .Text = "Decline", .FlatStyle = FlatStyle.Flat, .BackColor = Color.White, .ForeColor = Color.Firebrick,
+                .Font = New Font("Segoe UI Semibold", 10.0F), .Size = New Size(100, 36),
+                .Location = New Point(256, 368), .Cursor = Cursors.Hand
+            }
+            btnDecline.FlatAppearance.BorderColor = Color.Firebrick
+            btnDecline.FlatAppearance.BorderSize = 1
+
+            Dim btnClose As New Button() With {
+                .Text = "Close", .DialogResult = DialogResult.Cancel, .FlatStyle = FlatStyle.Flat,
+                .BackColor = Color.White, .ForeColor = DarkGreen,
+                .Font = New Font("Segoe UI Semibold", 10.0F), .Size = New Size(100, 36),
+                .Location = New Point(476, 368), .Cursor = Cursors.Hand
+            }
+            btnClose.FlatAppearance.BorderColor = DarkGreen
+            btnClose.FlatAppearance.BorderSize = 1
+
+            AddHandler btnApprove.Click,
+                Sub(s, ev)
+                    If lv.SelectedItems.Count = 0 Then
+                        lblInfo.Text = "Select a class first."
+                        Return
+                    End If
+                    Dim sel As ListViewItem = lv.SelectedItems(0)
+                    If RunNonQuery("UPDATE classes SET status = 'approved' WHERE class_code = @c", "@c", sel.Text) Then
+                        AddClassRows(New List(Of String()) From {
+                            New String() {sel.Text, sel.SubItems(1).Text, sel.SubItems(2).Text,
+                                          sel.SubItems(3).Text, sel.SubItems(4).Text}})
+                        approvedAny = True
+                        lblInfo.Text = "Approved " & sel.Text & "."
+                        lv.Items.Remove(sel)
+                    End If
+                End Sub
+
+            AddHandler btnDecline.Click,
+                Sub(s, ev)
+                    If lv.SelectedItems.Count = 0 Then
+                        lblInfo.Text = "Select a class first."
+                        Return
+                    End If
+                    Dim sel As ListViewItem = lv.SelectedItems(0)
+                    If RunNonQuery("UPDATE classes SET status = 'declined' WHERE class_code = @c", "@c", sel.Text) Then
+                        lblInfo.Text = "Declined " & sel.Text & "."
+                        lv.Items.Remove(sel)
+                    End If
+                End Sub
+
+            dlg.Controls.AddRange({lv, lblInfo, btnApprove, btnDecline, btnClose, header})
+            dlg.CancelButton = btnClose
+            dlg.ShowDialog(Form.ActiveForm)
+        End Using
+
+        Return approvedAny
+    End Function
+
+    ' ----- Assessments -----
+    ' File columns: Type, Counts toward (Quiz or Class Work), Max Score
+    Private Function ImportAssessments(choice As String) As Boolean
+        If cboCourse.SelectedIndex = -1 Then
+            MessageBox.Show("Please select a class first.", "Digital Gradebook")
+            Return False
+        End If
+
+        Dim rows As New List(Of String())
+        If choice.StartsWith("From file") Then
+            Dim loaded As List(Of String()) = LoadCsvRows("type")
+            If loaded Is Nothing Then Return False
+            rows = loaded
+        Else
+            Dim dt As DataTable = RunQuery("SELECT type, group_name, max_score FROM assessments WHERE class_code = @c",
+                                           "@c", SelectedClassCode())
+            If dt Is Nothing Then Return False
+            For Each r As DataRow In dt.Rows
+                rows.Add(New String() {Convert.ToString(r("type")), Convert.ToString(r("group_name")),
+                                       Convert.ToString(r("max_score"))})
+            Next
+        End If
+
+        Dim added As Integer = 0
+        For Each f As String() In rows
+            If f.Length < 3 Then Continue For
+            Dim t As String = CanonType(f(0))
+            Dim m As Double
+            If t = "" OrElse Not System.Text.RegularExpressions.Regex.IsMatch(t, "^[A-Za-z0-9 ]+$") Then Continue For
+            If Not (TryNum(f(2), m) AndAlso m > 0) Then Continue For
+
+            Dim grp As String = If(f(1).Trim().ToLower().StartsWith("q"), "Quiz", "CW")
+            AddAssessment(t, grp, m)
+            added += 1
+        Next
+
+        If added = 0 Then
+            MessageBox.Show("No valid assessments were found.", "Digital Gradebook")
+            Return False
+        End If
+        MessageBox.Show("Imported " & added & " assessments.", "Digital Gradebook")
+        Return True
     End Function
 End Class

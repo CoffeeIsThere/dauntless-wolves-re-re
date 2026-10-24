@@ -211,7 +211,7 @@ Partial Class Admin
         ' lblAdminName
         ' 
         lblAdminName.AutoSize = True
-        lblAdminName.Font = New Font("Segoe UI", 10.0F, FontStyle.Bold)
+        lblAdminName.Font = New Font("Segoe UI", 10F, FontStyle.Bold)
         lblAdminName.ForeColor = Color.Black
         lblAdminName.Location = New Point(60, 8)
         lblAdminName.Name = "lblAdminName"
@@ -378,7 +378,7 @@ Partial Class Admin
         ' 
         lblTotalProf.AutoSize = True
         lblTotalProf.Dock = DockStyle.Top
-        lblTotalProf.Font = New Font("Segoe UI", 9.0F, FontStyle.Bold, GraphicsUnit.Point, 0)
+        lblTotalProf.Font = New Font("Segoe UI", 9F, FontStyle.Bold, GraphicsUnit.Point, CByte(0))
         lblTotalProf.ForeColor = Color.DarkGreen
         lblTotalProf.Location = New Point(18, 53)
         lblTotalProf.Name = "lblTotalProf"
@@ -405,7 +405,7 @@ Partial Class Admin
         btnAddProf.BorderColor = Color.Black
         btnAddProf.BorderSize = 2
         btnAddProf.CornerRadius = 10
-        btnAddProf.Font = New Font("Segoe UI", 9.0F, FontStyle.Bold, GraphicsUnit.Point, 0)
+        btnAddProf.Font = New Font("Segoe UI", 9F, FontStyle.Bold, GraphicsUnit.Point, CByte(0))
         btnAddProf.ForeColor = Color.White
         btnAddProf.HoverColor = Color.LightGray
         btnAddProf.Location = New Point(1010, 12)
@@ -460,7 +460,7 @@ Partial Class Admin
         ' cardDashboard
         ' 
         cardDashboard.BackColor = Color.White
-        cardDashboard.BorderColor = Color.FromArgb(0, 85, 0)
+        cardDashboard.BorderColor = Color.FromArgb(CByte(0), CByte(85), CByte(0))
         cardDashboard.Controls.Add(tlpDashBottom)
         cardDashboard.Controls.Add(tlpdashstats)
         cardDashboard.Controls.Add(pnlDashHeader)
@@ -490,7 +490,7 @@ Partial Class Admin
         ' pnlupdatesheader
         ' 
         pnlupdatesheader.BackColor = Color.White
-        pnlupdatesheader.BorderColor = Color.FromArgb(0, 85, 0)
+        pnlupdatesheader.BorderColor = Color.FromArgb(CByte(0), CByte(85), CByte(0))
         pnlupdatesheader.Controls.Add(Panel1)
         pnlupdatesheader.Controls.Add(dgvupdates)
         pnlupdatesheader.Dock = DockStyle.Fill
@@ -526,7 +526,7 @@ Partial Class Admin
         ' 
         btnupdatesfilter.Anchor = AnchorStyles.Top Or AnchorStyles.Right
         btnupdatesfilter.BackColor = Color.Honeydew
-        btnupdatesfilter.Font = New Font("Segoe UI", 9.0F, FontStyle.Bold, GraphicsUnit.Point, 0)
+        btnupdatesfilter.Font = New Font("Segoe UI", 9.0F, FontStyle.Bold, GraphicsUnit.Point, CByte(0))
         btnupdatesfilter.ForeColor = Color.DarkGreen
         btnupdatesfilter.Location = New Point(424, 12)
         btnupdatesfilter.Name = "btnupdatesfilter"
@@ -538,7 +538,7 @@ Partial Class Admin
         ' Label10
         ' 
         Label10.AutoSize = True
-        Label10.Font = New Font("Segoe UI", 14.25F, FontStyle.Bold, GraphicsUnit.Point, 0)
+        Label10.Font = New Font("Segoe UI", 14.25F, FontStyle.Bold, GraphicsUnit.Point, CByte(0))
         Label10.ForeColor = Color.DarkGreen
         Label10.Location = New Point(56, 12)
         Label10.Name = "Label10"
@@ -559,7 +559,7 @@ Partial Class Admin
         ' CustomPanel6
         ' 
         CustomPanel6.BackColor = Color.White
-        CustomPanel6.BorderColor = Color.FromArgb(0, 85, 0)
+        CustomPanel6.BorderColor = Color.FromArgb(CByte(0), CByte(85), CByte(0))
         CustomPanel6.Controls.Add(tlpActions)
         CustomPanel6.Controls.Add(pnlactionsheader)
         CustomPanel6.Dock = DockStyle.Fill
@@ -614,7 +614,7 @@ Partial Class Admin
         btnEnterGrades.BorderSize = 5
         btnEnterGrades.CornerRadius = 10
         btnEnterGrades.Dock = DockStyle.Fill
-        btnEnterGrades.Font = New Font("Segoe UI", 12.0F, FontStyle.Bold, GraphicsUnit.Point, 0)
+        btnEnterGrades.Font = New Font("Segoe UI", 12.0F, FontStyle.Bold, GraphicsUnit.Point, CByte(0))
         btnEnterGrades.ForeColor = Color.DarkGreen
         btnEnterGrades.HoverColor = Color.LightGray
         btnEnterGrades.Location = New Point(258, 13)
@@ -688,7 +688,7 @@ Partial Class Admin
         ' Label11
         ' 
         Label11.AutoSize = True
-        Label11.Font = New Font("Segoe UI", 14.25F, FontStyle.Bold, GraphicsUnit.Point, 0)
+        Label11.Font = New Font("Segoe UI", 14.25F, FontStyle.Bold, GraphicsUnit.Point, CByte(0))
         Label11.ForeColor = Color.DarkGreen
         Label11.Location = New Point(56, 11)
         Label11.Name = "Label11"
@@ -718,7 +718,7 @@ Partial Class Admin
         ' CustomPanel5
         ' 
         CustomPanel5.BackColor = Color.AliceBlue
-        CustomPanel5.BorderColor = Color.FromArgb(0, 85, 0)
+        CustomPanel5.BorderColor = Color.FromArgb(CByte(0), CByte(85), CByte(0))
         CustomPanel5.Controls.Add(lblStatPending)
         CustomPanel5.Controls.Add(Label9)
         CustomPanel5.Dock = DockStyle.Fill
@@ -733,7 +733,7 @@ Partial Class Admin
         ' 
         lblStatPending.Dock = DockStyle.Top
         lblStatPending.FlatStyle = FlatStyle.Flat
-        lblStatPending.Font = New Font("Segoe UI", 15.75F, FontStyle.Bold, GraphicsUnit.Point, 0)
+        lblStatPending.Font = New Font("Segoe UI", 15.75F, FontStyle.Bold, GraphicsUnit.Point, CByte(0))
         lblStatPending.ForeColor = Color.DarkGreen
         lblStatPending.Location = New Point(10, 10)
         lblStatPending.Name = "lblStatPending"
@@ -746,7 +746,7 @@ Partial Class Admin
         ' 
         Label9.AutoSize = True
         Label9.FlatStyle = FlatStyle.Flat
-        Label9.Font = New Font("Segoe UI", 12.0F, FontStyle.Bold, GraphicsUnit.Point, 0)
+        Label9.Font = New Font("Segoe UI", 12.0F, FontStyle.Bold, GraphicsUnit.Point, CByte(0))
         Label9.ForeColor = Color.DarkGreen
         Label9.Location = New Point(53, 70)
         Label9.Name = "Label9"
@@ -758,7 +758,7 @@ Partial Class Admin
         ' CustomPanel4
         ' 
         CustomPanel4.BackColor = Color.AliceBlue
-        CustomPanel4.BorderColor = Color.FromArgb(0, 85, 0)
+        CustomPanel4.BorderColor = Color.FromArgb(CByte(0), CByte(85), CByte(0))
         CustomPanel4.Controls.Add(lblStatClasses)
         CustomPanel4.Controls.Add(Label8)
         CustomPanel4.Dock = DockStyle.Fill
@@ -773,7 +773,7 @@ Partial Class Admin
         ' 
         lblStatClasses.Dock = DockStyle.Top
         lblStatClasses.FlatStyle = FlatStyle.Flat
-        lblStatClasses.Font = New Font("Segoe UI", 15.75F, FontStyle.Bold, GraphicsUnit.Point, 0)
+        lblStatClasses.Font = New Font("Segoe UI", 15.75F, FontStyle.Bold, GraphicsUnit.Point, CByte(0))
         lblStatClasses.ForeColor = Color.DarkGreen
         lblStatClasses.Location = New Point(10, 10)
         lblStatClasses.Name = "lblStatClasses"
@@ -786,7 +786,7 @@ Partial Class Admin
         ' 
         Label8.AutoSize = True
         Label8.FlatStyle = FlatStyle.Flat
-        Label8.Font = New Font("Segoe UI", 12.0F, FontStyle.Bold, GraphicsUnit.Point, 0)
+        Label8.Font = New Font("Segoe UI", 12.0F, FontStyle.Bold, GraphicsUnit.Point, CByte(0))
         Label8.ForeColor = Color.DarkGreen
         Label8.Location = New Point(69, 70)
         Label8.Name = "Label8"
@@ -798,7 +798,7 @@ Partial Class Admin
         ' CustomPanel3
         ' 
         CustomPanel3.BackColor = Color.AliceBlue
-        CustomPanel3.BorderColor = Color.FromArgb(0, 85, 0)
+        CustomPanel3.BorderColor = Color.FromArgb(CByte(0), CByte(85), CByte(0))
         CustomPanel3.Controls.Add(lblStatProfs)
         CustomPanel3.Controls.Add(Label7)
         CustomPanel3.Dock = DockStyle.Fill
@@ -813,7 +813,7 @@ Partial Class Admin
         ' 
         lblStatProfs.Dock = DockStyle.Top
         lblStatProfs.FlatStyle = FlatStyle.Flat
-        lblStatProfs.Font = New Font("Segoe UI", 15.75F, FontStyle.Bold, GraphicsUnit.Point, 0)
+        lblStatProfs.Font = New Font("Segoe UI", 15.75F, FontStyle.Bold, GraphicsUnit.Point, CByte(0))
         lblStatProfs.ForeColor = Color.DarkGreen
         lblStatProfs.Location = New Point(10, 10)
         lblStatProfs.Name = "lblStatProfs"
@@ -826,7 +826,7 @@ Partial Class Admin
         ' 
         Label7.AutoSize = True
         Label7.FlatStyle = FlatStyle.Flat
-        Label7.Font = New Font("Segoe UI", 12.0F, FontStyle.Bold, GraphicsUnit.Point, 0)
+        Label7.Font = New Font("Segoe UI", 12.0F, FontStyle.Bold, GraphicsUnit.Point, CByte(0))
         Label7.ForeColor = Color.DarkGreen
         Label7.Location = New Point(79, 71)
         Label7.Name = "Label7"
@@ -838,7 +838,7 @@ Partial Class Admin
         ' CustomPanel2
         ' 
         CustomPanel2.BackColor = Color.AliceBlue
-        CustomPanel2.BorderColor = Color.FromArgb(0, 85, 0)
+        CustomPanel2.BorderColor = Color.FromArgb(CByte(0), CByte(85), CByte(0))
         CustomPanel2.Controls.Add(lblStatStudents)
         CustomPanel2.Controls.Add(Label6)
         CustomPanel2.Dock = DockStyle.Fill
@@ -853,7 +853,7 @@ Partial Class Admin
         ' 
         lblStatStudents.Dock = DockStyle.Top
         lblStatStudents.FlatStyle = FlatStyle.Flat
-        lblStatStudents.Font = New Font("Segoe UI", 15.75F, FontStyle.Bold, GraphicsUnit.Point, 0)
+        lblStatStudents.Font = New Font("Segoe UI", 15.75F, FontStyle.Bold, GraphicsUnit.Point, CByte(0))
         lblStatStudents.ForeColor = Color.DarkGreen
         lblStatStudents.Location = New Point(10, 10)
         lblStatStudents.Name = "lblStatStudents"
@@ -866,7 +866,7 @@ Partial Class Admin
         ' 
         Label6.AutoSize = True
         Label6.FlatStyle = FlatStyle.Flat
-        Label6.Font = New Font("Segoe UI", 12.0F, FontStyle.Bold, GraphicsUnit.Point, 0)
+        Label6.Font = New Font("Segoe UI", 12F, FontStyle.Bold, GraphicsUnit.Point, CByte(0))
         Label6.ForeColor = Color.DarkGreen
         Label6.Location = New Point(60, 70)
         Label6.Name = "Label6"
@@ -889,10 +889,10 @@ Partial Class Admin
         ' CustomPanel1
         ' 
         CustomPanel1.BackColor = Color.DarkGreen
-        CustomPanel1.BorderColor = Color.FromArgb(0, 85, 0)
+        CustomPanel1.BorderColor = Color.FromArgb(CByte(0), CByte(85), CByte(0))
         CustomPanel1.Controls.Add(Label5)
         CustomPanel1.CornerRadius = 11
-        CustomPanel1.Font = New Font("Segoe UI", 12.0F, FontStyle.Bold, GraphicsUnit.Point, 0)
+        CustomPanel1.Font = New Font("Segoe UI", 12F, FontStyle.Bold, GraphicsUnit.Point, CByte(0))
         CustomPanel1.ForeColor = Color.White
         CustomPanel1.Location = New Point(239, 13)
         CustomPanel1.Name = "CustomPanel1"
@@ -903,7 +903,7 @@ Partial Class Admin
         ' Label5
         ' 
         Label5.AutoSize = True
-        Label5.Font = New Font("Segoe UI", 11.25F, FontStyle.Bold, GraphicsUnit.Point, 0)
+        Label5.Font = New Font("Segoe UI", 11.25F, FontStyle.Bold, GraphicsUnit.Point, CByte(0))
         Label5.ForeColor = Color.White
         Label5.Location = New Point(20, 5)
         Label5.Name = "Label5"
@@ -914,7 +914,7 @@ Partial Class Admin
         ' Label2
         ' 
         Label2.AutoSize = True
-        Label2.Font = New Font("Segoe UI", 11.25F, FontStyle.Bold, GraphicsUnit.Point, 0)
+        Label2.Font = New Font("Segoe UI", 11.25F, FontStyle.Bold, GraphicsUnit.Point, CByte(0))
         Label2.ForeColor = Color.DarkGreen
         Label2.Location = New Point(68, 18)
         Label2.Name = "Label2"
@@ -947,7 +947,7 @@ Partial Class Admin
         ' pnlstudentcard
         ' 
         pnlstudentcard.BackColor = Color.White
-        pnlstudentcard.BorderColor = Color.FromArgb(0, 85, 0)
+        pnlstudentcard.BorderColor = Color.FromArgb(CByte(0), CByte(85), CByte(0))
         pnlstudentcard.Controls.Add(dgvstudents)
         pnlstudentcard.Controls.Add(Panel2)
         pnlstudentcard.Controls.Add(flowstudentpager)
@@ -989,7 +989,7 @@ Partial Class Admin
         ' lbltotalstudents
         ' 
         lbltotalstudents.AutoSize = True
-        lbltotalstudents.Font = New Font("Segoe UI", 9.0F, FontStyle.Bold, GraphicsUnit.Point, 0)
+        lbltotalstudents.Font = New Font("Segoe UI", 9F, FontStyle.Bold, GraphicsUnit.Point, CByte(0))
         lbltotalstudents.ForeColor = Color.DarkGreen
         lbltotalstudents.Location = New Point(13, 34)
         lbltotalstudents.Name = "lbltotalstudents"
@@ -1004,7 +1004,7 @@ Partial Class Admin
         btnaddstudent.BorderColor = Color.DarkGreen
         btnaddstudent.BorderSize = 3
         btnaddstudent.CornerRadius = 10
-        btnaddstudent.Font = New Font("Segoe UI", 9.0F, FontStyle.Bold, GraphicsUnit.Point, 0)
+        btnaddstudent.Font = New Font("Segoe UI", 9F, FontStyle.Bold, GraphicsUnit.Point, CByte(0))
         btnaddstudent.ForeColor = Color.White
         btnaddstudent.HoverColor = Color.LightGray
         btnaddstudent.Location = New Point(1025, 5)
@@ -1022,7 +1022,7 @@ Partial Class Admin
         btnStudentReset.BorderColor = Color.DarkGreen
         btnStudentReset.BorderSize = 2
         btnStudentReset.CornerRadius = 10
-        btnStudentReset.Font = New Font("Segoe UI Semibold", 9.0F, FontStyle.Bold, GraphicsUnit.Point, 0)
+        btnStudentReset.Font = New Font("Segoe UI Semibold", 9F, FontStyle.Bold, GraphicsUnit.Point, CByte(0))
         btnStudentReset.ForeColor = Color.DarkGreen
         btnStudentReset.HoverColor = Color.LightGray
         btnStudentReset.Location = New Point(933, 10)
@@ -1040,7 +1040,7 @@ Partial Class Admin
         btnStudentFilter.BorderColor = Color.DarkGreen
         btnStudentFilter.BorderSize = 2
         btnStudentFilter.CornerRadius = 10
-        btnStudentFilter.Font = New Font("Segoe UI Semibold", 9.0F, FontStyle.Bold, GraphicsUnit.Point, 0)
+        btnStudentFilter.Font = New Font("Segoe UI Semibold", 9F, FontStyle.Bold, GraphicsUnit.Point, CByte(0))
         btnStudentFilter.ForeColor = Color.DarkGreen
         btnStudentFilter.HoverColor = Color.LightGray
         btnStudentFilter.Location = New Point(845, 11)
@@ -1054,7 +1054,7 @@ Partial Class Admin
         ' Label4
         ' 
         Label4.AutoSize = True
-        Label4.Font = New Font("Segoe UI", 8.0F)
+        Label4.Font = New Font("Segoe UI", 8F)
         Label4.ForeColor = Color.DarkGreen
         Label4.Location = New Point(335, -3)
         Label4.Name = "Label4"
@@ -1065,7 +1065,7 @@ Partial Class Admin
         ' Label3
         ' 
         Label3.AutoSize = True
-        Label3.Font = New Font("Segoe UI", 8.25F, FontStyle.Regular, GraphicsUnit.Point, 0)
+        Label3.Font = New Font("Segoe UI", 8.25F, FontStyle.Regular, GraphicsUnit.Point, CByte(0))
         Label3.ForeColor = Color.DarkGreen
         Label3.Location = New Point(201, -3)
         Label3.Name = "Label3"
@@ -1109,7 +1109,7 @@ Partial Class Admin
         ' 
         ' Admin
         ' 
-        AutoScaleDimensions = New SizeF(7.0F, 15.0F)
+        AutoScaleDimensions = New SizeF(7F, 15F)
         AutoScaleMode = AutoScaleMode.Font
         ClientSize = New Size(1199, 562)
         Controls.Add(pnlContent)
