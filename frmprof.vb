@@ -1142,7 +1142,5 @@ Public Class frmprof
     Private Sub Label19_Click(sender As Object, e As EventArgs) Handles Label19.Click
     End Sub
 
-    Private Sub CustomButton7_Click(sender As Object, e As EventArgs) Handles CustomButton7.Click
 
-    End Sub
 End Class
