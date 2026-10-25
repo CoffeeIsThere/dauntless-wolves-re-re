@@ -42,6 +42,11 @@ Partial Class frmprof
         btnRecordScores = New Button()
         pnlFooter = New Panel()
         pnlContent = New Panel()
+        pnlClarificationRequests = New Panel()
+        RoundedPanel3 = New RoundedPanel()
+        dgvRequests = New DataGridView()
+        Label20 = New Label()
+        PictureBox4 = New PictureBox()
         pnlClassGrades = New Panel()
         RoundedPanel1 = New RoundedPanel()
         CustomButton3 = New CustomButton()
@@ -59,11 +64,6 @@ Partial Class frmprof
         Label13 = New Label()
         PictureBox3 = New PictureBox()
         LblClassGradeSheet = New Label()
-        pnlClarificationRequests = New Panel()
-        RoundedPanel3 = New RoundedPanel()
-        dgvRequests = New DataGridView()
-        Label20 = New Label()
-        PictureBox4 = New PictureBox()
         pnlAnalytics = New Panel()
         RoundedPanel5 = New RoundedPanel()
         CustomProgressBar4 = New CustomProgressBar()
@@ -135,15 +135,15 @@ Partial Class frmprof
         CType(PictureBox1, ComponentModel.ISupportInitialize).BeginInit()
         pnl2ndtab.SuspendLayout()
         pnlContent.SuspendLayout()
+        pnlClarificationRequests.SuspendLayout()
+        RoundedPanel3.SuspendLayout()
+        CType(dgvRequests, ComponentModel.ISupportInitialize).BeginInit()
+        CType(PictureBox4, ComponentModel.ISupportInitialize).BeginInit()
         pnlClassGrades.SuspendLayout()
         RoundedPanel1.SuspendLayout()
         CType(dgvClassGrades, ComponentModel.ISupportInitialize).BeginInit()
         RoundedPanel2.SuspendLayout()
         CType(PictureBox3, ComponentModel.ISupportInitialize).BeginInit()
-        pnlClarificationRequests.SuspendLayout()
-        RoundedPanel3.SuspendLayout()
-        CType(dgvRequests, ComponentModel.ISupportInitialize).BeginInit()
-        CType(PictureBox4, ComponentModel.ISupportInitialize).BeginInit()
         pnlAnalytics.SuspendLayout()
         RoundedPanel5.SuspendLayout()
         RoundedPanel4.SuspendLayout()
@@ -174,7 +174,7 @@ Partial Class frmprof
         pnlHeader.Location = New Point(0, 0)
         pnlHeader.Margin = New Padding(3, 2, 3, 2)
         pnlHeader.Name = "pnlHeader"
-        pnlHeader.Size = New Size(1104, 30)
+        pnlHeader.Size = New Size(966, 22)
         pnlHeader.TabIndex = 0
         ' 
         ' Lbltransparentgradingsytem
@@ -182,7 +182,7 @@ Partial Class frmprof
         Lbltransparentgradingsytem.AutoSize = True
         Lbltransparentgradingsytem.Font = New Font("Segoe UI", 7.8F, FontStyle.Regular, GraphicsUnit.Point, CByte(0))
         Lbltransparentgradingsytem.ForeColor = Color.White
-        Lbltransparentgradingsytem.Location = New Point(24, 7)
+        Lbltransparentgradingsytem.Location = New Point(21, 5)
         Lbltransparentgradingsytem.Name = "Lbltransparentgradingsytem"
         Lbltransparentgradingsytem.Size = New Size(251, 13)
         Lbltransparentgradingsytem.TabIndex = 0
@@ -198,10 +198,10 @@ Partial Class frmprof
         pnlTabs.Controls.Add(lblProfName)
         pnlTabs.Controls.Add(PictureBox1)
         pnlTabs.Dock = DockStyle.Top
-        pnlTabs.Location = New Point(0, 30)
+        pnlTabs.Location = New Point(0, 22)
         pnlTabs.Margin = New Padding(3, 2, 3, 2)
         pnlTabs.Name = "pnlTabs"
-        pnlTabs.Size = New Size(1104, 38)
+        pnlTabs.Size = New Size(966, 28)
         pnlTabs.TabIndex = 1
         ' 
         ' ComboBox5
@@ -209,10 +209,10 @@ Partial Class frmprof
         ComboBox5.FlatStyle = FlatStyle.Flat
         ComboBox5.FormattingEnabled = True
         ComboBox5.Items.AddRange(New Object() {"DSA", "OOP"})
-        ComboBox5.Location = New Point(451, 8)
+        ComboBox5.Location = New Point(395, 6)
         ComboBox5.Margin = New Padding(3, 2, 3, 2)
         ComboBox5.Name = "ComboBox5"
-        ComboBox5.Size = New Size(124, 23)
+        ComboBox5.Size = New Size(109, 23)
         ComboBox5.TabIndex = 6
         ComboBox5.Visible = False
         ' 
@@ -221,9 +221,9 @@ Partial Class frmprof
         LblRole.BackColor = Color.Green
         LblRole.CornerRadius = 20
         LblRole.ForeColor = Color.White
-        LblRole.Location = New Point(213, 11)
+        LblRole.Location = New Point(186, 8)
         LblRole.Name = "LblRole"
-        LblRole.Size = New Size(80, 19)
+        LblRole.Size = New Size(70, 14)
         LblRole.TabIndex = 5
         LblRole.Text = "Teacher"
         LblRole.TextAlign = ContentAlignment.MiddleCenter
@@ -236,10 +236,10 @@ Partial Class frmprof
         btnLogout.FlatAppearance.MouseOverBackColor = Color.Red
         btnLogout.FlatStyle = FlatStyle.Flat
         btnLogout.ForeColor = Color.Green
-        btnLogout.Location = New Point(1017, 11)
+        btnLogout.Location = New Point(890, 2)
         btnLogout.Margin = New Padding(3, 2, 3, 2)
         btnLogout.Name = "btnLogout"
-        btnLogout.Size = New Size(77, 26)
+        btnLogout.Size = New Size(67, 26)
         btnLogout.TabIndex = 4
         btnLogout.Text = "Log out"
         btnLogout.UseVisualStyleBackColor = True
@@ -250,17 +250,17 @@ Partial Class frmprof
         ComboBox1.FlatStyle = FlatStyle.Flat
         ComboBox1.FormattingEnabled = True
         ComboBox1.Items.AddRange(New Object() {"BSCS-1A", "BSCS-2A", "BSCS-3A", "BSCS-4A"})
-        ComboBox1.Location = New Point(314, 9)
+        ComboBox1.Location = New Point(275, 7)
         ComboBox1.Margin = New Padding(3, 2, 3, 2)
         ComboBox1.Name = "ComboBox1"
-        ComboBox1.Size = New Size(124, 23)
+        ComboBox1.Size = New Size(109, 23)
         ComboBox1.TabIndex = 3
         ' 
         ' lblProfName
         ' 
         lblProfName.AutoSize = True
         lblProfName.ForeColor = Color.DarkGreen
-        lblProfName.Location = New Point(69, 11)
+        lblProfName.Location = New Point(60, 8)
         lblProfName.Name = "lblProfName"
         lblProfName.Size = New Size(0, 15)
         lblProfName.TabIndex = 1
@@ -268,10 +268,10 @@ Partial Class frmprof
         ' PictureBox1
         ' 
         PictureBox1.Image = CType(resources.GetObject("PictureBox1.Image"), Image)
-        PictureBox1.Location = New Point(24, 2)
+        PictureBox1.Location = New Point(21, 2)
         PictureBox1.Margin = New Padding(3, 2, 3, 2)
         PictureBox1.Name = "PictureBox1"
-        PictureBox1.Size = New Size(38, 35)
+        PictureBox1.Size = New Size(33, 26)
         PictureBox1.SizeMode = PictureBoxSizeMode.StretchImage
         PictureBox1.TabIndex = 0
         PictureBox1.TabStop = False
@@ -286,10 +286,10 @@ Partial Class frmprof
         pnl2ndtab.Controls.Add(btnClassGrades)
         pnl2ndtab.Controls.Add(btnRecordScores)
         pnl2ndtab.Dock = DockStyle.Top
-        pnl2ndtab.Location = New Point(0, 68)
+        pnl2ndtab.Location = New Point(0, 50)
         pnl2ndtab.Margin = New Padding(3, 2, 3, 2)
         pnl2ndtab.Name = "pnl2ndtab"
-        pnl2ndtab.Size = New Size(1104, 38)
+        pnl2ndtab.Size = New Size(966, 28)
         pnl2ndtab.TabIndex = 2
         ' 
         ' CustomButton6
@@ -303,11 +303,11 @@ Partial Class frmprof
         CustomButton6.Font = New Font("Segoe UI Semibold", 7.8F, FontStyle.Bold)
         CustomButton6.ForeColor = Color.White
         CustomButton6.HoverColor = Color.DarkGreen
-        CustomButton6.Location = New Point(783, 11)
+        CustomButton6.Location = New Point(685, 8)
         CustomButton6.Margin = New Padding(3, 2, 3, 2)
         CustomButton6.Name = "CustomButton6"
         CustomButton6.NormalColor = Color.Green
-        CustomButton6.Size = New Size(147, 22)
+        CustomButton6.Size = New Size(129, 16)
         CustomButton6.TabIndex = 17
         CustomButton6.Text = "Add Assessment"
         CustomButton6.UseVisualStyleBackColor = False
@@ -323,11 +323,11 @@ Partial Class frmprof
         CustomButton4.Font = New Font("Segoe UI Semibold", 7.8F, FontStyle.Bold)
         CustomButton4.ForeColor = Color.White
         CustomButton4.HoverColor = Color.DarkGreen
-        CustomButton4.Location = New Point(947, 11)
+        CustomButton4.Location = New Point(829, 8)
         CustomButton4.Margin = New Padding(3, 2, 3, 2)
         CustomButton4.Name = "CustomButton4"
         CustomButton4.NormalColor = Color.Green
-        CustomButton4.Size = New Size(147, 22)
+        CustomButton4.Size = New Size(129, 16)
         CustomButton4.TabIndex = 16
         CustomButton4.Text = "Open Digital Gradebook"
         CustomButton4.UseVisualStyleBackColor = False
@@ -339,10 +339,10 @@ Partial Class frmprof
         btnRevisionRequests.FlatAppearance.BorderSize = 2
         btnRevisionRequests.FlatStyle = FlatStyle.Flat
         btnRevisionRequests.ForeColor = Color.DarkGreen
-        btnRevisionRequests.Location = New Point(273, 11)
+        btnRevisionRequests.Location = New Point(239, 5)
         btnRevisionRequests.Margin = New Padding(3, 2, 3, 2)
         btnRevisionRequests.Name = "btnRevisionRequests"
-        btnRevisionRequests.Size = New Size(145, 26)
+        btnRevisionRequests.Size = New Size(127, 26)
         btnRevisionRequests.TabIndex = 2
         btnRevisionRequests.Text = "Clarification Requests"
         btnRevisionRequests.UseVisualStyleBackColor = False
@@ -354,10 +354,10 @@ Partial Class frmprof
         btnAuditLogs.FlatAppearance.BorderSize = 2
         btnAuditLogs.FlatStyle = FlatStyle.Flat
         btnAuditLogs.ForeColor = Color.DarkGreen
-        btnAuditLogs.Location = New Point(528, 11)
+        btnAuditLogs.Location = New Point(462, 5)
         btnAuditLogs.Margin = New Padding(3, 2, 3, 2)
         btnAuditLogs.Name = "btnAuditLogs"
-        btnAuditLogs.Size = New Size(107, 26)
+        btnAuditLogs.Size = New Size(94, 26)
         btnAuditLogs.TabIndex = 5
         btnAuditLogs.Text = "Audit Logs"
         btnAuditLogs.UseVisualStyleBackColor = False
@@ -369,10 +369,10 @@ Partial Class frmprof
         btnAnalytics.FlatAppearance.BorderSize = 2
         btnAnalytics.FlatStyle = FlatStyle.Flat
         btnAnalytics.ForeColor = Color.DarkGreen
-        btnAnalytics.Location = New Point(425, 11)
+        btnAnalytics.Location = New Point(372, 5)
         btnAnalytics.Margin = New Padding(3, 2, 3, 2)
         btnAnalytics.Name = "btnAnalytics"
-        btnAnalytics.Size = New Size(97, 26)
+        btnAnalytics.Size = New Size(85, 26)
         btnAnalytics.TabIndex = 4
         btnAnalytics.Text = "Analytics"
         btnAnalytics.UseVisualStyleBackColor = False
@@ -384,10 +384,10 @@ Partial Class frmprof
         btnClassGrades.FlatAppearance.BorderSize = 2
         btnClassGrades.FlatStyle = FlatStyle.Flat
         btnClassGrades.ForeColor = Color.DarkGreen
-        btnClassGrades.Location = New Point(152, 11)
+        btnClassGrades.Location = New Point(133, 5)
         btnClassGrades.Margin = New Padding(3, 2, 3, 2)
         btnClassGrades.Name = "btnClassGrades"
-        btnClassGrades.Size = New Size(116, 26)
+        btnClassGrades.Size = New Size(102, 26)
         btnClassGrades.TabIndex = 1
         btnClassGrades.Text = "Class Grades"
         btnClassGrades.UseVisualStyleBackColor = False
@@ -399,10 +399,10 @@ Partial Class frmprof
         btnRecordScores.FlatAppearance.BorderSize = 2
         btnRecordScores.FlatStyle = FlatStyle.Flat
         btnRecordScores.ForeColor = Color.DarkGreen
-        btnRecordScores.Location = New Point(24, 11)
+        btnRecordScores.Location = New Point(21, 5)
         btnRecordScores.Margin = New Padding(3, 2, 3, 2)
         btnRecordScores.Name = "btnRecordScores"
-        btnRecordScores.Size = New Size(122, 26)
+        btnRecordScores.Size = New Size(107, 26)
         btnRecordScores.TabIndex = 0
         btnRecordScores.Text = "Record Scores"
         btnRecordScores.UseVisualStyleBackColor = False
@@ -411,10 +411,10 @@ Partial Class frmprof
         ' 
         pnlFooter.Anchor = AnchorStyles.Bottom Or AnchorStyles.Left Or AnchorStyles.Right
         pnlFooter.BackColor = Color.DarkGreen
-        pnlFooter.Location = New Point(0, 381)
+        pnlFooter.Location = New Point(0, 286)
         pnlFooter.Margin = New Padding(3, 2, 3, 2)
         pnlFooter.Name = "pnlFooter"
-        pnlFooter.Size = New Size(1104, 19)
+        pnlFooter.Size = New Size(966, 14)
         pnlFooter.TabIndex = 3
         ' 
         ' pnlContent
@@ -426,11 +426,72 @@ Partial Class frmprof
         pnlContent.Controls.Add(pnlAnalytics)
         pnlContent.Controls.Add(pnlRecordScores)
         pnlContent.Controls.Add(pnlAuditLogs)
-        pnlContent.Location = New Point(0, 105)
+        pnlContent.Location = New Point(0, 79)
         pnlContent.Margin = New Padding(3, 2, 3, 2)
         pnlContent.Name = "pnlContent"
-        pnlContent.Size = New Size(1104, 400)
+        pnlContent.Size = New Size(966, 300)
         pnlContent.TabIndex = 5
+        ' 
+        ' pnlClarificationRequests
+        ' 
+        pnlClarificationRequests.Anchor = AnchorStyles.Top Or AnchorStyles.Bottom Or AnchorStyles.Left Or AnchorStyles.Right
+        pnlClarificationRequests.BackColor = Color.White
+        pnlClarificationRequests.Controls.Add(RoundedPanel3)
+        pnlClarificationRequests.Location = New Point(0, 0)
+        pnlClarificationRequests.Margin = New Padding(3, 2, 3, 2)
+        pnlClarificationRequests.Name = "pnlClarificationRequests"
+        pnlClarificationRequests.Size = New Size(966, 300)
+        pnlClarificationRequests.TabIndex = 9
+        pnlClarificationRequests.Visible = False
+        ' 
+        ' RoundedPanel3
+        ' 
+        RoundedPanel3.Anchor = AnchorStyles.Top Or AnchorStyles.Bottom Or AnchorStyles.Left Or AnchorStyles.Right
+        RoundedPanel3.BackColor = Color.White
+        RoundedPanel3.BorderColor = Color.DarkGreen
+        RoundedPanel3.BorderThickness = 2
+        RoundedPanel3.Controls.Add(dgvRequests)
+        RoundedPanel3.Controls.Add(Label20)
+        RoundedPanel3.Controls.Add(PictureBox4)
+        RoundedPanel3.CornerRadius = 20
+        RoundedPanel3.Location = New Point(23, 18)
+        RoundedPanel3.Margin = New Padding(3, 2, 3, 2)
+        RoundedPanel3.Name = "RoundedPanel3"
+        RoundedPanel3.Size = New Size(927, 264)
+        RoundedPanel3.TabIndex = 0
+        ' 
+        ' dgvRequests
+        ' 
+        dgvRequests.Anchor = AnchorStyles.Top Or AnchorStyles.Bottom Or AnchorStyles.Left Or AnchorStyles.Right
+        dgvRequests.ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.AutoSize
+        dgvRequests.Location = New Point(11, 44)
+        dgvRequests.Margin = New Padding(3, 2, 3, 2)
+        dgvRequests.Name = "dgvRequests"
+        dgvRequests.RowHeadersWidth = 51
+        dgvRequests.Size = New Size(900, 213)
+        dgvRequests.TabIndex = 7
+        ' 
+        ' Label20
+        ' 
+        Label20.AutoSize = True
+        Label20.Font = New Font("Segoe UI", 13.8F, FontStyle.Bold)
+        Label20.ForeColor = Color.DarkGreen
+        Label20.Location = New Point(53, 14)
+        Label20.Name = "Label20"
+        Label20.Size = New Size(282, 25)
+        Label20.TabIndex = 6
+        Label20.Text = "Pending Clarification Requests"
+        ' 
+        ' PictureBox4
+        ' 
+        PictureBox4.Image = CType(resources.GetObject("PictureBox4.Image"), Image)
+        PictureBox4.Location = New Point(16, 10)
+        PictureBox4.Margin = New Padding(3, 2, 3, 2)
+        PictureBox4.Name = "PictureBox4"
+        PictureBox4.Size = New Size(33, 26)
+        PictureBox4.SizeMode = PictureBoxSizeMode.StretchImage
+        PictureBox4.TabIndex = 5
+        PictureBox4.TabStop = False
         ' 
         ' pnlClassGrades
         ' 
@@ -440,8 +501,8 @@ Partial Class frmprof
         pnlClassGrades.Location = New Point(0, 0)
         pnlClassGrades.Margin = New Padding(3, 2, 3, 2)
         pnlClassGrades.Name = "pnlClassGrades"
-        pnlClassGrades.Padding = New Padding(13, 11, 13, 11)
-        pnlClassGrades.Size = New Size(1104, 400)
+        pnlClassGrades.Padding = New Padding(11, 8, 11, 8)
+        pnlClassGrades.Size = New Size(966, 300)
         pnlClassGrades.TabIndex = 8
         ' 
         ' RoundedPanel1
@@ -459,10 +520,10 @@ Partial Class frmprof
         RoundedPanel1.Controls.Add(LblClassGradeSheet)
         RoundedPanel1.CornerRadius = 20
         RoundedPanel1.Dock = DockStyle.Fill
-        RoundedPanel1.Location = New Point(13, 11)
+        RoundedPanel1.Location = New Point(11, 8)
         RoundedPanel1.Margin = New Padding(3, 2, 3, 2)
         RoundedPanel1.Name = "RoundedPanel1"
-        RoundedPanel1.Size = New Size(1078, 378)
+        RoundedPanel1.Size = New Size(944, 284)
         RoundedPanel1.TabIndex = 0
         ' 
         ' CustomButton3
@@ -476,11 +537,11 @@ Partial Class frmprof
         CustomButton3.Font = New Font("Segoe UI Semibold", 7.8F, FontStyle.Bold)
         CustomButton3.ForeColor = Color.White
         CustomButton3.HoverColor = Color.DarkGreen
-        CustomButton3.Location = New Point(984, 354)
+        CustomButton3.Location = New Point(862, 266)
         CustomButton3.Margin = New Padding(3, 2, 3, 2)
         CustomButton3.Name = "CustomButton3"
         CustomButton3.NormalColor = Color.Green
-        CustomButton3.Size = New Size(92, 22)
+        CustomButton3.Size = New Size(80, 16)
         CustomButton3.TabIndex = 17
         CustomButton3.Text = "Save as Pdf"
         CustomButton3.UseVisualStyleBackColor = False
@@ -495,7 +556,7 @@ Partial Class frmprof
         dgvClassGrades.ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.AutoSize
         dgvClassGrades.ColumnHeadersVisible = False
         dgvClassGrades.GridColor = Color.Gray
-        dgvClassGrades.Location = New Point(13, 112)
+        dgvClassGrades.Location = New Point(11, 84)
         dgvClassGrades.Margin = New Padding(3, 2, 3, 2)
         dgvClassGrades.Name = "dgvClassGrades"
         dgvClassGrades.ReadOnly = True
@@ -503,7 +564,7 @@ Partial Class frmprof
         dgvClassGrades.RowHeadersWidth = 51
         dgvClassGrades.RowTemplate.Height = 55
         dgvClassGrades.SelectionMode = DataGridViewSelectionMode.FullRowSelect
-        dgvClassGrades.Size = New Size(1056, 238)
+        dgvClassGrades.Size = New Size(925, 178)
         dgvClassGrades.TabIndex = 15
         ' 
         ' ComboBox3
@@ -511,10 +572,10 @@ Partial Class frmprof
         ComboBox3.Anchor = AnchorStyles.Top Or AnchorStyles.Right
         ComboBox3.FormattingEnabled = True
         ComboBox3.Items.AddRange(New Object() {"Midterms", "Finals"})
-        ComboBox3.Location = New Point(994, 13)
+        ComboBox3.Location = New Point(871, 10)
         ComboBox3.Margin = New Padding(3, 2, 3, 2)
         ComboBox3.Name = "ComboBox3"
-        ComboBox3.Size = New Size(76, 23)
+        ComboBox3.Size = New Size(67, 23)
         ComboBox3.TabIndex = 12
         ' 
         ' CustomButton2
@@ -525,14 +586,14 @@ Partial Class frmprof
         CustomButton2.BorderSize = 2
         CustomButton2.CornerRadius = 10
         CustomButton2.FlatStyle = FlatStyle.Flat
-        CustomButton2.Font = New Font("Segoe UI Semibold", 9.0F, FontStyle.Bold, GraphicsUnit.Point, CByte(0))
+        CustomButton2.Font = New Font("Segoe UI Semibold", 9F, FontStyle.Bold, GraphicsUnit.Point, CByte(0))
         CustomButton2.ForeColor = Color.DarkGreen
         CustomButton2.HoverColor = Color.WhiteSmoke
-        CustomButton2.Location = New Point(900, 13)
+        CustomButton2.Location = New Point(789, 10)
         CustomButton2.Margin = New Padding(3, 2, 3, 2)
         CustomButton2.Name = "CustomButton2"
         CustomButton2.NormalColor = Color.White
-        CustomButton2.Size = New Size(82, 22)
+        CustomButton2.Size = New Size(72, 16)
         CustomButton2.TabIndex = 14
         CustomButton2.Text = "Filter"
         CustomButton2.UseVisualStyleBackColor = False
@@ -551,19 +612,19 @@ Partial Class frmprof
         RoundedPanel2.Controls.Add(cboSW1)
         RoundedPanel2.Controls.Add(txtStudent)
         RoundedPanel2.CornerRadius = 20
-        RoundedPanel2.Location = New Point(9, 70)
+        RoundedPanel2.Location = New Point(8, 52)
         RoundedPanel2.Margin = New Padding(3, 2, 3, 2)
         RoundedPanel2.Name = "RoundedPanel2"
-        RoundedPanel2.Size = New Size(1063, 34)
+        RoundedPanel2.Size = New Size(931, 26)
         RoundedPanel2.TabIndex = 8
         ' 
         ' lblStatus
         ' 
         lblStatus.Anchor = AnchorStyles.Top Or AnchorStyles.Right
         lblStatus.AutoSize = True
-        lblStatus.Font = New Font("Segoe UI", 9.0F, FontStyle.Bold, GraphicsUnit.Point, CByte(0))
+        lblStatus.Font = New Font("Segoe UI", 9F, FontStyle.Bold, GraphicsUnit.Point, CByte(0))
         lblStatus.ForeColor = Color.DarkGreen
-        lblStatus.Location = New Point(964, 12)
+        lblStatus.Location = New Point(845, 9)
         lblStatus.Name = "lblStatus"
         lblStatus.Size = New Size(42, 15)
         lblStatus.TabIndex = 11
@@ -573,9 +634,9 @@ Partial Class frmprof
         ' 
         lblRunningGrade.Anchor = AnchorStyles.Top Or AnchorStyles.Right
         lblRunningGrade.AutoSize = True
-        lblRunningGrade.Font = New Font("Segoe UI", 9.0F, FontStyle.Bold, GraphicsUnit.Point, CByte(0))
+        lblRunningGrade.Font = New Font("Segoe UI", 9F, FontStyle.Bold, GraphicsUnit.Point, CByte(0))
         lblRunningGrade.ForeColor = Color.DarkGreen
-        lblRunningGrade.Location = New Point(761, 12)
+        lblRunningGrade.Location = New Point(667, 9)
         lblRunningGrade.Name = "lblRunningGrade"
         lblRunningGrade.Size = New Size(90, 15)
         lblRunningGrade.TabIndex = 10
@@ -585,9 +646,9 @@ Partial Class frmprof
         ' 
         lblMidterms.Anchor = AnchorStyles.Top Or AnchorStyles.Right
         lblMidterms.AutoSize = True
-        lblMidterms.Font = New Font("Segoe UI", 9.0F, FontStyle.Bold, GraphicsUnit.Point, CByte(0))
+        lblMidterms.Font = New Font("Segoe UI", 9F, FontStyle.Bold, GraphicsUnit.Point, CByte(0))
         lblMidterms.ForeColor = Color.DarkGreen
-        lblMidterms.Location = New Point(615, 12)
+        lblMidterms.Location = New Point(539, 9)
         lblMidterms.Name = "lblMidterms"
         lblMidterms.Size = New Size(61, 15)
         lblMidterms.TabIndex = 9
@@ -597,38 +658,38 @@ Partial Class frmprof
         ' 
         cboHW1.FormattingEnabled = True
         cboHW1.Items.AddRange(New Object() {"HW1", "HW2", "HW3", "HW4", "HW5"})
-        cboHW1.Location = New Point(321, 10)
+        cboHW1.Location = New Point(281, 8)
         cboHW1.Margin = New Padding(3, 2, 3, 2)
         cboHW1.Name = "cboHW1"
-        cboHW1.Size = New Size(76, 23)
+        cboHW1.Size = New Size(67, 23)
         cboHW1.TabIndex = 8
         ' 
         ' cboQuiz1
         ' 
         cboQuiz1.FormattingEnabled = True
         cboQuiz1.Items.AddRange(New Object() {"Quiz1", "Quiz2", "Quiz3", "Quiz4", "Quiz5"})
-        cboQuiz1.Location = New Point(415, 10)
+        cboQuiz1.Location = New Point(363, 8)
         cboQuiz1.Margin = New Padding(3, 2, 3, 2)
         cboQuiz1.Name = "cboQuiz1"
-        cboQuiz1.Size = New Size(76, 23)
+        cboQuiz1.Size = New Size(67, 23)
         cboQuiz1.TabIndex = 7
         ' 
         ' cboSW1
         ' 
         cboSW1.FormattingEnabled = True
         cboSW1.Items.AddRange(New Object() {"SW1", "SW2", "SW3", "SW4", "SW5"})
-        cboSW1.Location = New Point(225, 10)
+        cboSW1.Location = New Point(197, 8)
         cboSW1.Margin = New Padding(3, 2, 3, 2)
         cboSW1.Name = "cboSW1"
-        cboSW1.Size = New Size(76, 23)
+        cboSW1.Size = New Size(67, 23)
         cboSW1.TabIndex = 6
         ' 
         ' txtStudent
         ' 
         txtStudent.AutoSize = True
-        txtStudent.Font = New Font("Segoe UI", 9.0F, FontStyle.Bold, GraphicsUnit.Point, CByte(0))
+        txtStudent.Font = New Font("Segoe UI", 9F, FontStyle.Bold, GraphicsUnit.Point, CByte(0))
         txtStudent.ForeColor = Color.DarkGreen
-        txtStudent.Location = New Point(16, 10)
+        txtStudent.Location = New Point(14, 8)
         txtStudent.Name = "txtStudent"
         txtStudent.Size = New Size(52, 15)
         txtStudent.TabIndex = 5
@@ -640,7 +701,7 @@ Partial Class frmprof
         Label13.BackColor = Color.Transparent
         Label13.Font = New Font("Segoe UI", 13.8F, FontStyle.Bold)
         Label13.ForeColor = Color.DarkGreen
-        Label13.Location = New Point(257, 13)
+        Label13.Location = New Point(225, 10)
         Label13.Name = "Label13"
         Label13.Size = New Size(87, 25)
         Label13.TabIndex = 6
@@ -649,10 +710,10 @@ Partial Class frmprof
         ' PictureBox3
         ' 
         PictureBox3.Image = CType(resources.GetObject("PictureBox3.Image"), Image)
-        PictureBox3.Location = New Point(21, 9)
+        PictureBox3.Location = New Point(18, 7)
         PictureBox3.Margin = New Padding(3, 2, 3, 2)
         PictureBox3.Name = "PictureBox3"
-        PictureBox3.Size = New Size(38, 35)
+        PictureBox3.Size = New Size(33, 26)
         PictureBox3.SizeMode = PictureBoxSizeMode.StretchImage
         PictureBox3.TabIndex = 5
         PictureBox3.TabStop = False
@@ -663,72 +724,11 @@ Partial Class frmprof
         LblClassGradeSheet.BackColor = Color.Transparent
         LblClassGradeSheet.Font = New Font("Segoe UI", 13.8F, FontStyle.Bold)
         LblClassGradeSheet.ForeColor = Color.DarkGreen
-        LblClassGradeSheet.Location = New Point(66, 13)
+        LblClassGradeSheet.Location = New Point(58, 10)
         LblClassGradeSheet.Name = "LblClassGradeSheet"
         LblClassGradeSheet.Size = New Size(186, 25)
         LblClassGradeSheet.TabIndex = 0
         LblClassGradeSheet.Text = "Class Grade Sheet - "
-        ' 
-        ' pnlClarificationRequests
-        ' 
-        pnlClarificationRequests.Anchor = AnchorStyles.Top Or AnchorStyles.Bottom Or AnchorStyles.Left Or AnchorStyles.Right
-        pnlClarificationRequests.BackColor = Color.White
-        pnlClarificationRequests.Controls.Add(RoundedPanel3)
-        pnlClarificationRequests.Location = New Point(0, 0)
-        pnlClarificationRequests.Margin = New Padding(3, 2, 3, 2)
-        pnlClarificationRequests.Name = "pnlClarificationRequests"
-        pnlClarificationRequests.Size = New Size(1104, 400)
-        pnlClarificationRequests.TabIndex = 9
-        pnlClarificationRequests.Visible = False
-        ' 
-        ' RoundedPanel3
-        ' 
-        RoundedPanel3.Anchor = AnchorStyles.Top Or AnchorStyles.Bottom Or AnchorStyles.Left Or AnchorStyles.Right
-        RoundedPanel3.BackColor = Color.White
-        RoundedPanel3.BorderColor = Color.DarkGreen
-        RoundedPanel3.BorderThickness = 2
-        RoundedPanel3.Controls.Add(dgvRequests)
-        RoundedPanel3.Controls.Add(Label20)
-        RoundedPanel3.Controls.Add(PictureBox4)
-        RoundedPanel3.CornerRadius = 20
-        RoundedPanel3.Location = New Point(26, 24)
-        RoundedPanel3.Margin = New Padding(3, 2, 3, 2)
-        RoundedPanel3.Name = "RoundedPanel3"
-        RoundedPanel3.Size = New Size(1059, 352)
-        RoundedPanel3.TabIndex = 0
-        ' 
-        ' dgvRequests
-        ' 
-        dgvRequests.Anchor = AnchorStyles.Top Or AnchorStyles.Bottom Or AnchorStyles.Left Or AnchorStyles.Right
-        dgvRequests.ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.AutoSize
-        dgvRequests.Location = New Point(13, 58)
-        dgvRequests.Margin = New Padding(3, 2, 3, 2)
-        dgvRequests.Name = "dgvRequests"
-        dgvRequests.RowHeadersWidth = 51
-        dgvRequests.Size = New Size(1028, 284)
-        dgvRequests.TabIndex = 7
-        ' 
-        ' Label20
-        ' 
-        Label20.AutoSize = True
-        Label20.Font = New Font("Segoe UI", 13.8F, FontStyle.Bold)
-        Label20.ForeColor = Color.DarkGreen
-        Label20.Location = New Point(61, 19)
-        Label20.Name = "Label20"
-        Label20.Size = New Size(282, 25)
-        Label20.TabIndex = 6
-        Label20.Text = "Pending Clarification Requests"
-        ' 
-        ' PictureBox4
-        ' 
-        PictureBox4.Image = CType(resources.GetObject("PictureBox4.Image"), Image)
-        PictureBox4.Location = New Point(18, 13)
-        PictureBox4.Margin = New Padding(3, 2, 3, 2)
-        PictureBox4.Name = "PictureBox4"
-        PictureBox4.Size = New Size(38, 35)
-        PictureBox4.SizeMode = PictureBoxSizeMode.StretchImage
-        PictureBox4.TabIndex = 5
-        PictureBox4.TabStop = False
         ' 
         ' pnlAnalytics
         ' 
@@ -739,7 +739,7 @@ Partial Class frmprof
         pnlAnalytics.Location = New Point(0, 0)
         pnlAnalytics.Margin = New Padding(3, 2, 3, 2)
         pnlAnalytics.Name = "pnlAnalytics"
-        pnlAnalytics.Size = New Size(1104, 400)
+        pnlAnalytics.Size = New Size(966, 300)
         pnlAnalytics.TabIndex = 10
         pnlAnalytics.Visible = False
         ' 
@@ -760,10 +760,10 @@ Partial Class frmprof
         RoundedPanel5.Controls.Add(Label50)
         RoundedPanel5.Controls.Add(Label48)
         RoundedPanel5.CornerRadius = 20
-        RoundedPanel5.Location = New Point(542, 24)
+        RoundedPanel5.Location = New Point(474, 18)
         RoundedPanel5.Margin = New Padding(3, 2, 3, 2)
         RoundedPanel5.Name = "RoundedPanel5"
-        RoundedPanel5.Size = New Size(534, 292)
+        RoundedPanel5.Size = New Size(467, 219)
         RoundedPanel5.TabIndex = 1
         ' 
         ' CustomProgressBar4
@@ -773,12 +773,12 @@ Partial Class frmprof
         CustomProgressBar4.BorderColor = Color.Black
         CustomProgressBar4.CornerRadius = 11
         CustomProgressBar4.ForeColor = Color.White
-        CustomProgressBar4.Location = New Point(130, 213)
+        CustomProgressBar4.Location = New Point(114, 160)
         CustomProgressBar4.Margin = New Padding(3, 2, 3, 2)
         CustomProgressBar4.Maximum = 100
         CustomProgressBar4.Name = "CustomProgressBar4"
         CustomProgressBar4.ShowText = True
-        CustomProgressBar4.Size = New Size(378, 18)
+        CustomProgressBar4.Size = New Size(331, 14)
         CustomProgressBar4.TabIndex = 16
         CustomProgressBar4.Text = "CustomProgressBar4"
         CustomProgressBar4.TextAlign = ContentAlignment.MiddleLeft
@@ -792,12 +792,12 @@ Partial Class frmprof
         CustomProgressBar3.BorderColor = Color.Black
         CustomProgressBar3.CornerRadius = 11
         CustomProgressBar3.ForeColor = Color.White
-        CustomProgressBar3.Location = New Point(132, 161)
+        CustomProgressBar3.Location = New Point(116, 121)
         CustomProgressBar3.Margin = New Padding(3, 2, 3, 2)
         CustomProgressBar3.Maximum = 100
         CustomProgressBar3.Name = "CustomProgressBar3"
         CustomProgressBar3.ShowText = True
-        CustomProgressBar3.Size = New Size(378, 18)
+        CustomProgressBar3.Size = New Size(331, 14)
         CustomProgressBar3.TabIndex = 15
         CustomProgressBar3.Text = "CustomProgressBar3"
         CustomProgressBar3.TextAlign = ContentAlignment.MiddleLeft
@@ -811,12 +811,12 @@ Partial Class frmprof
         CustomProgressBar2.BorderColor = Color.Black
         CustomProgressBar2.CornerRadius = 11
         CustomProgressBar2.ForeColor = Color.White
-        CustomProgressBar2.Location = New Point(132, 119)
+        CustomProgressBar2.Location = New Point(116, 89)
         CustomProgressBar2.Margin = New Padding(3, 2, 3, 2)
         CustomProgressBar2.Maximum = 100
         CustomProgressBar2.Name = "CustomProgressBar2"
         CustomProgressBar2.ShowText = True
-        CustomProgressBar2.Size = New Size(378, 18)
+        CustomProgressBar2.Size = New Size(331, 14)
         CustomProgressBar2.TabIndex = 14
         CustomProgressBar2.Text = "CustomProgressBar2"
         CustomProgressBar2.TextAlign = ContentAlignment.MiddleLeft
@@ -830,12 +830,12 @@ Partial Class frmprof
         CustomProgressBar1.BorderColor = Color.Black
         CustomProgressBar1.CornerRadius = 11
         CustomProgressBar1.ForeColor = Color.White
-        CustomProgressBar1.Location = New Point(132, 80)
+        CustomProgressBar1.Location = New Point(116, 60)
         CustomProgressBar1.Margin = New Padding(3, 2, 3, 2)
         CustomProgressBar1.Maximum = 100
         CustomProgressBar1.Name = "CustomProgressBar1"
         CustomProgressBar1.ShowText = True
-        CustomProgressBar1.Size = New Size(378, 18)
+        CustomProgressBar1.Size = New Size(331, 14)
         CustomProgressBar1.TabIndex = 13
         CustomProgressBar1.Text = "CustomProgressBar1"
         CustomProgressBar1.TextAlign = ContentAlignment.MiddleLeft
@@ -845,9 +845,9 @@ Partial Class frmprof
         ' Label54
         ' 
         Label54.AutoSize = True
-        Label54.Font = New Font("Segoe UI", 10.0F)
+        Label54.Font = New Font("Segoe UI", 10F)
         Label54.ForeColor = Color.DarkGreen
-        Label54.Location = New Point(27, 216)
+        Label54.Location = New Point(24, 162)
         Label54.Name = "Label54"
         Label54.Size = New Size(57, 19)
         Label54.TabIndex = 12
@@ -856,9 +856,9 @@ Partial Class frmprof
         ' Label53
         ' 
         Label53.AutoSize = True
-        Label53.Font = New Font("Segoe UI", 10.0F)
+        Label53.Font = New Font("Segoe UI", 10F)
         Label53.ForeColor = Color.DarkGreen
-        Label53.Location = New Point(27, 164)
+        Label53.Location = New Point(24, 123)
         Label53.Name = "Label53"
         Label53.Size = New Size(47, 19)
         Label53.TabIndex = 11
@@ -867,9 +867,9 @@ Partial Class frmprof
         ' Label52
         ' 
         Label52.AutoSize = True
-        Label52.Font = New Font("Segoe UI", 10.0F)
+        Label52.Font = New Font("Segoe UI", 10F)
         Label52.ForeColor = Color.DarkGreen
-        Label52.Location = New Point(27, 121)
+        Label52.Location = New Point(24, 91)
         Label52.Name = "Label52"
         Label52.Size = New Size(63, 19)
         Label52.TabIndex = 10
@@ -878,9 +878,9 @@ Partial Class frmprof
         ' Label51
         ' 
         Label51.AutoSize = True
-        Label51.Font = New Font("Segoe UI", 10.0F)
+        Label51.Font = New Font("Segoe UI", 10F)
         Label51.ForeColor = Color.DarkGreen
-        Label51.Location = New Point(27, 80)
+        Label51.Location = New Point(24, 60)
         Label51.Name = "Label51"
         Label51.Size = New Size(56, 19)
         Label51.TabIndex = 9
@@ -890,17 +890,17 @@ Partial Class frmprof
         ' 
         Label50.Anchor = AnchorStyles.Top Or AnchorStyles.Left Or AnchorStyles.Right
         Label50.BackColor = Color.DimGray
-        Label50.Location = New Point(2, 58)
+        Label50.Location = New Point(2, 44)
         Label50.Name = "Label50"
-        Label50.Size = New Size(531, 2)
+        Label50.Size = New Size(465, 2)
         Label50.TabIndex = 8
         ' 
         ' Label48
         ' 
         Label48.AutoSize = True
-        Label48.Font = New Font("Segoe UI", 12.0F, FontStyle.Bold)
+        Label48.Font = New Font("Segoe UI", 12F, FontStyle.Bold)
         Label48.ForeColor = Color.DarkGreen
-        Label48.Location = New Point(37, 18)
+        Label48.Location = New Point(32, 14)
         Label48.Name = "Label48"
         Label48.Size = New Size(228, 21)
         Label48.TabIndex = 7
@@ -918,10 +918,10 @@ Partial Class frmprof
         RoundedPanel4.Controls.Add(Label49)
         RoundedPanel4.Controls.Add(Label47)
         RoundedPanel4.CornerRadius = 20
-        RoundedPanel4.Location = New Point(14, 24)
+        RoundedPanel4.Location = New Point(12, 18)
         RoundedPanel4.Margin = New Padding(3, 2, 3, 2)
         RoundedPanel4.Name = "RoundedPanel4"
-        RoundedPanel4.Size = New Size(534, 292)
+        RoundedPanel4.Size = New Size(467, 219)
         RoundedPanel4.TabIndex = 0
         ' 
         ' RoundedPanel9
@@ -930,19 +930,19 @@ Partial Class frmprof
         RoundedPanel9.BorderThickness = 2
         RoundedPanel9.Controls.Add(Label58)
         RoundedPanel9.CornerRadius = 20
-        RoundedPanel9.Location = New Point(8, 173)
+        RoundedPanel9.Location = New Point(7, 130)
         RoundedPanel9.Margin = New Padding(3, 2, 3, 2)
         RoundedPanel9.Name = "RoundedPanel9"
-        RoundedPanel9.Size = New Size(166, 90)
+        RoundedPanel9.Size = New Size(145, 68)
         RoundedPanel9.TabIndex = 9
         ' 
         ' Label58
         ' 
         Label58.AutoSize = True
         Label58.BackColor = Color.Transparent
-        Label58.Font = New Font("Segoe UI", 10.0F)
+        Label58.Font = New Font("Segoe UI", 10F)
         Label58.ForeColor = Color.DarkGreen
-        Label58.Location = New Point(39, 73)
+        Label58.Location = New Point(34, 55)
         Label58.Name = "Label58"
         Label58.Size = New Size(80, 19)
         Label58.TabIndex = 20
@@ -954,19 +954,19 @@ Partial Class frmprof
         RoundedPanel8.BorderThickness = 2
         RoundedPanel8.Controls.Add(Label57)
         RoundedPanel8.CornerRadius = 20
-        RoundedPanel8.Location = New Point(357, 68)
+        RoundedPanel8.Location = New Point(312, 51)
         RoundedPanel8.Margin = New Padding(3, 2, 3, 2)
         RoundedPanel8.Name = "RoundedPanel8"
-        RoundedPanel8.Size = New Size(166, 90)
+        RoundedPanel8.Size = New Size(145, 68)
         RoundedPanel8.TabIndex = 10
         ' 
         ' Label57
         ' 
         Label57.AutoSize = True
         Label57.BackColor = Color.Transparent
-        Label57.Font = New Font("Segoe UI", 10.0F)
+        Label57.Font = New Font("Segoe UI", 10F)
         Label57.ForeColor = Color.DarkGreen
-        Label57.Location = New Point(54, 70)
+        Label57.Location = New Point(47, 52)
         Label57.Name = "Label57"
         Label57.Size = New Size(55, 19)
         Label57.TabIndex = 19
@@ -978,19 +978,19 @@ Partial Class frmprof
         RoundedPanel7.BorderThickness = 2
         RoundedPanel7.Controls.Add(Label56)
         RoundedPanel7.CornerRadius = 20
-        RoundedPanel7.Location = New Point(183, 68)
+        RoundedPanel7.Location = New Point(160, 51)
         RoundedPanel7.Margin = New Padding(3, 2, 3, 2)
         RoundedPanel7.Name = "RoundedPanel7"
-        RoundedPanel7.Size = New Size(166, 90)
+        RoundedPanel7.Size = New Size(145, 68)
         RoundedPanel7.TabIndex = 9
         ' 
         ' Label56
         ' 
         Label56.AutoSize = True
         Label56.BackColor = Color.Transparent
-        Label56.Font = New Font("Segoe UI", 10.0F)
+        Label56.Font = New Font("Segoe UI", 10F)
         Label56.ForeColor = Color.DarkGreen
-        Label56.Location = New Point(46, 70)
+        Label56.Location = New Point(40, 52)
         Label56.Name = "Label56"
         Label56.Size = New Size(63, 19)
         Label56.TabIndex = 18
@@ -1002,19 +1002,19 @@ Partial Class frmprof
         RoundedPanel6.BorderThickness = 2
         RoundedPanel6.Controls.Add(Label55)
         RoundedPanel6.CornerRadius = 20
-        RoundedPanel6.Location = New Point(8, 68)
+        RoundedPanel6.Location = New Point(7, 51)
         RoundedPanel6.Margin = New Padding(3, 2, 3, 2)
         RoundedPanel6.Name = "RoundedPanel6"
-        RoundedPanel6.Size = New Size(166, 90)
+        RoundedPanel6.Size = New Size(145, 68)
         RoundedPanel6.TabIndex = 8
         ' 
         ' Label55
         ' 
         Label55.AutoSize = True
         Label55.BackColor = Color.Transparent
-        Label55.Font = New Font("Segoe UI", 10.0F)
+        Label55.Font = New Font("Segoe UI", 10F)
         Label55.ForeColor = Color.DarkGreen
-        Label55.Location = New Point(22, 70)
+        Label55.Location = New Point(19, 52)
         Label55.Name = "Label55"
         Label55.Size = New Size(110, 19)
         Label55.TabIndex = 17
@@ -1024,17 +1024,17 @@ Partial Class frmprof
         ' 
         Label49.Anchor = AnchorStyles.Top Or AnchorStyles.Left Or AnchorStyles.Right
         Label49.BackColor = Color.DimGray
-        Label49.Location = New Point(-1, 58)
+        Label49.Location = New Point(-1, 44)
         Label49.Name = "Label49"
-        Label49.Size = New Size(534, 2)
+        Label49.Size = New Size(467, 2)
         Label49.TabIndex = 7
         ' 
         ' Label47
         ' 
         Label47.AutoSize = True
-        Label47.Font = New Font("Segoe UI", 12.0F, FontStyle.Bold)
+        Label47.Font = New Font("Segoe UI", 12F, FontStyle.Bold)
         Label47.ForeColor = Color.DarkGreen
-        Label47.Location = New Point(25, 18)
+        Label47.Location = New Point(22, 14)
         Label47.Name = "Label47"
         Label47.Size = New Size(228, 21)
         Label47.TabIndex = 6
@@ -1052,7 +1052,7 @@ Partial Class frmprof
         pnlRecordScores.Location = New Point(0, 0)
         pnlRecordScores.Margin = New Padding(3, 2, 3, 2)
         pnlRecordScores.Name = "pnlRecordScores"
-        pnlRecordScores.Size = New Size(1104, 400)
+        pnlRecordScores.Size = New Size(966, 300)
         pnlRecordScores.TabIndex = 7
         pnlRecordScores.Visible = False
         ' 
@@ -1060,19 +1060,19 @@ Partial Class frmprof
         ' 
         TableLayoutPanel1.BackColor = Color.White
         TableLayoutPanel1.ColumnCount = 2
-        TableLayoutPanel1.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 50.0F))
-        TableLayoutPanel1.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 50.0F))
+        TableLayoutPanel1.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 50F))
+        TableLayoutPanel1.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 50F))
         TableLayoutPanel1.Controls.Add(RoundedPanel12, 1, 0)
         TableLayoutPanel1.Controls.Add(RoundedPanel11, 0, 0)
         TableLayoutPanel1.Dock = DockStyle.Fill
         TableLayoutPanel1.GrowStyle = TableLayoutPanelGrowStyle.FixedSize
-        TableLayoutPanel1.Location = New Point(0, 43)
+        TableLayoutPanel1.Location = New Point(0, 33)
         TableLayoutPanel1.Margin = New Padding(3, 2, 3, 2)
         TableLayoutPanel1.Name = "TableLayoutPanel1"
         TableLayoutPanel1.RowCount = 1
-        TableLayoutPanel1.RowStyles.Add(New RowStyle(SizeType.Percent, 100.0F))
-        TableLayoutPanel1.RowStyles.Add(New RowStyle(SizeType.Absolute, 356.0F))
-        TableLayoutPanel1.Size = New Size(1104, 357)
+        TableLayoutPanel1.RowStyles.Add(New RowStyle(SizeType.Percent, 100F))
+        TableLayoutPanel1.RowStyles.Add(New RowStyle(SizeType.Absolute, 268F))
+        TableLayoutPanel1.Size = New Size(966, 267)
         TableLayoutPanel1.TabIndex = 8
         ' 
         ' RoundedPanel12
@@ -1101,10 +1101,10 @@ Partial Class frmprof
         RoundedPanel12.Controls.Add(PictureBox6)
         RoundedPanel12.Controls.Add(Label6)
         RoundedPanel12.CornerRadius = 20
-        RoundedPanel12.Location = New Point(555, 2)
+        RoundedPanel12.Location = New Point(486, 2)
         RoundedPanel12.Margin = New Padding(3, 2, 3, 2)
         RoundedPanel12.Name = "RoundedPanel12"
-        RoundedPanel12.Size = New Size(546, 272)
+        RoundedPanel12.Size = New Size(477, 204)
         RoundedPanel12.TabIndex = 6
         ' 
         ' PillLabel4
@@ -1112,9 +1112,9 @@ Partial Class frmprof
         PillLabel4.Anchor = AnchorStyles.Top Or AnchorStyles.Right
         PillLabel4.BackColor = Color.Gray
         PillLabel4.CornerRadius = 20
-        PillLabel4.Location = New Point(443, 214)
+        PillLabel4.Location = New Point(387, 160)
         PillLabel4.Name = "PillLabel4"
-        PillLabel4.Size = New Size(80, 19)
+        PillLabel4.Size = New Size(70, 14)
         PillLabel4.TabIndex = 34
         PillLabel4.Text = "N/A"
         PillLabel4.TextAlign = ContentAlignment.MiddleCenter
@@ -1124,9 +1124,9 @@ Partial Class frmprof
         PillLabel3.Anchor = AnchorStyles.Top Or AnchorStyles.Right
         PillLabel3.BackColor = Color.LightGreen
         PillLabel3.CornerRadius = 20
-        PillLabel3.Location = New Point(443, 173)
+        PillLabel3.Location = New Point(387, 130)
         PillLabel3.Name = "PillLabel3"
-        PillLabel3.Size = New Size(80, 19)
+        PillLabel3.Size = New Size(70, 14)
         PillLabel3.TabIndex = 33
         PillLabel3.Text = "90/100"
         PillLabel3.TextAlign = ContentAlignment.MiddleCenter
@@ -1136,9 +1136,9 @@ Partial Class frmprof
         PillLabel2.Anchor = AnchorStyles.Top Or AnchorStyles.Right
         PillLabel2.BackColor = Color.LightGreen
         PillLabel2.CornerRadius = 20
-        PillLabel2.Location = New Point(443, 133)
+        PillLabel2.Location = New Point(387, 100)
         PillLabel2.Name = "PillLabel2"
-        PillLabel2.Size = New Size(80, 19)
+        PillLabel2.Size = New Size(70, 14)
         PillLabel2.TabIndex = 32
         PillLabel2.Text = "46/50"
         PillLabel2.TextAlign = ContentAlignment.MiddleCenter
@@ -1148,9 +1148,9 @@ Partial Class frmprof
         PillLabel1.Anchor = AnchorStyles.Top Or AnchorStyles.Right
         PillLabel1.BackColor = Color.LightGreen
         PillLabel1.CornerRadius = 20
-        PillLabel1.Location = New Point(443, 92)
+        PillLabel1.Location = New Point(387, 69)
         PillLabel1.Name = "PillLabel1"
-        PillLabel1.Size = New Size(80, 19)
+        PillLabel1.Size = New Size(70, 14)
         PillLabel1.TabIndex = 31
         PillLabel1.Text = "18/20"
         PillLabel1.TextAlign = ContentAlignment.MiddleCenter
@@ -1159,78 +1159,78 @@ Partial Class frmprof
         ' 
         Label19.Anchor = AnchorStyles.Top Or AnchorStyles.Left Or AnchorStyles.Right
         Label19.BackColor = Color.Black
-        Label19.Location = New Point(78, 225)
+        Label19.Location = New Point(68, 169)
         Label19.Name = "Label19"
-        Label19.Size = New Size(361, 2)
+        Label19.Size = New Size(315, 2)
         Label19.TabIndex = 30
         ' 
         ' Label18
         ' 
         Label18.Anchor = AnchorStyles.Top Or AnchorStyles.Left Or AnchorStyles.Right
         Label18.BackColor = Color.Black
-        Label18.Location = New Point(78, 183)
+        Label18.Location = New Point(68, 137)
         Label18.Name = "Label18"
-        Label18.Size = New Size(361, 2)
+        Label18.Size = New Size(315, 2)
         Label18.TabIndex = 29
         ' 
         ' Label17
         ' 
         Label17.Anchor = AnchorStyles.Top Or AnchorStyles.Left Or AnchorStyles.Right
         Label17.BackColor = Color.Black
-        Label17.Location = New Point(78, 145)
+        Label17.Location = New Point(68, 109)
         Label17.Name = "Label17"
-        Label17.Size = New Size(361, 2)
+        Label17.Size = New Size(315, 2)
         Label17.TabIndex = 28
         ' 
         ' Label16
         ' 
         Label16.Anchor = AnchorStyles.Top Or AnchorStyles.Left Or AnchorStyles.Right
         Label16.BackColor = Color.Black
-        Label16.Location = New Point(78, 102)
+        Label16.Location = New Point(68, 76)
         Label16.Name = "Label16"
-        Label16.Size = New Size(361, 2)
+        Label16.Size = New Size(315, 2)
         Label16.TabIndex = 27
         ' 
         ' Label15
         ' 
         Label15.BackColor = Color.White
-        Label15.Font = New Font("Segoe UI", 12.0F)
+        Label15.Font = New Font("Segoe UI", 12F)
         Label15.ForeColor = Color.DarkGreen
-        Label15.Location = New Point(14, 208)
+        Label15.Location = New Point(12, 156)
         Label15.Name = "Label15"
-        Label15.Size = New Size(226, 26)
+        Label15.Size = New Size(198, 20)
         Label15.TabIndex = 26
         Label15.Text = "SW2"
         ' 
         ' Label14
         ' 
         Label14.BackColor = Color.White
-        Label14.Font = New Font("Segoe UI", 12.0F)
+        Label14.Font = New Font("Segoe UI", 12F)
         Label14.ForeColor = Color.DarkGreen
-        Label14.Location = New Point(14, 170)
+        Label14.Location = New Point(12, 128)
         Label14.Name = "Label14"
-        Label14.Size = New Size(226, 26)
+        Label14.Size = New Size(198, 20)
         Label14.TabIndex = 25
         Label14.Text = "SW2"
         ' 
         ' Label12
         ' 
         Label12.BackColor = Color.White
-        Label12.Font = New Font("Segoe UI", 12.0F)
+        Label12.Font = New Font("Segoe UI", 12F)
         Label12.ForeColor = Color.DarkGreen
-        Label12.Location = New Point(14, 133)
+        Label12.Location = New Point(12, 100)
         Label12.Name = "Label12"
-        Label12.Size = New Size(226, 26)
+        Label12.Size = New Size(198, 20)
         Label12.TabIndex = 24
         Label12.Text = "SW2"
         ' 
         ' PictureBox7
         ' 
         PictureBox7.Image = CType(resources.GetObject("PictureBox7.Image"), Image)
-        PictureBox7.Location = New Point(14, 50)
+        PictureBox7.Location = New Point(12, 38)
         PictureBox7.Margin = New Padding(3, 2, 3, 2)
         PictureBox7.Name = "PictureBox7"
-        PictureBox7.Size = New Size(35, 30)
+        PictureBox7.Size = New Size(31, 22)
         PictureBox7.SizeMode = PictureBoxSizeMode.StretchImage
         PictureBox7.TabIndex = 23
         PictureBox7.TabStop = False
@@ -1238,11 +1238,11 @@ Partial Class frmprof
         ' Label11
         ' 
         Label11.BackColor = Color.White
-        Label11.Font = New Font("Segoe UI", 12.0F)
+        Label11.Font = New Font("Segoe UI", 12F)
         Label11.ForeColor = Color.DarkGreen
-        Label11.Location = New Point(14, 92)
+        Label11.Location = New Point(12, 69)
         Label11.Name = "Label11"
-        Label11.Size = New Size(226, 26)
+        Label11.Size = New Size(198, 20)
         Label11.TabIndex = 22
         Label11.Text = "SW1"
         ' 
@@ -1250,54 +1250,54 @@ Partial Class frmprof
         ' 
         Label10.Anchor = AnchorStyles.Top Or AnchorStyles.Right
         Label10.BackColor = Color.White
-        Label10.Font = New Font("Segoe UI", 15.0F, FontStyle.Bold)
+        Label10.Font = New Font("Segoe UI", 15F, FontStyle.Bold)
         Label10.ForeColor = Color.DarkGreen
-        Label10.Location = New Point(435, 49)
+        Label10.Location = New Point(380, 37)
         Label10.Name = "Label10"
-        Label10.Size = New Size(108, 26)
+        Label10.Size = New Size(94, 20)
         Label10.TabIndex = 21
         Label10.Text = "25-06767"
         ' 
         ' Label9
         ' 
         Label9.BackColor = Color.White
-        Label9.Font = New Font("Segoe UI", 15.0F, FontStyle.Bold)
+        Label9.Font = New Font("Segoe UI", 15F, FontStyle.Bold)
         Label9.ForeColor = Color.DarkGreen
-        Label9.Location = New Point(239, 50)
+        Label9.Location = New Point(209, 38)
         Label9.Name = "Label9"
-        Label9.Size = New Size(35, 26)
+        Label9.Size = New Size(31, 20)
         Label9.TabIndex = 20
         Label9.Text = "--"
         ' 
         ' Label8
         ' 
         Label8.BackColor = Color.White
-        Label8.Font = New Font("Segoe UI", 15.0F, FontStyle.Bold)
+        Label8.Font = New Font("Segoe UI", 15F, FontStyle.Bold)
         Label8.ForeColor = Color.DarkGreen
-        Label8.Location = New Point(48, 51)
+        Label8.Location = New Point(42, 38)
         Label8.Name = "Label8"
-        Label8.Size = New Size(226, 26)
+        Label8.Size = New Size(198, 20)
         Label8.TabIndex = 19
         Label8.Text = "Lalata, Carl Jade"
         ' 
         ' Label7
         ' 
         Label7.BackColor = Color.White
-        Label7.Font = New Font("Segoe UI", 9.0F, FontStyle.Bold)
+        Label7.Font = New Font("Segoe UI", 9F, FontStyle.Bold)
         Label7.ForeColor = Color.DarkGreen
-        Label7.Location = New Point(52, 10)
+        Label7.Location = New Point(46, 8)
         Label7.Name = "Label7"
-        Label7.Size = New Size(169, 26)
+        Label7.Size = New Size(148, 20)
         Label7.TabIndex = 18
         Label7.Text = "Record Student Score"
         ' 
         ' PictureBox6
         ' 
         PictureBox6.Image = CType(resources.GetObject("PictureBox6.Image"), Image)
-        PictureBox6.Location = New Point(14, 8)
+        PictureBox6.Location = New Point(12, 6)
         PictureBox6.Margin = New Padding(3, 2, 3, 2)
         PictureBox6.Name = "PictureBox6"
-        PictureBox6.Size = New Size(32, 28)
+        PictureBox6.Size = New Size(28, 21)
         PictureBox6.SizeMode = PictureBoxSizeMode.StretchImage
         PictureBox6.TabIndex = 18
         PictureBox6.TabStop = False
@@ -1306,9 +1306,9 @@ Partial Class frmprof
         ' 
         Label6.Anchor = AnchorStyles.Top Or AnchorStyles.Left Or AnchorStyles.Right
         Label6.BackColor = Color.Black
-        Label6.Location = New Point(3, 38)
+        Label6.Location = New Point(3, 28)
         Label6.Name = "Label6"
-        Label6.Size = New Size(533, 2)
+        Label6.Size = New Size(465, 2)
         Label6.TabIndex = 18
         ' 
         ' RoundedPanel11
@@ -1331,16 +1331,16 @@ Partial Class frmprof
         RoundedPanel11.Location = New Point(3, 2)
         RoundedPanel11.Margin = New Padding(3, 2, 3, 2)
         RoundedPanel11.Name = "RoundedPanel11"
-        RoundedPanel11.Size = New Size(546, 272)
+        RoundedPanel11.Size = New Size(477, 204)
         RoundedPanel11.TabIndex = 0
         ' 
         ' Label5
         ' 
         Label5.Anchor = AnchorStyles.Top Or AnchorStyles.Left Or AnchorStyles.Right
         Label5.BackColor = Color.Black
-        Label5.Location = New Point(3, 38)
+        Label5.Location = New Point(3, 28)
         Label5.Name = "Label5"
-        Label5.Size = New Size(544, 2)
+        Label5.Size = New Size(475, 2)
         Label5.TabIndex = 17
         ' 
         ' CustomButton5
@@ -1351,31 +1351,31 @@ Partial Class frmprof
         CustomButton5.CornerRadius = 10
         CustomButton5.ForeColor = Color.White
         CustomButton5.HoverColor = Color.DarkGreen
-        CustomButton5.Location = New Point(10, 230)
+        CustomButton5.Location = New Point(9, 172)
         CustomButton5.Margin = New Padding(3, 2, 3, 2)
         CustomButton5.Name = "CustomButton5"
         CustomButton5.NormalColor = Color.Green
-        CustomButton5.Size = New Size(523, 22)
+        CustomButton5.Size = New Size(458, 16)
         CustomButton5.TabIndex = 16
         CustomButton5.Text = "Submit and Recalculate"
         CustomButton5.UseVisualStyleBackColor = False
         ' 
         ' TextBox1
         ' 
-        TextBox1.Location = New Point(11, 177)
+        TextBox1.Location = New Point(10, 133)
         TextBox1.Margin = New Padding(3, 2, 3, 2)
         TextBox1.Name = "TextBox1"
-        TextBox1.Size = New Size(524, 23)
+        TextBox1.Size = New Size(459, 23)
         TextBox1.TabIndex = 15
         ' 
         ' Label4
         ' 
         Label4.BackColor = Color.White
-        Label4.Font = New Font("Segoe UI", 9.0F, FontStyle.Bold)
+        Label4.Font = New Font("Segoe UI", 9F, FontStyle.Bold)
         Label4.ForeColor = Color.DarkGreen
-        Label4.Location = New Point(11, 159)
+        Label4.Location = New Point(10, 119)
         Label4.Name = "Label4"
-        Label4.Size = New Size(169, 26)
+        Label4.Size = New Size(148, 20)
         Label4.TabIndex = 14
         Label4.Text = "Score"
         ' 
@@ -1383,20 +1383,20 @@ Partial Class frmprof
         ' 
         ComboBox4.DropDownStyle = ComboBoxStyle.DropDownList
         ComboBox4.FormattingEnabled = True
-        ComboBox4.Location = New Point(11, 117)
+        ComboBox4.Location = New Point(10, 88)
         ComboBox4.Margin = New Padding(3, 2, 3, 2)
         ComboBox4.Name = "ComboBox4"
-        ComboBox4.Size = New Size(524, 23)
+        ComboBox4.Size = New Size(459, 23)
         ComboBox4.TabIndex = 13
         ' 
         ' Label3
         ' 
         Label3.BackColor = Color.White
-        Label3.Font = New Font("Segoe UI", 9.0F, FontStyle.Bold)
+        Label3.Font = New Font("Segoe UI", 9F, FontStyle.Bold)
         Label3.ForeColor = Color.DarkGreen
-        Label3.Location = New Point(10, 101)
+        Label3.Location = New Point(9, 76)
         Label3.Name = "Label3"
-        Label3.Size = New Size(169, 26)
+        Label3.Size = New Size(148, 20)
         Label3.TabIndex = 12
         Label3.Text = "Assesment"
         ' 
@@ -1404,41 +1404,41 @@ Partial Class frmprof
         ' 
         ComboBox2.DropDownStyle = ComboBoxStyle.DropDownList
         ComboBox2.FormattingEnabled = True
-        ComboBox2.Location = New Point(11, 64)
+        ComboBox2.Location = New Point(10, 48)
         ComboBox2.Margin = New Padding(3, 2, 3, 2)
         ComboBox2.Name = "ComboBox2"
-        ComboBox2.Size = New Size(524, 23)
+        ComboBox2.Size = New Size(459, 23)
         ComboBox2.TabIndex = 11
         ' 
         ' Label2
         ' 
         Label2.BackColor = Color.White
-        Label2.Font = New Font("Segoe UI", 9.0F, FontStyle.Bold)
+        Label2.Font = New Font("Segoe UI", 9F, FontStyle.Bold)
         Label2.ForeColor = Color.DarkGreen
-        Label2.Location = New Point(10, 49)
+        Label2.Location = New Point(9, 37)
         Label2.Name = "Label2"
-        Label2.Size = New Size(169, 26)
+        Label2.Size = New Size(148, 20)
         Label2.TabIndex = 10
         Label2.Text = "Student"
         ' 
         ' Label1
         ' 
         Label1.BackColor = Color.White
-        Label1.Font = New Font("Segoe UI", 9.0F, FontStyle.Bold)
+        Label1.Font = New Font("Segoe UI", 9F, FontStyle.Bold)
         Label1.ForeColor = Color.DarkGreen
-        Label1.Location = New Point(52, 13)
+        Label1.Location = New Point(46, 10)
         Label1.Name = "Label1"
-        Label1.Size = New Size(169, 26)
+        Label1.Size = New Size(148, 20)
         Label1.TabIndex = 7
         Label1.Text = "Record Student Score"
         ' 
         ' PictureBox2
         ' 
         PictureBox2.Image = CType(resources.GetObject("PictureBox2.Image"), Image)
-        PictureBox2.Location = New Point(10, 7)
+        PictureBox2.Location = New Point(9, 5)
         PictureBox2.Margin = New Padding(3, 2, 3, 2)
         PictureBox2.Name = "PictureBox2"
-        PictureBox2.Size = New Size(32, 28)
+        PictureBox2.Size = New Size(28, 21)
         PictureBox2.SizeMode = PictureBoxSizeMode.StretchImage
         PictureBox2.TabIndex = 9
         PictureBox2.TabStop = False
@@ -1446,10 +1446,10 @@ Partial Class frmprof
         ' picRecord
         ' 
         picRecord.Image = CType(resources.GetObject("picRecord.Image"), Image)
-        picRecord.Location = New Point(24, 4)
+        picRecord.Location = New Point(21, 3)
         picRecord.Margin = New Padding(3, 2, 3, 2)
         picRecord.Name = "picRecord"
-        picRecord.Size = New Size(38, 35)
+        picRecord.Size = New Size(33, 26)
         picRecord.SizeMode = PictureBoxSizeMode.StretchImage
         picRecord.TabIndex = 5
         picRecord.TabStop = False
@@ -1462,7 +1462,7 @@ Partial Class frmprof
         Panel1.Location = New Point(0, 2)
         Panel1.Margin = New Padding(3, 2, 3, 2)
         Panel1.Name = "Panel1"
-        Panel1.Size = New Size(1104, 41)
+        Panel1.Size = New Size(966, 31)
         Panel1.TabIndex = 7
         ' 
         ' lblPageTitle
@@ -1471,7 +1471,7 @@ Partial Class frmprof
         lblPageTitle.BackColor = Color.White
         lblPageTitle.Font = New Font("Segoe UI", 13.8F, FontStyle.Bold, GraphicsUnit.Point, CByte(0))
         lblPageTitle.ForeColor = Color.DarkGreen
-        lblPageTitle.Location = New Point(78, 10)
+        lblPageTitle.Location = New Point(68, 8)
         lblPageTitle.Name = "lblPageTitle"
         lblPageTitle.Size = New Size(206, 25)
         lblPageTitle.TabIndex = 6
@@ -1484,7 +1484,7 @@ Partial Class frmprof
         spacerpanel.Location = New Point(0, 0)
         spacerpanel.Margin = New Padding(3, 2, 3, 2)
         spacerpanel.Name = "spacerpanel"
-        spacerpanel.Size = New Size(1104, 2)
+        spacerpanel.Size = New Size(966, 2)
         spacerpanel.TabIndex = 0
         ' 
         ' pnlAuditLogs
@@ -1495,7 +1495,7 @@ Partial Class frmprof
         pnlAuditLogs.Location = New Point(0, 0)
         pnlAuditLogs.Margin = New Padding(3, 2, 3, 2)
         pnlAuditLogs.Name = "pnlAuditLogs"
-        pnlAuditLogs.Size = New Size(1120, 540)
+        pnlAuditLogs.Size = New Size(980, 405)
         pnlAuditLogs.TabIndex = 11
         pnlAuditLogs.Visible = False
         ' 
@@ -1510,21 +1510,21 @@ Partial Class frmprof
         RoundedPanel10.Controls.Add(PictureBox5)
         RoundedPanel10.Controls.Add(Label59)
         RoundedPanel10.CornerRadius = 20
-        RoundedPanel10.Location = New Point(10, 11)
+        RoundedPanel10.Location = New Point(9, 8)
         RoundedPanel10.Margin = New Padding(3, 2, 3, 2)
         RoundedPanel10.Name = "RoundedPanel10"
-        RoundedPanel10.Size = New Size(1083, 260)
+        RoundedPanel10.Size = New Size(948, 195)
         RoundedPanel10.TabIndex = 0
         ' 
         ' dgvAuditLogs
         ' 
         dgvAuditLogs.Anchor = AnchorStyles.Top Or AnchorStyles.Bottom Or AnchorStyles.Left Or AnchorStyles.Right
         dgvAuditLogs.ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.AutoSize
-        dgvAuditLogs.Location = New Point(16, 46)
+        dgvAuditLogs.Location = New Point(14, 34)
         dgvAuditLogs.Margin = New Padding(3, 2, 3, 2)
         dgvAuditLogs.Name = "dgvAuditLogs"
         dgvAuditLogs.RowHeadersWidth = 51
-        dgvAuditLogs.Size = New Size(1054, 202)
+        dgvAuditLogs.Size = New Size(922, 152)
         dgvAuditLogs.TabIndex = 19
         ' 
         ' CustomButton1
@@ -1536,11 +1536,11 @@ Partial Class frmprof
         CustomButton1.CornerRadius = 11
         CustomButton1.ForeColor = Color.White
         CustomButton1.HoverColor = Color.DarkGreen
-        CustomButton1.Location = New Point(975, 15)
+        CustomButton1.Location = New Point(853, 11)
         CustomButton1.Margin = New Padding(3, 2, 3, 2)
         CustomButton1.Name = "CustomButton1"
         CustomButton1.NormalColor = Color.Green
-        CustomButton1.Size = New Size(94, 23)
+        CustomButton1.Size = New Size(82, 17)
         CustomButton1.TabIndex = 18
         CustomButton1.Text = "Save as Pdf"
         CustomButton1.UseVisualStyleBackColor = False
@@ -1548,10 +1548,10 @@ Partial Class frmprof
         ' PictureBox5
         ' 
         PictureBox5.Image = CType(resources.GetObject("PictureBox5.Image"), Image)
-        PictureBox5.Location = New Point(15, 3)
+        PictureBox5.Location = New Point(13, 2)
         PictureBox5.Margin = New Padding(3, 2, 3, 2)
         PictureBox5.Name = "PictureBox5"
-        PictureBox5.Size = New Size(38, 35)
+        PictureBox5.Size = New Size(33, 26)
         PictureBox5.SizeMode = PictureBoxSizeMode.StretchImage
         PictureBox5.TabIndex = 6
         PictureBox5.TabStop = False
@@ -1559,9 +1559,9 @@ Partial Class frmprof
         ' Label59
         ' 
         Label59.AutoSize = True
-        Label59.Font = New Font("Segoe UI", 11.0F)
+        Label59.Font = New Font("Segoe UI", 11F)
         Label59.ForeColor = Color.DarkGreen
-        Label59.Location = New Point(67, 13)
+        Label59.Location = New Point(59, 10)
         Label59.Name = "Label59"
         Label59.Size = New Size(193, 20)
         Label59.TabIndex = 6
@@ -1569,15 +1569,16 @@ Partial Class frmprof
         ' 
         ' frmprof
         ' 
-        AutoScaleDimensions = New SizeF(8.0F, 20.0F)
+        AutoScaleDimensions = New SizeF(7F, 15F)
         AutoScaleMode = AutoScaleMode.Font
         BackColor = Color.FromArgb(CByte(238), CByte(242), CByte(247))
-        ClientSize = New Size(1104, 505)
+        ClientSize = New Size(966, 379)
         Controls.Add(pnlContent)
         Controls.Add(pnl2ndtab)
         Controls.Add(pnlTabs)
         Controls.Add(pnlHeader)
         Cursor = Cursors.Hand
+        Margin = New Padding(3, 2, 3, 2)
         Name = "frmprof"
         StartPosition = FormStartPosition.CenterScreen
         Text = "frmprof"
@@ -1588,6 +1589,11 @@ Partial Class frmprof
         CType(PictureBox1, ComponentModel.ISupportInitialize).EndInit()
         pnl2ndtab.ResumeLayout(False)
         pnlContent.ResumeLayout(False)
+        pnlClarificationRequests.ResumeLayout(False)
+        RoundedPanel3.ResumeLayout(False)
+        RoundedPanel3.PerformLayout()
+        CType(dgvRequests, ComponentModel.ISupportInitialize).EndInit()
+        CType(PictureBox4, ComponentModel.ISupportInitialize).EndInit()
         pnlClassGrades.ResumeLayout(False)
         RoundedPanel1.ResumeLayout(False)
         RoundedPanel1.PerformLayout()
@@ -1595,11 +1601,6 @@ Partial Class frmprof
         RoundedPanel2.ResumeLayout(False)
         RoundedPanel2.PerformLayout()
         CType(PictureBox3, ComponentModel.ISupportInitialize).EndInit()
-        pnlClarificationRequests.ResumeLayout(False)
-        RoundedPanel3.ResumeLayout(False)
-        RoundedPanel3.PerformLayout()
-        CType(dgvRequests, ComponentModel.ISupportInitialize).EndInit()
-        CType(PictureBox4, ComponentModel.ISupportInitialize).EndInit()
         pnlAnalytics.ResumeLayout(False)
         RoundedPanel5.ResumeLayout(False)
         RoundedPanel5.PerformLayout()

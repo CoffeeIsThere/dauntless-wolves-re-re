@@ -408,7 +408,7 @@ Partial Class Admin
         btnAddProf.Font = New Font("Segoe UI", 9F, FontStyle.Bold, GraphicsUnit.Point, CByte(0))
         btnAddProf.ForeColor = Color.White
         btnAddProf.HoverColor = Color.LightGray
-        btnAddProf.Location = New Point(1010, 12)
+        btnAddProf.Location = New Point(1010, 7)
         btnAddProf.Margin = New Padding(3, 2, 3, 2)
         btnAddProf.Name = "btnAddProf"
         btnAddProf.NormalColor = Color.DarkGreen
@@ -474,16 +474,16 @@ Partial Class Admin
         ' tlpDashBottom
         ' 
         tlpDashBottom.ColumnCount = 2
-        tlpDashBottom.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 50.0F))
-        tlpDashBottom.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 50.0F))
+        tlpDashBottom.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 50F))
+        tlpDashBottom.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 50F))
         tlpDashBottom.Controls.Add(pnlupdatesheader, 0, 0)
         tlpDashBottom.Controls.Add(CustomPanel6, 1, 0)
         tlpDashBottom.Dock = DockStyle.Fill
         tlpDashBottom.Location = New Point(10, 186)
         tlpDashBottom.Name = "tlpDashBottom"
         tlpDashBottom.RowCount = 1
-        tlpDashBottom.RowStyles.Add(New RowStyle(SizeType.Percent, 100.0F))
-        tlpDashBottom.RowStyles.Add(New RowStyle(SizeType.Absolute, 192.0F))
+        tlpDashBottom.RowStyles.Add(New RowStyle(SizeType.Percent, 100F))
+        tlpDashBottom.RowStyles.Add(New RowStyle(SizeType.Absolute, 192F))
         tlpDashBottom.Size = New Size(1099, 191)
         tlpDashBottom.TabIndex = 2
         ' 
@@ -526,7 +526,7 @@ Partial Class Admin
         ' 
         btnupdatesfilter.Anchor = AnchorStyles.Top Or AnchorStyles.Right
         btnupdatesfilter.BackColor = Color.Honeydew
-        btnupdatesfilter.Font = New Font("Segoe UI", 9.0F, FontStyle.Bold, GraphicsUnit.Point, CByte(0))
+        btnupdatesfilter.Font = New Font("Segoe UI", 9F, FontStyle.Bold, GraphicsUnit.Point, CByte(0))
         btnupdatesfilter.ForeColor = Color.DarkGreen
         btnupdatesfilter.Location = New Point(424, 12)
         btnupdatesfilter.Name = "btnupdatesfilter"
@@ -573,8 +573,8 @@ Partial Class Admin
         ' tlpActions
         ' 
         tlpActions.ColumnCount = 2
-        tlpActions.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 50.0F))
-        tlpActions.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 50.0F))
+        tlpActions.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 50F))
+        tlpActions.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 50F))
         tlpActions.Controls.Add(btnAddClass, 0, 0)
         tlpActions.Controls.Add(btnEnterGrades, 1, 0)
         tlpActions.Controls.Add(btnViewRequests, 0, 1)
@@ -584,8 +584,8 @@ Partial Class Admin
         tlpActions.Name = "tlpActions"
         tlpActions.Padding = New Padding(10)
         tlpActions.RowCount = 2
-        tlpActions.RowStyles.Add(New RowStyle(SizeType.Percent, 50.0F))
-        tlpActions.RowStyles.Add(New RowStyle(SizeType.Percent, 50.0F))
+        tlpActions.RowStyles.Add(New RowStyle(SizeType.Percent, 50F))
+        tlpActions.RowStyles.Add(New RowStyle(SizeType.Percent, 50F))
         tlpActions.Size = New Size(510, 103)
         tlpActions.TabIndex = 5
         ' 
@@ -614,7 +614,7 @@ Partial Class Admin
         btnEnterGrades.BorderSize = 5
         btnEnterGrades.CornerRadius = 10
         btnEnterGrades.Dock = DockStyle.Fill
-        btnEnterGrades.Font = New Font("Segoe UI", 12.0F, FontStyle.Bold, GraphicsUnit.Point, CByte(0))
+        btnEnterGrades.Font = New Font("Segoe UI", 12F, FontStyle.Bold, GraphicsUnit.Point, CByte(0))
         btnEnterGrades.ForeColor = Color.DarkGreen
         btnEnterGrades.HoverColor = Color.LightGray
         btnEnterGrades.Location = New Point(258, 13)
@@ -699,10 +699,10 @@ Partial Class Admin
         ' tlpdashstats
         ' 
         tlpdashstats.ColumnCount = 4
-        tlpdashstats.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 25.0F))
-        tlpdashstats.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 25.0F))
-        tlpdashstats.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 25.0F))
-        tlpdashstats.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 25.0F))
+        tlpdashstats.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 25F))
+        tlpdashstats.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 25F))
+        tlpdashstats.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 25F))
+        tlpdashstats.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 25F))
         tlpdashstats.Controls.Add(CustomPanel5, 3, 0)
         tlpdashstats.Controls.Add(CustomPanel4, 2, 0)
         tlpdashstats.Controls.Add(CustomPanel3, 1, 0)
@@ -711,7 +711,7 @@ Partial Class Admin
         tlpdashstats.Location = New Point(10, 66)
         tlpdashstats.Name = "tlpdashstats"
         tlpdashstats.RowCount = 1
-        tlpdashstats.RowStyles.Add(New RowStyle(SizeType.Percent, 100.0F))
+        tlpdashstats.RowStyles.Add(New RowStyle(SizeType.Percent, 100F))
         tlpdashstats.Size = New Size(1099, 120)
         tlpdashstats.TabIndex = 1
         ' 
@@ -746,7 +746,7 @@ Partial Class Admin
         ' 
         Label9.AutoSize = True
         Label9.FlatStyle = FlatStyle.Flat
-        Label9.Font = New Font("Segoe UI", 12.0F, FontStyle.Bold, GraphicsUnit.Point, CByte(0))
+        Label9.Font = New Font("Segoe UI", 12F, FontStyle.Bold, GraphicsUnit.Point, CByte(0))
         Label9.ForeColor = Color.DarkGreen
         Label9.Location = New Point(53, 70)
         Label9.Name = "Label9"
@@ -786,7 +786,7 @@ Partial Class Admin
         ' 
         Label8.AutoSize = True
         Label8.FlatStyle = FlatStyle.Flat
-        Label8.Font = New Font("Segoe UI", 12.0F, FontStyle.Bold, GraphicsUnit.Point, CByte(0))
+        Label8.Font = New Font("Segoe UI", 12F, FontStyle.Bold, GraphicsUnit.Point, CByte(0))
         Label8.ForeColor = Color.DarkGreen
         Label8.Location = New Point(69, 70)
         Label8.Name = "Label8"
@@ -826,7 +826,7 @@ Partial Class Admin
         ' 
         Label7.AutoSize = True
         Label7.FlatStyle = FlatStyle.Flat
-        Label7.Font = New Font("Segoe UI", 12.0F, FontStyle.Bold, GraphicsUnit.Point, CByte(0))
+        Label7.Font = New Font("Segoe UI", 12F, FontStyle.Bold, GraphicsUnit.Point, CByte(0))
         Label7.ForeColor = Color.DarkGreen
         Label7.Location = New Point(79, 71)
         Label7.Name = "Label7"
