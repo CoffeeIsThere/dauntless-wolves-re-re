@@ -1,0 +1,76 @@
+Imports MySql.Data.MySqlClient
+Public Module AppSession
+    Public IsAdmin As Boolean = False
+    Public CurrentUser As New User()
+End Module
+Public Class User
+    Public UserId As String
+End Class
+Module Program
+    Sub Main()
+        Dim maximum, weight As Double
+        Check(ValidationHelper.TryAssessmentImportRow({"Quiz", "Quiz", "20", "Midterm", "10"}, maximum, weight), "valid assessment import row")
+        Check(Not ValidationHelper.TryAssessmentImportRow({"Quiz", "Quiz", "NaN", "Midterm", "10"}, maximum, weight), "reject nonfinite import score")
+        Check(Not ValidationHelper.TryAssessmentImportRow({"Quiz", "Quiz", "20", "1st Semester", "10"}, maximum, weight), "reject import semester")
+        Check(Not ValidationHelper.TryAssessmentImportRow({"Quiz", "Quiz", "20", "Finals", "101"}, maximum, weight), "reject invalid import weight")
+        Check(Not ValidationHelper.TryAssessmentImportRow({"Unknown", "CW", "20", "Finals", "10"}, maximum, weight), "reject unsupported import type")
+        Dim service As New GradeService()
+        Using conn = DatabaseHelper.GetConnection()
+            Dim teacher As String
+            Dim classId As Integer
+            Using cmd As New MySqlCommand("SELECT teacher_id,class_id FROM class ORDER BY class_id LIMIT 1", conn)
+                Using r = cmd.ExecuteReader()
+                    r.Read()
+                    teacher = r.GetString(0)
+                    classId = r.GetInt32(1)
+                End Using
+            End Using
+            Check(Not service.CreateAssessment(classId, "Denied", "Quiz", 20, "Midterm", "not-owner").Success, "reject other teacher")
+            Check(Not service.CreateAssessment(classId, "Invalid", "Quiz", 20, "1st Semester", teacher).Success, "reject semester as term")
+            Check(service.CreateAssessment(classId, "Review test", "Quiz", 20, "Midterm", teacher, 10).Success, "create assessment")
+            Dim id As Integer
+            Using cmd As New MySqlCommand("SELECT MAX(assessment_id) FROM assessment", conn)
+                id = CInt(cmd.ExecuteScalar())
+            End Using
+            Dim student As String
+            Using cmd As New MySqlCommand("SELECT student_id FROM enrollment WHERE class_id=" & classId & " LIMIT 1", conn)
+                student = CStr(cmd.ExecuteScalar())
+            End Using
+            Check(service.SaveAssessmentScore(student, classId, id, 15, teacher).Success, "save score")
+            Check(Not service.SaveAssessmentScore(student, classId, id, 25, teacher).Success, "reject out of range")
+            Check(Not service.SaveAssessmentScore(student, classId, id, Nothing, teacher).Success, "reject silent clearing")
+            Using cmd As New MySqlCommand("SELECT score FROM studentgrade WHERE assessment_id=" & id & " AND enrollment_id=(SELECT enrollment_id FROM enrollment WHERE class_id=" & classId & " AND student_id=@Student)", conn)
+                cmd.Parameters.AddWithValue("@Student", student)
+                Check(CDbl(cmd.ExecuteScalar()) = 15, "saved score survives rejected edits")
+            End Using
+            Check(service.GetClassGradeSheet(classId, teacher).Columns.Contains("A" & id), "grade sheet uses assessment ID")
+            Check(service.GetAuditLogsForTeacher(teacher).Rows.Count > 0, "audit query returns changes")
+            Dim revision As New RevisionRequestService()
+            Dim requestId As Integer
+            Using cmd As New MySqlCommand("INSERT INTO revisionrequest (grade_id, reason, requested_points, status) SELECT grade_id, 'Integration check', 2, 'Pending' FROM studentgrade WHERE assessment_id=@Id AND score=15 LIMIT 1; SELECT LAST_INSERT_ID();", conn)
+                cmd.Parameters.AddWithValue("@Id", id)
+                requestId = CInt(cmd.ExecuteScalar())
+            End Using
+            Check(Not revision.ApproveAndApplyRevision(requestId, "not-owner").Success, "deny approval by other teacher")
+            Check(revision.ReviewRequestResult(requestId, "Under Review", teacher).Success, "mark under review")
+            Check(revision.ApproveAndApplyRevision(requestId, teacher).Success, "approve under-review points request")
+            Check(Not revision.ApproveAndApplyRevision(requestId, teacher).Success, "prevent duplicate approval")
+            Using cmd As New MySqlCommand("INSERT INTO revisionrequest (grade_id, reason, status) SELECT grade_id, 'Recheck test', 'Under Review' FROM studentgrade WHERE assessment_id=@Id AND score=17 LIMIT 1; SELECT LAST_INSERT_ID();", conn)
+                cmd.Parameters.AddWithValue("@Id", id)
+                requestId = CInt(cmd.ExecuteScalar())
+            End Using
+            Check(revision.ApproveAndApplyRevision(requestId, teacher).Message = "NEEDSCORE", "recheck requires corrected score")
+            Check(Not revision.ApproveAndApplyRevision(requestId, teacher, 25).Success, "reject invalid corrected score")
+            Check(revision.ApproveAndApplyRevision(requestId, teacher, 18).Success, "approve corrected recheck score")
+            Using cmd As New MySqlCommand("INSERT INTO revisionrequest (grade_id, reason, status) SELECT grade_id, 'Close test', 'Pending' FROM studentgrade WHERE assessment_id=@Id AND score=18 LIMIT 1; SELECT LAST_INSERT_ID();", conn)
+                cmd.Parameters.AddWithValue("@Id", id)
+                requestId = CInt(cmd.ExecuteScalar())
+            End Using
+            Check(revision.RejectRequestResult(requestId, teacher, "Insufficient evidence").Success, "close request with reason")
+        End Using
+    End Sub
+    Sub Check(ok As Boolean, name As String)
+        If Not ok Then Throw New Exception("FAIL: " & name)
+        Console.WriteLine("PASS: " & name)
+    End Sub
+End Module

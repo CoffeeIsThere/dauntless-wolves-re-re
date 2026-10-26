@@ -15,6 +15,7 @@ Public Class ExportService
     ''' which could print a paper copy by accident).
     ''' </summary>
     Public Function ExportToPDF(printDoc As PrintDocument, targetFilePath As String) As Boolean
+        Dim temporaryFile As String = Nothing
         Try
             Dim targetPrinter As String = "Microsoft Print to PDF"
             Dim printerFound As Boolean = False
@@ -36,15 +37,48 @@ Public Class ExportService
 
             If Not String.IsNullOrEmpty(targetFilePath) Then
                 printDoc.PrinterSettings.PrintToFile = True
-                printDoc.PrinterSettings.PrintFileName = targetFilePath
+                temporaryFile = Path.Combine(Path.GetDirectoryName(Path.GetFullPath(targetFilePath)), Guid.NewGuid().ToString("N") & ".pdf")
+                printDoc.PrinterSettings.PrintFileName = temporaryFile
             End If
 
             printDoc.Print()
+            Dim timer = Stopwatch.StartNew()
+            Dim complete = False
+            Do
+                If temporaryFile IsNot Nothing AndAlso File.Exists(temporaryFile) Then
+                    Try
+                        Using stream As New FileStream(temporaryFile, FileMode.Open, FileAccess.Read, FileShare.None)
+                            If stream.Length >= 5 Then
+                                Dim header(4) As Byte
+                                stream.ReadExactly(header)
+                                complete = System.Text.Encoding.ASCII.GetString(header) = "%PDF-"
+                            End If
+                        End Using
+                    Catch ex As IOException
+                        complete = False
+                    End Try
+                End If
+                If complete Then Exit Do
+                Threading.Thread.Sleep(100)
+            Loop While timer.Elapsed < TimeSpan.FromSeconds(10)
+            If Not complete Then
+                MessageBox.Show("The PDF file was not created. Check Microsoft Print to PDF and the destination.", "PDF export")
+                Return False
+            End If
+            File.Move(temporaryFile, targetFilePath, True)
             Return True
 
         Catch ex As Exception
             MessageBox.Show("Failed to generate PDF: " & ex.Message, "Export Error", MessageBoxButtons.OK, MessageBoxIcon.Error)
             Return False
+        Finally
+            If temporaryFile IsNot Nothing AndAlso File.Exists(temporaryFile) Then
+                Try
+                    File.Delete(temporaryFile)
+                Catch ex As IOException
+                    ' The Windows spooler may still be writing a failed job.
+                End Try
+            End If
         End Try
     End Function
 

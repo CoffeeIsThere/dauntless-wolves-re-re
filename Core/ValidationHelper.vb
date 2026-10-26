@@ -37,4 +37,13 @@ Public Class ValidationHelper
     Public Shared Function IsValidWeight(weight As Double) As Boolean
         Return weight >= 0.0 AndAlso weight <= 100.0
     End Function
+    Public Shared Function TryAssessmentImportRow(fields As String(), ByRef maximum As Double, ByRef weight As Double) As Boolean
+        If fields Is Nothing OrElse fields.Length <> 5 Then Return False
+        If Not {"Quiz", "Activity", "Exam", "Project", "Attendance"}.Contains(fields(0).Trim()) Then Return False
+        If Not {"Midterm", "Finals"}.Contains(fields(3).Trim()) Then Return False
+        Return Double.TryParse(fields(2), Globalization.NumberStyles.Float, Globalization.CultureInfo.InvariantCulture, maximum) AndAlso
+            Double.IsFinite(maximum) AndAlso maximum > 0 AndAlso maximum <= 9999.99 AndAlso
+            Double.TryParse(fields(4), Globalization.NumberStyles.Float, Globalization.CultureInfo.InvariantCulture, weight) AndAlso
+            Double.IsFinite(weight) AndAlso weight > 0 AndAlso weight <= 100
+    End Function
 End Class

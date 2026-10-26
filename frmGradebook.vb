@@ -17,8 +17,7 @@ Public Class frmGradebook
     Private Const PASSING As Double = 75
 
     ' Suggestions in the Add Assessment popup (the prof can also type any other type)
-    Private ReadOnly PresetTypes As String() = {"Quiz", "Homework", "Activity", "Seatwork",
-                                                "Laboratory", "Recitation"}
+    Private ReadOnly PresetTypes As String() = {"Quiz", "Activity", "Exam", "Project", "Attendance"}
 
     ' Assessments the prof has added (starts empty)
     Private Class AssessItem
@@ -27,6 +26,8 @@ Public Class frmGradebook
         Public Type As String     ' any name: Quiz, Homework, Laboratory, ...
         Public Group As String    ' "Quiz" or "CW"
     End Class
+    Private loadingClass As Boolean
+    Private assessmentIds As New Dictionary(Of String, Integer)
     Private items As New List(Of AssessItem)
 
     ' Class info (from Add Class / imports)
@@ -36,6 +37,7 @@ Public Class frmGradebook
         Public Schedule As String
         Public Term As String
         Public SY As String
+        Public Id As Integer
     End Class
     Private classes As New Dictionary(Of String, ClassInfo)(StringComparer.OrdinalIgnoreCase)
     Private classTip As New ToolTip()
@@ -56,6 +58,31 @@ Public Class frmGradebook
     Private lblMeetings As New Label()
     Private txtMeetings As New TextBox()
 
+    Private assessmentOwner As Form
+
+    Public Sub ShowAssessmentForClass(classId As Integer, owner As Form)
+        assessmentOwner = owner
+        InitialClassId = classId
+        ' Prepare the shared assessment workflow without showing the gradebook window.
+        frmGradebook_Load(Me, EventArgs.Empty)
+        OpenAddAssessment()
+    End Sub
+
+    Public Property InitialClassId As Integer
+
+    Public Sub SelectClass(classId As Integer)
+        For Each item In cboCourse.Items
+            If classes.ContainsKey(item.ToString()) AndAlso classes(item.ToString()).Id = classId Then
+                cboCourse.SelectedItem = item
+                Return
+            End If
+        Next
+    End Sub
+
+    Public Sub OpenAddAssessment()
+        btnAddAssessment_Click(Me, EventArgs.Empty)
+    End Sub
+
     Private Sub frmGradebook_Load(sender As Object, e As EventArgs) Handles MyBase.Load
         Me.BackColor = Color.White
         EnableDoubleBuffer()
@@ -63,12 +90,16 @@ Public Class frmGradebook
         CreateMeetingsBox()
         CreateSummaryLabel()
         HookUpRevisionButton()
+        lblSummary.Tag = "Assessment scores are saved. Attendance, project percentage, exam summary, and other worksheet inputs are local calculations only."
+        classTip.SetToolTip(dgvGrades, CStr(lblSummary.Tag))
 
         cboCourse.DropDownStyle = ComboBoxStyle.DropDownList
 
         ' Load real active classes from MySQL database
         LoadClassesFromDatabase()
 
+        SelectClass(InitialClassId)
+        ConfigureToolbar()
         UpdateSummary()
     End Sub
 
@@ -81,18 +112,18 @@ Public Class frmGradebook
 
         If dt IsNot Nothing AndAlso dt.Rows.Count > 0 Then
             For Each row As DataRow In dt.Rows
-                Dim code As String = Convert.ToString(row("class_code"))
+                Dim code As String = Convert.ToString(row("class_label"))
                 Dim name As String = Convert.ToString(row("course_name"))
                 Dim term As String = Convert.ToString(row("term"))
                 Dim sy As String = Convert.ToString(row("academic_year"))
                 Dim sched As String = Convert.ToString(row("schedule"))
 
                 Dim info As New ClassInfo With {
-                    .Code = code, .Name = name, .Term = term, .SY = sy, .Schedule = sched
+                    .Code = code, .Name = name, .Term = term, .SY = sy, .Schedule = sched, .Id = Convert.ToInt32(row("class_id"))
                 }
                 classes(code) = info
 
-                Dim displayText As String = $"{code} - {name}"
+                Dim displayText As String = code
                 cboCourse.Items.Add(displayText)
             Next
 
@@ -405,6 +436,10 @@ Public Class frmGradebook
         Dim col As DataGridViewColumn = dgvGrades.Columns(e.ColumnIndex)
         If Not maxScores.ContainsKey(col.Name) Then Return
 
+        If assessmentIds.ContainsKey(col.Name) Then
+            MessageBox.Show("Existing assessment maximum scores cannot be changed from this screen.")
+            Return
+        End If
         Dim title As String = TitleOf(col.Name)
         Dim txt As String = ShowInputDialog("Max Score", "Highest possible score for " & title,
                                             maxScores(col.Name).ToString())
@@ -685,14 +720,12 @@ Public Class frmGradebook
         ComputeRow(row)
         UpdateSummary()
 
-        ' PERSISTENCE TO DATABASE:
-        ' Save score to MySQL if it is an input cell with a valid numeric score
-        If CanEditCell(cell) AndAlso cell.Value IsNot Nothing AndAlso IsNumeric(cell.Value) Then
-            Dim studentNo As String = Convert.ToString(row.Cells("StudentName").Tag) ' Stored Student ID
-            Dim classId As Integer = GetClassIdFromCode(SelectedClassCode())
-
-            ' Save asynchronously/silently via GradeService
-            _gradeService.SaveScore(studentNo, classId, colName, Convert.ToDouble(cell.Value), AppSession.CurrentUser.UserId)
+        If Not loadingClass AndAlso assessmentIds.ContainsKey(colName) Then
+            Dim result = _gradeService.SaveAssessmentScore(
+                Convert.ToString(row.Cells("StudentName").Tag), GetClassIdFromCode(SelectedClassCode()),
+                assessmentIds(colName), If(cell.Value Is Nothing, CType(Nothing, Double?), CDbl(cell.Value)), AppSession.CurrentUser.UserId)
+            If Not result.Success Then MessageBox.Show(result.Message, "Score not saved", MessageBoxButtons.OK, MessageBoxIcon.Error)
+            LoadClassData()
         End If
     End Sub
 
@@ -700,7 +733,14 @@ Public Class frmGradebook
     Private Sub dgvGrades_KeyDown(sender As Object, e As KeyEventArgs) Handles dgvGrades.KeyDown
         If e.KeyCode = Keys.Delete Then
             For Each c As DataGridViewCell In dgvGrades.SelectedCells
-                If CanEditCell(c) Then c.Value = Nothing
+                If CanEditCell(c) Then
+                    If assessmentIds.ContainsKey(dgvGrades.Columns(c.ColumnIndex).Name) Then
+                        MessageBox.Show("Enter a corrected score instead of deleting a saved grade.", "Grade not cleared")
+                        e.Handled = True
+                        Return
+                    End If
+                    c.Value = Nothing
+                End If
             Next
             ComputeAll()
             e.Handled = True
@@ -723,7 +763,14 @@ Public Class frmGradebook
             For j As Integer = 0 To parts.Length - 1
                 If c0 + j >= dgvGrades.Columns.Count Then Exit For
                 Dim cell As DataGridViewCell = dgvGrades.Rows(r0 + i).Cells(c0 + j)
-                If CanEditCell(cell) Then ApplyScore(cell, parts(j))
+                If CanEditCell(cell) AndAlso ApplyScore(cell, parts(j)) AndAlso assessmentIds.ContainsKey(dgvGrades.Columns(cell.ColumnIndex).Name) Then
+                    Dim result = _gradeService.SaveAssessmentScore(Convert.ToString(dgvGrades.Rows(cell.RowIndex).Cells("StudentName").Tag), GetClassIdFromCode(SelectedClassCode()), assessmentIds(dgvGrades.Columns(cell.ColumnIndex).Name), If(cell.Value Is Nothing, CType(Nothing, Double?), CDbl(cell.Value)), AppSession.CurrentUser.UserId)
+                    If Not result.Success Then
+                        MessageBox.Show(result.Message, "Paste stopped")
+                        LoadClassData()
+                        Return
+                    End If
+                End If
             Next
         Next
 
@@ -885,83 +932,50 @@ Public Class frmGradebook
     End Sub
 
     Private Sub LoadClassData()
-        dgvGrades.Rows.Clear()
-
-        Dim classCode As String = SelectedClassCode()
-        If String.IsNullOrEmpty(classCode) Then
-            FillEmptyRows()
-            ComputeAll()
-            Return
-        End If
-
-        Dim classId As Integer = GetClassIdFromCode(classCode)
-        If classId = 0 Then
-            FillEmptyRows()
-            ComputeAll()
-            Return
-        End If
-
-        ' 1. Load enrolled students
-        Dim dtStudents As DataTable = _gradeService.GetEnrolledStudents(classId)
-        If dtStudents IsNot Nothing AndAlso dtStudents.Rows.Count > 0 Then
-            For Each row As DataRow In dtStudents.Rows
-                Dim studentId As String = Convert.ToString(row("student_id"))
-                Dim fullName As String = Convert.ToString(row("full_name"))
-
-                Dim vals(dgvGrades.Columns.Count - 1) As Object
-                vals(dgvGrades.Columns("StudentName").Index) = fullName
-
-                Dim rowIndex As Integer = dgvGrades.Rows.Add(vals)
-                dgvGrades.Rows(rowIndex).Cells("StudentName").Tag = studentId
+        loadingClass = True
+        Try
+            dgvGrades.Rows.Clear()
+            For Each it In items
+                dgvGrades.Columns.Remove(it.Key & "Raw")
+                dgvGrades.Columns.Remove(it.Key & "GrA")
+            Next
+            items.Clear()
+            assessmentIds.Clear()
+            maxScores.Clear()
+            maxScores("ExamRaw") = 100
+            Dim classId = GetClassIdFromCode(SelectedClassCode())
+            If classId = 0 Then Return
+            For Each a As DataRow In _gradeService.GetAssessmentsByClass(classId, AppSession.CurrentUser.UserId).Rows
+                Dim key = "Assessment" & a("assessment_id").ToString()
+                Dim title = a("title").ToString()
+                Dim type = a("assessment_type").ToString()
+                Dim grp = GroupFor(type)
+                Dim at = dgvGrades.Columns(grp & "Comp").Index
+                AddCol(key & "Raw", RawHeader(title, CDbl(a("total_score"))), "input", at)
+                AddCol(key & "GrA", title & vbLf & "GrA", "calc", at + 1)
+                items.Add(New AssessItem With {.Key = key, .Title = title, .Type = type, .Group = grp})
+                maxScores(key & "Raw") = CDbl(a("total_score"))
+                assessmentIds(key & "Raw") = CInt(a("assessment_id"))
+            Next
+            Dim scores = _gradeService.GetScoresByClass(classId)
+            For Each student As DataRow In _gradeService.GetEnrollmentsByClass(classId, AppSession.CurrentUser.UserId).Rows
+                Dim idx = dgvGrades.Rows.Add()
+                Dim row = dgvGrades.Rows(idx)
+                row.Cells("StudentName").Value = student("full_name")
+                row.Cells("StudentName").Tag = student("student_id").ToString()
+                For Each score As DataRow In scores.Rows
+                    Dim col = "Assessment" & score("assessment_id").ToString() & "Raw"
+                    If score("student_id").ToString() = student("student_id").ToString() AndAlso assessmentIds.ContainsKey(col) AndAlso Not IsDBNull(score("score")) Then
+                        row.Cells(col).Value = score("score")
+                    End If
+                Next
             Next
             SortAndRenumber()
-        End If
-
-        ' 2. Load dynamic assessment columns from database
-        Dim dtAssessments As DataTable = _gradeService.GetAssessmentsByClass(classId)
-        If dtAssessments IsNot Nothing AndAlso dtAssessments.Rows.Count > 0 Then
-            For Each row As DataRow In dtAssessments.Rows
-                Dim title As String = Convert.ToString(row("title"))
-                Dim type As String = Convert.ToString(row("assessment_type"))
-                Dim grp As String = GroupFor(type)
-                Dim maxScore As Double = Convert.ToDouble(row("total_score"))
-
-                ' Avoid adding duplicate UI columns if already created
-                Dim rawColName As String = System.Text.RegularExpressions.Regex.Replace(title, "[^A-Za-z0-9]", "") & "Raw"
-                If Not dgvGrades.Columns.Contains(rawColName) Then
-                    AddAssessment(type, grp, maxScore)
-                End If
-            Next
-        End If
-
-        ' 3. Populate existing student scores into yellow input cells
-        Dim dtScores As DataTable = _gradeService.GetScoresByClass(classId)
-        If dtScores IsNot Nothing AndAlso dtScores.Rows.Count > 0 Then
-            For Each sRow As DataRow In dtScores.Rows
-                Dim sId As String = Convert.ToString(sRow("student_id"))
-                Dim title As String = Convert.ToString(sRow("title"))
-                Dim scoreVal As Object = sRow("score")
-
-                If scoreVal IsNot DBNull.Value Then
-                    Dim colKey As String = System.Text.RegularExpressions.Regex.Replace(title, "[^A-Za-z0-9]", "") & "Raw"
-
-                    ' Find matching student row in DataGridView
-                    For Each dRow As DataGridViewRow In dgvGrades.Rows
-                        If IsStudentRow(dRow) AndAlso Convert.ToString(dRow.Cells("StudentName").Tag) = sId Then
-                            If dgvGrades.Columns.Contains(colKey) Then
-                                dRow.Cells(colKey).Value = Convert.ToDouble(scoreVal)
-                            ElseIf dgvGrades.Columns.Contains("ExamRaw") AndAlso title.StartsWith("Exam", StringComparison.OrdinalIgnoreCase) Then
-                                dRow.Cells("ExamRaw").Value = Convert.ToDouble(scoreVal)
-                            End If
-                            Exit For
-                        End If
-                    Next
-                End If
-            Next
-        End If
-
-        FillEmptyRows()
-        ComputeAll()
+        Finally
+            loadingClass = False
+            FillEmptyRows()
+            ComputeAll()
+        End Try
     End Sub
 
     ' ===== Add Student: name goes into the grid, list re-sorts A-Z and renumbers =====
@@ -972,21 +986,9 @@ Public Class frmGradebook
 
         If Not ShowStudentDialog(fullName, studentNo, course) Then Return
 
-        For Each r As DataGridViewRow In dgvGrades.Rows
-            If IsStudentRow(r) AndAlso String.Equals(Convert.ToString(r.Cells("StudentName").Value),
-                                                     fullName, StringComparison.OrdinalIgnoreCase) Then
-                MessageBox.Show("That student is already in the list.", "Digital Gradebook")
-                Return
-            End If
-        Next
-
-        Dim vals(dgvGrades.Columns.Count - 1) As Object
-        vals(dgvGrades.Columns("StudentName").Index) = fullName
-        dgvGrades.Rows.Add(vals)
-
-        SortAndRenumber()
-
-        ' TODO: save fullName, studentNo and course to your database
+        Dim result = _classService.EnrollStudent(studentNo, GetClassIdFromCode(SelectedClassCode()), "Teacher", AppSession.CurrentUser.UserId)
+        If Not result.Success Then MessageBox.Show(result.Message, "Enrollment failed")
+        LoadClassData()
     End Sub
 
     ' ===== Add Assessment: type anything, it numbers itself (Quiz 1, Quiz 2, Laboratory 1 ...) =====
@@ -1004,7 +1006,14 @@ Public Class frmGradebook
         Dim currentClassCode = SelectedClassCode()
         Dim classId = GetClassIdFromCode(currentClassCode)
         Dim assessmentTitle = NextTitle(type)
-        Dim term = If(classes.ContainsKey(currentClassCode), classes(currentClassCode).Term, "Midterm")
+        Dim term = ShowInputDialog("Assessment term", "Enter Midterm or Finals", "Midterm")
+        If term = "" Then Return
+        Dim weightText = ShowInputDialog("Assessment weight", "Enter the assessment weight (greater than 0, up to 100)", "10")
+        Dim weight As Double
+        If Not TryNum(weightText, weight) OrElse weight <= 0 OrElse weight > 100 Then
+            MessageBox.Show("Enter a weight greater than 0 and up to 100.")
+            Return
+        End If
 
         ' Create assessment in MySQL
         Dim res = _gradeService.CreateAssessment(
@@ -1013,11 +1022,11 @@ Public Class frmGradebook
             type,
             maxScore,
             term,
-            CurrentUser.UserId
+            CurrentUser.UserId, weight
         )
 
         If res.Success Then
-            AddAssessment(type, grp, maxScore)
+            LoadClassData()
             MessageBox.Show($"Assessment '{assessmentTitle}' created and saved to database!", "Success", MessageBoxButtons.OK, MessageBoxIcon.Information)
         Else
             MessageBox.Show($"Could not create assessment: {res.Message}", "Database Error", MessageBoxButtons.OK, MessageBoxIcon.Error)
@@ -1228,7 +1237,7 @@ Public Class frmGradebook
             dlg.CancelButton = btnCancel
             dlg.ActiveControl = txtSurname
 
-            dlg.ShowDialog(Me)
+            dlg.ShowDialog(If(assessmentOwner, Me))
 
             If accepted Then
                 fullName = BuildName(txtSurname.Text, txtFirst.Text, txtMI.Text)
@@ -1391,7 +1400,7 @@ Public Class frmGradebook
             dlg.CancelButton = btnCancel
             dlg.ActiveControl = txtCode
 
-            dlg.ShowDialog(Me)
+            dlg.ShowDialog(If(assessmentOwner, Me))
         End Using
 
         Return result
@@ -1435,7 +1444,7 @@ Public Class frmGradebook
 
             ' Type: pick a suggestion OR type your own
             Dim lblType As New Label() With {
-                .Text = "Type (pick one or type your own, e.g. Laboratory)",
+                .Text = "Assessment type (choose a supported type)",
                 .ForeColor = Color.Gray,
                 .Font = New Font("Segoe UI", 9.0F),
                 .AutoSize = True,
@@ -1566,10 +1575,10 @@ Public Class frmGradebook
                     Dim t As String = CanonType(cboType.Text)
                     Dim m As Double
                     If t = "" Then
-                        lblError.Text = "Please enter a type (e.g. Quiz, Laboratory)."
+                        lblError.Text = "Choose an assessment type."
                         cboType.Focus()
-                    ElseIf Not System.Text.RegularExpressions.Regex.IsMatch(t, "^[A-Za-z0-9 ]+$") Then
-                        lblError.Text = "Use letters, numbers and spaces only."
+                    ElseIf Not PresetTypes.Contains(t) Then
+                        lblError.Text = "Choose Quiz, Activity, Exam, Project, or Attendance."
                         cboType.Focus()
                     ElseIf Not (TryNum(txtMax.Text, m) AndAlso m > 0) Then
                         lblError.Text = "Enter a max score greater than 0."
@@ -1591,7 +1600,7 @@ Public Class frmGradebook
             dlg.CancelButton = btnCancel
             dlg.ActiveControl = cboType
 
-            dlg.ShowDialog(Me)
+            dlg.ShowDialog(If(assessmentOwner, Me))
         End Using
 
         If accepted Then
@@ -1684,7 +1693,7 @@ Public Class frmGradebook
             dlg.ActiveControl = txt
             txt.SelectAll()
 
-            If dlg.ShowDialog(Me) = DialogResult.OK Then
+            If dlg.ShowDialog(If(assessmentOwner, Me)) = DialogResult.OK Then
                 Return txt.Text.Trim()
             End If
             Return ""
@@ -1699,10 +1708,7 @@ Public Class frmGradebook
 
     ' "IT 112 - Information Assurance" -> "IT 112"
     Private Function SelectedClassCode() As String
-        If cboCourse.SelectedItem Is Nothing Then Return ""
-        Dim text As String = cboCourse.SelectedItem.ToString()
-        Dim idx As Integer = text.IndexOf(" - ")
-        Return If(idx > 0, text.Substring(0, idx).Trim(), text.Trim())
+        Return If(cboCourse.SelectedItem Is Nothing, "", cboCourse.SelectedItem.ToString())
     End Function
 
     ' pairs = "@name", value, "@name", value ...
@@ -2072,55 +2078,85 @@ Public Class frmGradebook
     ' ----- Assessments -----
     ' File columns: Type, Counts toward (Quiz or Class Work), Max Score
     Private Function ImportAssessments(choice As String) As Boolean
-        If cboCourse.SelectedIndex = -1 Then
-            MessageBox.Show("Please select a class first.", "Digital Gradebook")
+        Dim classId = GetClassIdFromCode(SelectedClassCode())
+        If classId = 0 Then
+            MessageBox.Show("Select a class before importing.")
             Return False
         End If
-
-        Dim rows As New List(Of String())
-        If choice.StartsWith("From file") Then
-            Dim loaded As List(Of String()) = LoadCsvRows("type")
-            If loaded Is Nothing Then Return False
-            rows = loaded
-        Else
-            Dim dt As DataTable = RunQuery("SELECT type, group_name, max_score FROM assessments WHERE class_code = @c",
-                                           "@c", SelectedClassCode())
-            If dt Is Nothing Then Return False
-            For Each r As DataRow In dt.Rows
-                rows.Add(New String() {Convert.ToString(r("type")), Convert.ToString(r("group_name")),
-                                       Convert.ToString(r("max_score"))})
-            Next
+        If Not choice.StartsWith("From file") Then
+            LoadClassData()
+            MessageBox.Show("Existing assessments have been refreshed from the database.")
+            Return False
         End If
-
-        Dim added As Integer = 0
-        For Each f As String() In rows
-            If f.Length < 3 Then Continue For
-            Dim t As String = CanonType(f(0))
-            Dim m As Double
-            If t = "" OrElse Not System.Text.RegularExpressions.Regex.IsMatch(t, "^[A-Za-z0-9 ]+$") Then Continue For
-            If Not (TryNum(f(2), m) AndAlso m > 0) Then Continue For
-
-            Dim grp As String = If(f(1).Trim().ToLower().StartsWith("q"), "Quiz", "CW")
-            AddAssessment(t, grp, m)
-            added += 1
+        Dim rows = LoadCsvRows("type")
+        If rows Is Nothing Then Return False
+        ' CSV: type, group, max_score, term, weight. Validate every row before saving.
+        Dim definitions As New List(Of (Type As String, Max As Double, Term As String, Weight As Double))
+        For i = 0 To rows.Count - 1
+            Dim fields = rows(i)
+            Dim maximum, weight As Double
+            If Not ValidationHelper.TryAssessmentImportRow(fields, maximum, weight) Then
+                MessageBox.Show("Invalid CSV row " & (i + 1) & ". Expected: type,group,max_score,term,weight. Types: Quiz, Activity, Exam, Project, Attendance; term: Midterm or Finals.")
+                Return False
+            End If
+            definitions.Add((fields(0).Trim(), maximum, fields(3).Trim(), weight))
         Next
-
-        If added = 0 Then
-            MessageBox.Show("No valid assessments were found.", "Digital Gradebook")
-            Return False
-        End If
-        MessageBox.Show("Imported " & added & " assessments.", "Digital Gradebook")
+        If definitions.Count = 0 Then Return False
+        If MessageBox.Show("Save " & definitions.Count & " assessments to the selected class?", "Confirm import", MessageBoxButtons.YesNo) <> DialogResult.Yes Then Return False
+        Dim added = 0
+        For Each definition In definitions
+            Dim result = _gradeService.CreateAssessment(classId, NextTitle(definition.Type), definition.Type, definition.Max, definition.Term, AppSession.CurrentUser.UserId, definition.Weight)
+            If Not result.Success Then
+                MessageBox.Show("Imported " & added & " assessments before stopping: " & result.Message)
+                LoadClassData()
+                Return False
+            End If
+            added += 1
+            LoadClassData()
+        Next
+        MessageBox.Show("Imported " & added & " assessments.")
         Return True
     End Function
 
+    Private Sub ConfigureToolbar()
+        Dim toolbar As New FlowLayoutPanel With {.Dock = DockStyle.Fill, .WrapContents = True, .AutoScroll = True, .Padding = New Padding(8), .BackColor = Color.White}
+        Dim controls() As Control = {Label1, cboCourse, btnAddClass, btnAddStudent, btnAddAssessment, CustomButton2, lblMeetings, txtMeetings, CustomButton1}
+        For Each control In controls
+            control.Dock = DockStyle.None
+            control.Anchor = AnchorStyles.Top Or AnchorStyles.Left
+            control.Margin = New Padding(4, 3, 4, 3)
+            control.Height = 26
+            If TypeOf control Is Button Then
+                control.Font = New Font("Segoe UI", 9)
+                control.Width = TextRenderer.MeasureText(control.Text, control.Font).Width + 20
+            End If
+            toolbar.Controls.Add(control)
+        Next
+        Label1.Font = New Font("Segoe UI", 12, FontStyle.Bold)
+        Label1.Width = 180
+        cboCourse.Width = 190
+        ' Keep the meetings label and value together when the toolbar wraps.
+        Dim meetingsGroup As New FlowLayoutPanel With {.AutoSize = True, .WrapContents = False, .Margin = New Padding(4, 3, 4, 3)}
+        lblMeetings.AutoSize = True
+        lblMeetings.Margin = New Padding(0, 4, 4, 0)
+        txtMeetings.Width = 42
+        txtMeetings.Margin = New Padding(0)
+        meetingsGroup.Controls.AddRange({lblMeetings, txtMeetings})
+        toolbar.Controls.Add(meetingsGroup)
+        toolbar.Controls.SetChildIndex(meetingsGroup, toolbar.Controls.IndexOf(CustomButton1))
+        PictureBox1.Visible = False
+        Panel2.Controls.Add(toolbar)
+        toolbar.BringToFront()
+        Dim resizeToolbar As EventHandler = Sub(sender, args)
+                                                Panel2.Height = Math.Max(58, toolbar.GetPreferredSize(New Size(Math.Max(300, Panel2.ClientSize.Width), 0)).Height + 12)
+                                            End Sub
+        AddHandler Panel2.SizeChanged, resizeToolbar
+        resizeToolbar(Me, EventArgs.Empty)
+    End Sub
 
     Private Function GetClassIdFromCode(code As String) As Integer
-        If String.IsNullOrEmpty(code) Then Return 0
-        Dim dt As DataTable = _classService.GetClassByCode(code)
-        If dt IsNot Nothing AndAlso dt.Rows.Count > 0 Then
-            Return Convert.ToInt32(dt.Rows(0)("class_id"))
-        End If
-        Return 0
+        If code Is Nothing OrElse Not classes.ContainsKey(code) Then Return 0
+        Return classes(code).Id
     End Function
 
     Public Sub ReviewPendingRevisionRequests()

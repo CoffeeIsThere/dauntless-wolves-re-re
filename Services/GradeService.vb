@@ -519,7 +519,7 @@ Public Class GradeService
     ' Fetch all assessments for a specific teacher's class
     Public Function GetAssessmentsByClass(classId As Integer, teacherId As String) As DataTable
         Dim sql As String =
-            "SELECT a.assessment_id, a.title, a.term, a.total_score " &
+            "SELECT a.assessment_id, a.title, a.term, a.total_score, a.assessment_type " &
             "FROM assessment a JOIN class c ON a.class_id = c.class_id " &
             "WHERE a.class_id = @ClassId AND c.teacher_id = @TeacherId " &
             "ORDER BY a.term, a.created_at, a.assessment_id"
@@ -575,28 +575,47 @@ Public Class GradeService
         Return DatabaseHelper.ExecuteQuery(sql, {New MySqlParameter("@TeacherId", teacherId)})
     End Function
 
-    Public Function CreateAssessment(classId As Integer, title As String, assessmentType As String, maxScore As Double, term As String, createdBy As String) As OperationResult
+    Public Function CreateAssessment(classId As Integer, title As String, assessmentType As String, maxScore As Double, term As String, createdBy As String, Optional weight As Double = 10) As OperationResult
+        If term <> "Midterm" AndAlso term <> "Finals" Then Return OperationResult.Fail("Term must be Midterm or Finals.")
+        If Not {"Quiz", "Activity", "Exam", "Project", "Attendance"}.Contains(assessmentType) Then Return OperationResult.Fail("Choose Quiz, Activity, Exam, Project, or Attendance as the assessment type.")
+        If Double.IsNaN(maxScore) OrElse Double.IsInfinity(maxScore) OrElse maxScore <= 0 OrElse maxScore > 9999.99 OrElse weight <= 0 OrElse weight > 100 OrElse Double.IsNaN(weight) Then Return OperationResult.Fail("Invalid maximum score or weight.")
         Try
-            Dim sql As String = "INSERT INTO assessments (class_id, title, assessment_type, total_score, term, created_by) " &
-                               "VALUES (@classId, @title, @type, @maxScore, @term, @createdBy)"
-            Dim params As MySqlParameter() = {
-                New MySqlParameter("@classId", classId),
-                New MySqlParameter("@title", title),
-                New MySqlParameter("@type", assessmentType),
-                New MySqlParameter("@maxScore", maxScore),
-                New MySqlParameter("@term", term),
-                New MySqlParameter("@createdBy", createdBy)
-            }
-
-            Dim rows As Integer = DatabaseHelper.ExecuteNonQuery(sql, params)
-            If rows > 0 Then
-                Return OperationResult.Ok("Assessment created successfully.")
-            Else
-                Return OperationResult.Fail("Failed to insert assessment record.")
-            End If
+            Using conn = DatabaseHelper.GetConnection()
+                Using tx = conn.BeginTransaction()
+                    Using cmd As New MySqlCommand("SELECT teacher_id FROM class WHERE class_id = @Id FOR UPDATE", conn, tx)
+                        cmd.Parameters.AddWithValue("@Id", classId)
+                        If Convert.ToString(cmd.ExecuteScalar()) <> createdBy Then Return OperationResult.Fail("You can only create assessments for your own classes.")
+                    End Using
+                    Using cmd As New MySqlCommand("INSERT INTO assessment (class_id,title,assessment_type,total_score,term,weight) VALUES (@Id,@Title,@Type,@Max,@Term,@Weight)", conn, tx)
+                        cmd.Parameters.AddWithValue("@Id", classId)
+                        cmd.Parameters.AddWithValue("@Title", title)
+                        cmd.Parameters.AddWithValue("@Type", assessmentType)
+                        cmd.Parameters.AddWithValue("@Max", maxScore)
+                        cmd.Parameters.AddWithValue("@Term", term)
+                        cmd.Parameters.AddWithValue("@Weight", weight)
+                        cmd.ExecuteNonQuery()
+                        Dim id = cmd.LastInsertedId
+                        Using seed As New MySqlCommand("INSERT INTO studentgrade (enrollment_id,assessment_id) SELECT enrollment_id,@Assessment FROM enrollment WHERE class_id=@Class", conn, tx)
+                            seed.Parameters.AddWithValue("@Assessment", id)
+                            seed.Parameters.AddWithValue("@Class", classId)
+                            seed.ExecuteNonQuery()
+                        End Using
+                        AuditService.LogActionTx(conn, tx, "Teacher", createdBy, "Created assessment", "Assessment", id.ToString(), Nothing, title)
+                    End Using
+                    tx.Commit()
+                    Return OperationResult.Ok("Assessment created.")
+                End Using
+            End Using
         Catch ex As Exception
-            Return OperationResult.Fail($"Database error: {ex.Message}")
+            Return OperationResult.Fail("Could not create assessment: " & ex.Message)
         End Try
+    End Function
+
+    Public Function SaveAssessmentScore(studentId As String, classId As Integer, assessmentId As Integer, score As Double?, teacherId As String) As OperationResult
+        Dim enrollmentId = GetEnrollmentIdByStudentAndClass(studentId, classId)
+        If enrollmentId = 0 Then Return OperationResult.Fail("Student is not enrolled in this class.")
+        If Not score.HasValue Then Return OperationResult.Fail("Clearing a saved grade is not supported. Enter a corrected score instead.")
+        Return RecordScore(enrollmentId, assessmentId, score.Value, teacherId, "Edited in digital gradebook")
     End Function
 
     Public Function EnrollStudentInClass(studentNo As String, classId As Integer) As OperationResult
@@ -615,27 +634,6 @@ Public Class GradeService
             End If
         Catch ex As Exception
             Return OperationResult.Fail($"Database error: {ex.Message}")
-        End Try
-    End Function
-
-    Public Function SaveScore(studentId As String, classId As Integer, assessmentKey As String, score As Double, updatedBy As String) As OperationResult
-        Try
-            Dim sql As String = "INSERT INTO scores (student_id, class_id, item_name, score, updated_by) " &
-                               "VALUES (@studentId, @classId, @key, @score, @updatedBy) " &
-                               "ON DUPLICATE KEY UPDATE score = @score, updated_by = @updatedBy, updated_at = NOW()"
-
-            Dim params As MySqlParameter() = {
-                New MySqlParameter("@studentId", studentId),
-                New MySqlParameter("@classId", classId),
-                New MySqlParameter("@key", assessmentKey),
-                New MySqlParameter("@score", score),
-                New MySqlParameter("@updatedBy", updatedBy)
-            }
-
-            DatabaseHelper.ExecuteNonQuery(sql, params)
-            Return OperationResult.Ok("Score saved successfully.")
-        Catch ex As Exception
-            Return OperationResult.Fail($"Failed to save score: {ex.Message}")
         End Try
     End Function
 
