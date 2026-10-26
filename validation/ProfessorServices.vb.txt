@@ -8,6 +8,12 @@ Public Class User
 End Class
 Module Program
     Sub Main()
+        Dim maximum, weight As Double
+        Check(ValidationHelper.TryAssessmentImportRow({"Quiz", "Quiz", "20", "Midterm", "10"}, maximum, weight), "valid assessment import row")
+        Check(Not ValidationHelper.TryAssessmentImportRow({"Quiz", "Quiz", "NaN", "Midterm", "10"}, maximum, weight), "reject nonfinite import score")
+        Check(Not ValidationHelper.TryAssessmentImportRow({"Quiz", "Quiz", "20", "1st Semester", "10"}, maximum, weight), "reject import semester")
+        Check(Not ValidationHelper.TryAssessmentImportRow({"Quiz", "Quiz", "20", "Finals", "101"}, maximum, weight), "reject invalid import weight")
+        Check(Not ValidationHelper.TryAssessmentImportRow({"Unknown", "CW", "20", "Finals", "10"}, maximum, weight), "reject unsupported import type")
         Dim service As New GradeService()
         Using conn = DatabaseHelper.GetConnection()
             Dim teacher As String
@@ -39,6 +45,28 @@ Module Program
             End Using
             Check(service.GetClassGradeSheet(classId, teacher).Columns.Contains("A" & id), "grade sheet uses assessment ID")
             Check(service.GetAuditLogsForTeacher(teacher).Rows.Count > 0, "audit query returns changes")
+            Dim revision As New RevisionRequestService()
+            Dim requestId As Integer
+            Using cmd As New MySqlCommand("INSERT INTO revisionrequest (grade_id, reason, requested_points, status) SELECT grade_id, 'Integration check', 2, 'Pending' FROM studentgrade WHERE assessment_id=@Id AND score=15 LIMIT 1; SELECT LAST_INSERT_ID();", conn)
+                cmd.Parameters.AddWithValue("@Id", id)
+                requestId = CInt(cmd.ExecuteScalar())
+            End Using
+            Check(Not revision.ApproveAndApplyRevision(requestId, "not-owner").Success, "deny approval by other teacher")
+            Check(revision.ReviewRequestResult(requestId, "Under Review", teacher).Success, "mark under review")
+            Check(revision.ApproveAndApplyRevision(requestId, teacher).Success, "approve under-review points request")
+            Check(Not revision.ApproveAndApplyRevision(requestId, teacher).Success, "prevent duplicate approval")
+            Using cmd As New MySqlCommand("INSERT INTO revisionrequest (grade_id, reason, status) SELECT grade_id, 'Recheck test', 'Under Review' FROM studentgrade WHERE assessment_id=@Id AND score=17 LIMIT 1; SELECT LAST_INSERT_ID();", conn)
+                cmd.Parameters.AddWithValue("@Id", id)
+                requestId = CInt(cmd.ExecuteScalar())
+            End Using
+            Check(revision.ApproveAndApplyRevision(requestId, teacher).Message = "NEEDSCORE", "recheck requires corrected score")
+            Check(Not revision.ApproveAndApplyRevision(requestId, teacher, 25).Success, "reject invalid corrected score")
+            Check(revision.ApproveAndApplyRevision(requestId, teacher, 18).Success, "approve corrected recheck score")
+            Using cmd As New MySqlCommand("INSERT INTO revisionrequest (grade_id, reason, status) SELECT grade_id, 'Close test', 'Pending' FROM studentgrade WHERE assessment_id=@Id AND score=18 LIMIT 1; SELECT LAST_INSERT_ID();", conn)
+                cmd.Parameters.AddWithValue("@Id", id)
+                requestId = CInt(cmd.ExecuteScalar())
+            End Using
+            Check(revision.RejectRequestResult(requestId, teacher, "Insufficient evidence").Success, "close request with reason")
         End Using
     End Sub
     Sub Check(ok As Boolean, name As String)

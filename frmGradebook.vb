@@ -58,6 +58,21 @@ Public Class frmGradebook
     Private lblMeetings As New Label()
     Private txtMeetings As New TextBox()
 
+    Public Property InitialClassId As Integer
+
+    Public Sub SelectClass(classId As Integer)
+        For Each item In cboCourse.Items
+            If classes.ContainsKey(item.ToString()) AndAlso classes(item.ToString()).Id = classId Then
+                cboCourse.SelectedItem = item
+                Return
+            End If
+        Next
+    End Sub
+
+    Public Sub OpenAddAssessment()
+        btnAddAssessment_Click(Me, EventArgs.Empty)
+    End Sub
+
     Private Sub frmGradebook_Load(sender As Object, e As EventArgs) Handles MyBase.Load
         Me.BackColor = Color.White
         EnableDoubleBuffer()
@@ -73,6 +88,8 @@ Public Class frmGradebook
         ' Load real active classes from MySQL database
         LoadClassesFromDatabase()
 
+        SelectClass(InitialClassId)
+        ConfigureToolbar()
         UpdateSummary()
     End Sub
 
@@ -1417,7 +1434,7 @@ Public Class frmGradebook
 
             ' Type: pick a suggestion OR type your own
             Dim lblType As New Label() With {
-                .Text = "Type (pick one or type your own, e.g. Laboratory)",
+                .Text = "Assessment type (choose a supported type)",
                 .ForeColor = Color.Gray,
                 .Font = New Font("Segoe UI", 9.0F),
                 .AutoSize = True,
@@ -1548,7 +1565,7 @@ Public Class frmGradebook
                     Dim t As String = CanonType(cboType.Text)
                     Dim m As Double
                     If t = "" Then
-                        lblError.Text = "Please enter a type (e.g. Quiz, Laboratory)."
+                        lblError.Text = "Choose an assessment type."
                         cboType.Focus()
                     ElseIf Not PresetTypes.Contains(t) Then
                         lblError.Text = "Choose Quiz, Activity, Exam, Project, or Attendance."
@@ -2051,47 +2068,66 @@ Public Class frmGradebook
     ' ----- Assessments -----
     ' File columns: Type, Counts toward (Quiz or Class Work), Max Score
     Private Function ImportAssessments(choice As String) As Boolean
-        If cboCourse.SelectedIndex = -1 Then
-            MessageBox.Show("Please select a class first.", "Digital Gradebook")
+        Dim classId = GetClassIdFromCode(SelectedClassCode())
+        If classId = 0 Then
+            MessageBox.Show("Select a class before importing.")
             Return False
         End If
-
-        Dim rows As New List(Of String())
-        If choice.StartsWith("From file") Then
-            Dim loaded As List(Of String()) = LoadCsvRows("type")
-            If loaded Is Nothing Then Return False
-            rows = loaded
-        Else
-            Dim dt As DataTable = RunQuery("SELECT type, group_name, max_score FROM assessments WHERE class_code = @c",
-                                           "@c", SelectedClassCode())
-            If dt Is Nothing Then Return False
-            For Each r As DataRow In dt.Rows
-                rows.Add(New String() {Convert.ToString(r("type")), Convert.ToString(r("group_name")),
-                                       Convert.ToString(r("max_score"))})
-            Next
+        If Not choice.StartsWith("From file") Then
+            LoadClassData()
+            MessageBox.Show("Existing assessments have been refreshed from the database.")
+            Return False
         End If
-
-        Dim added As Integer = 0
-        For Each f As String() In rows
-            If f.Length < 3 Then Continue For
-            Dim t As String = CanonType(f(0))
-            Dim m As Double
-            If t = "" OrElse Not System.Text.RegularExpressions.Regex.IsMatch(t, "^[A-Za-z0-9 ]+$") Then Continue For
-            If Not (TryNum(f(2), m) AndAlso m > 0) Then Continue For
-
-            Dim grp As String = If(f(1).Trim().ToLower().StartsWith("q"), "Quiz", "CW")
-            AddAssessment(t, grp, m)
-            added += 1
+        Dim rows = LoadCsvRows("type")
+        If rows Is Nothing Then Return False
+        ' CSV: type, group, max_score, term, weight. Validate every row before saving.
+        Dim definitions As New List(Of (Type As String, Max As Double, Term As String, Weight As Double))
+        For i = 0 To rows.Count - 1
+            Dim fields = rows(i)
+            Dim maximum, weight As Double
+            If Not ValidationHelper.TryAssessmentImportRow(fields, maximum, weight) Then
+                MessageBox.Show("Invalid CSV row " & (i + 1) & ". Expected: type,group,max_score,term,weight. Types: Quiz, Activity, Exam, Project, Attendance; term: Midterm or Finals.")
+                Return False
+            End If
+            definitions.Add((fields(0).Trim(), maximum, fields(3).Trim(), weight))
         Next
-
-        If added = 0 Then
-            MessageBox.Show("No valid assessments were found.", "Digital Gradebook")
-            Return False
-        End If
-        MessageBox.Show("Imported " & added & " assessments.", "Digital Gradebook")
+        If definitions.Count = 0 Then Return False
+        If MessageBox.Show("Save " & definitions.Count & " assessments to the selected class?", "Confirm import", MessageBoxButtons.YesNo) <> DialogResult.Yes Then Return False
+        Dim added = 0
+        For Each definition In definitions
+            Dim result = _gradeService.CreateAssessment(classId, NextTitle(definition.Type), definition.Type, definition.Max, definition.Term, AppSession.CurrentUser.UserId, definition.Weight)
+            If Not result.Success Then
+                MessageBox.Show("Imported " & added & " assessments before stopping: " & result.Message)
+                LoadClassData()
+                Return False
+            End If
+            added += 1
+            LoadClassData()
+        Next
+        MessageBox.Show("Imported " & added & " assessments.")
         Return True
     End Function
 
+    Private Sub ConfigureToolbar()
+        Dim toolbar As New FlowLayoutPanel With {.Dock = DockStyle.Fill, .WrapContents = True, .AutoScroll = True, .Padding = New Padding(12), .BackColor = Color.White}
+        Dim controls() As Control = {Label1, cboCourse, btnAddClass, btnAddStudent, btnAddAssessment, CustomButton2, lblMeetings, txtMeetings, CustomButton1}
+        For Each control In controls
+            control.Dock = DockStyle.None
+            control.Anchor = AnchorStyles.Top Or AnchorStyles.Left
+            control.Margin = New Padding(5)
+            control.Height = 32
+            If TypeOf control Is Button Then control.Width = Math.Max(145, control.PreferredSize.Width + 20)
+            toolbar.Controls.Add(control)
+        Next
+        PictureBox1.Visible = False
+        Panel2.Controls.Add(toolbar)
+        toolbar.BringToFront()
+        Dim resizeToolbar As EventHandler = Sub(sender, args)
+                                                Panel2.Height = Math.Max(90, toolbar.GetPreferredSize(New Size(Math.Max(300, Panel2.ClientSize.Width), 0)).Height + 12)
+                                            End Sub
+        AddHandler Panel2.SizeChanged, resizeToolbar
+        resizeToolbar(Me, EventArgs.Empty)
+    End Sub
 
     Private Function GetClassIdFromCode(code As String) As Integer
         If code Is Nothing OrElse Not classes.ContainsKey(code) Then Return 0

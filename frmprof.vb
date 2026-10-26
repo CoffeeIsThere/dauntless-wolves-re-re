@@ -64,6 +64,8 @@ Public Class frmprof
         ConfigureRequestsGrid()
         ConfigureAuditGrid()
         BuildAnalyticsLabels()
+        ConfigureProfessorLayout()
+        LoadAnalytics()
     End Sub
 
     ' Helper function: loops through all controls, including nested ones
@@ -153,7 +155,7 @@ Public Class frmprof
             Return
         End If
 
-        Dim dt As DataTable = _gradeService.GetClassGradeSheet(classId, _currentTeacherId)
+        Dim dt As DataTable = _gradeService.GetClassGradeSheet(classId, _currentTeacherId, If(ComboBox3.SelectedItem Is Nothing, "All", ComboBox3.SelectedItem.ToString()))
 
         If dt IsNot Nothing AndAlso dt.Rows.Count > 0 Then
             dgvClassGrades.DataSource = dt
@@ -180,7 +182,8 @@ Public Class frmprof
         dgvClassGrades.ScrollBars = ScrollBars.Both
         For Each col As DataGridViewColumn In dgvClassGrades.Columns
             col.Visible = col.Name <> "EnrollmentId" AndAlso col.Name <> "StudentId"
-            col.AutoSizeMode = DataGridViewAutoSizeColumnMode.AllCells
+            col.AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill
+            col.MinimumWidth = 85
             If col.Name = "Student" Then col.MinimumWidth = 180
             If col.Name = "RunningGrade" Then col.HeaderText = "Running Grade"
         Next
@@ -274,7 +277,7 @@ Public Class frmprof
             Dim btnCol As New DataGridViewButtonColumn()
             btnCol.Name = "Action"
             btnCol.DataPropertyName = "Action"
-            btnCol.HeaderText = "Action"
+            btnCol.HeaderText = "Review / Approve"
             btnCol.FillWeight = 12
             btnCol.FlatStyle = FlatStyle.Flat
             btnCol.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter
@@ -321,7 +324,7 @@ Public Class frmprof
 
             Dim reason As String = row("reason").ToString()
             Dim status As String = row("status").ToString()
-            Dim action As String = If(status = "Pending" OrElse status = "Under Review", "Approve", "Closed")
+            Dim action As String = If(status = "Pending" OrElse status = "Under Review", "Review", "Closed")
 
             dt.Rows.Add(reqId, enrolId, assessId, reqPtsVal, studentName, assessTitle, currScore, reqPtsStr, reason, status, action)
         Next
@@ -363,38 +366,15 @@ Public Class frmprof
     Private Sub dgvRequests_CellContentClick(sender As Object, e As DataGridViewCellEventArgs) _
         Handles dgvRequests.CellContentClick
 
-        If e.RowIndex < 0 Then Exit Sub
+        If e.RowIndex < 0 OrElse e.ColumnIndex < 0 Then Exit Sub
         If dgvRequests.Columns(e.ColumnIndex).Name <> "Action" Then Exit Sub
 
         Dim row As DataGridViewRow = dgvRequests.Rows(e.RowIndex)
-        If row.Cells("Action").Value.ToString() <> "Approve" Then Exit Sub
+        If row.Cells("Action").Value.ToString() <> "Review" Then Exit Sub
 
-        If MessageBox.Show("Approve this revision request and update the student's grade?", "Confirm Revision Approval",
-                           MessageBoxButtons.YesNo, MessageBoxIcon.Question) = DialogResult.Yes Then
-
-            Dim drv As DataRowView = DirectCast(row.DataBoundItem, DataRowView)
-            If drv Is Nothing Then Exit Sub
-
-            Dim requestId As Integer = Convert.ToInt32(drv("RequestId"))
-
-            Dim result As OperationResult = _revisionService.ApproveAndApplyRevision(requestId, _currentTeacherId)
-
-            If Not result.Success AndAlso result.Message = "NEEDSCORE" Then
-                Dim txt As String = InputBox("Enter the corrected score for this assessment:", "Re-check")
-                Dim fixedScore As Double
-                If txt = "" OrElse Not Double.TryParse(txt, Globalization.NumberStyles.Float,
-                                                       Globalization.CultureInfo.InvariantCulture, fixedScore) Then Exit Sub
-                result = _revisionService.ApproveAndApplyRevision(requestId, _currentTeacherId, fixedScore)
-            End If
-
-            If result.Success Then
-                MessageBox.Show(result.Message, "Request Approved", MessageBoxButtons.OK, MessageBoxIcon.Information)
-                LoadRequests()
-                LoadClassGrades()
-            Else
-                MessageBox.Show(result.Message, "Approval Failed", MessageBoxButtons.OK, MessageBoxIcon.Error)
-            End If
-        End If
+        Dim drv = TryCast(row.DataBoundItem, DataRowView)
+        If drv Is Nothing Then Return
+        ReviewRequest(CInt(drv("RequestId")))
     End Sub
 
     ' =====================================================
@@ -530,7 +510,7 @@ Public Class frmprof
         l.ForeColor = textColor
         l.Font = New Font("Segoe UI", 20.0F, FontStyle.Bold)
         l.TextAlign = ContentAlignment.MiddleCenter
-        l.SetBounds(0, 10, tile.Width, 55)
+        l.SetBounds(0, 4, tile.Width, 44)
         l.Anchor = AnchorStyles.Top Or AnchorStyles.Left Or AnchorStyles.Right
         tile.Controls.Add(l)
         l.BringToFront()
@@ -546,17 +526,15 @@ Public Class frmprof
 
         Dim tiles() As Control = {RoundedPanel6, RoundedPanel7, RoundedPanel8, RoundedPanel9}
         Dim valueLabels() As Label = {lblClassAvg, lblPassing, lblAtRisk, lblTopScore}
+        Dim captions = {"Class Average", "Passing Students", "At-Risk Students", "Highest Grade"}
         For i As Integer = 0 To tiles.Length - 1
-            For Each c As Control In tiles(i).Controls
-                If TypeOf c Is Label AndAlso c IsNot valueLabels(i) Then
-                    Dim cap As Label = DirectCast(c, Label)
-                    cap.AutoSize = False
-                    cap.Dock = DockStyle.Bottom
-                    cap.Height = 30
-                    cap.TextAlign = ContentAlignment.MiddleCenter
-                    cap.BackColor = Color.Transparent
-                End If
+            tiles(i).Height = 100
+            For Each old As Label In tiles(i).Controls.OfType(Of Label)().ToList()
+                If old IsNot valueLabels(i) Then old.Visible = False
             Next
+            Dim caption As New Label With {.Text = captions(i), .Dock = DockStyle.Bottom, .Height = 44, .TextAlign = ContentAlignment.MiddleCenter, .ForeColor = Color.DarkGreen, .BackColor = Color.White}
+            tiles(i).Controls.Add(caption)
+            caption.BringToFront()
         Next
     End Sub
 
@@ -973,7 +951,7 @@ Public Class frmprof
 
     ' Action Buttons
     Private Sub CustomButton4_Click(sender As Object, e As EventArgs) Handles CustomButton4.Click
-        frmGradebook.Show()
+        OpenAssessmentManager(False)
     End Sub
 
     Private Sub CustomButton5_Click(sender As Object, e As EventArgs) Handles CustomButton5.Click
@@ -1005,75 +983,119 @@ Public Class frmprof
     End Sub
 
     Private Sub CustomButton6_Click(sender As Object, e As EventArgs) Handles CustomButton6.Click
-        If dgvClassGrades.Rows.Count = 0 Then
-            LoadClassGrades()
-        End If
+        OpenAssessmentManager(True)
+    End Sub
 
-        If dgvClassGrades.Rows.Count = 0 Then
-            MessageBox.Show("No class grade records available to export.", "Export Notice", MessageBoxButtons.OK, MessageBoxIcon.Information)
+    Private Sub OpenAssessmentManager(addAssessment As Boolean)
+        Dim book = My.Forms.frmGradebook
+        book.InitialClassId = SelectedClassId()
+        book.Show()
+        book.SelectClass(SelectedClassId())
+        book.BringToFront()
+        If addAssessment Then book.OpenAddAssessment()
+    End Sub
+
+    Private Sub ExportAudit(sender As Object, e As EventArgs) Handles CustomButton1.Click
+        ExportGrid(dgvAuditLogs, "PROFESSOR AUDIT LOG")
+    End Sub
+
+    Private Sub ExportClass(sender As Object, e As EventArgs) Handles CustomButton3.Click
+        ExportGrid(dgvClassGrades, "CLASS GRADE REPORT")
+    End Sub
+
+    Private Sub ExportGrid(grid As DataGridView, title As String)
+        If grid.Rows.Count = 0 Then
+            MessageBox.Show("There are no records to export.")
             Return
         End If
-
-        Using sfd As New SaveFileDialog()
-            sfd.Filter = "CSV Files (*.csv)|*.csv|PDF Files (*.pdf)|*.pdf"
-            sfd.FileName = $"Class_Grades_{DateTime.Now:yyyyMMdd}.csv"
-
-            If sfd.ShowDialog() = DialogResult.OK Then
-                If sfd.FilterIndex = 1 Then
-                    ' CSV Export
-                    If _exportService.ExportToCSV(dgvClassGrades, sfd.FileName) Then
-                        MessageBox.Show("Class grades exported to CSV successfully!", "Export Complete", MessageBoxButtons.OK, MessageBoxIcon.Information)
-                    End If
-                Else
-                    ' PDF Export
-                    Dim printDoc As New Printing.PrintDocument()
-                    AddHandler printDoc.PrintPage, Sub(s, args)
-                                                       Dim g As Graphics = args.Graphics
-                                                       Dim titleFont As New Font("Segoe UI", 14, FontStyle.Bold)
-                                                       Dim headerFont As New Font("Segoe UI", 9, FontStyle.Bold)
-                                                       Dim bodyFont As New Font("Segoe UI", 9, FontStyle.Regular)
-
-                                                       Dim y As Integer = 40
-                                                       g.DrawString("DAUNTLESS WOLVES - CLASS GRADE REPORT", titleFont, Brushes.DarkGreen, 40, y)
-                                                       y += 28
-                                                       g.DrawString($"Faculty ID: {_currentTeacherId} | Generated: {DateTime.Now:MMM d, yyyy HH:mm}", bodyFont, Brushes.Gray, 40, y)
-                                                       y += 30
-
-                                                       ' Headers
-                                                       Dim x As Integer = 40
-                                                       For Each col As DataGridViewColumn In dgvClassGrades.Columns
-                                                           If col.Visible Then
-                                                               g.DrawString(col.HeaderText, headerFont, Brushes.DarkGreen, x, y)
-                                                               x += 75
-                                                           End If
-                                                       Next
-
-                                                       y += 20
-                                                       g.DrawLine(Pens.DarkGreen, 40, y, Math.Max(x, 650), y)
-                                                       y += 10
-
-                                                       ' Data Rows
-                                                       For Each row As DataGridViewRow In dgvClassGrades.Rows
-                                                           If Not row.IsNewRow Then
-                                                               x = 40
-                                                               For Each col As DataGridViewColumn In dgvClassGrades.Columns
-                                                                   If col.Visible Then
-                                                                       Dim cellVal As String = If(row.Cells(col.Index).Value IsNot Nothing, row.Cells(col.Index).Value.ToString(), "")
-                                                                       g.DrawString(cellVal, bodyFont, Brushes.Black, x, y)
-                                                                       x += 75
-                                                                   End If
-                                                               Next
-                                                               y += 22
-                                                           End If
-                                                       Next
-                                                   End Sub
-
-                    If _exportService.ExportToPDF(printDoc, sfd.FileName) Then
-                        MessageBox.Show("Class grades exported to PDF successfully!", "Export Complete", MessageBoxButtons.OK, MessageBoxIcon.Information)
-                    End If
-                End If
-            End If
+        Using dialog As New SaveFileDialog With {.Filter = "PDF files (*.pdf)|*.pdf", .FileName = title.Replace(" ", "_") & ".pdf"}
+            If dialog.ShowDialog(Me) <> DialogResult.OK Then Return
+            Using doc = _exportService.CreateGridPrintDocument(grid, title, "Professor: " & AppSession.CurrentUser.FullName)
+                If _exportService.ExportToPDF(doc, dialog.FileName) Then MessageBox.Show("PDF saved successfully.")
+            End Using
         End Using
+    End Sub
+
+    Private Sub ReviewRequest(requestId As Integer)
+        Using dialog As New Form With {.Text = "Review clarification", .Size = New Size(440, 260), .StartPosition = FormStartPosition.CenterParent}
+            Dim actions As New ComboBox With {.DropDownStyle = ComboBoxStyle.DropDownList, .Location = New Point(20, 20), .Width = 380}
+            actions.Items.AddRange({"Approve", "Mark Under Review", "Reject / Close"})
+            actions.SelectedIndex = 0
+            Dim hint As New Label With {.Text = "Corrected score for re-checks, or reason for closing:", .Location = New Point(20, 60), .AutoSize = True}
+            Dim input As New TextBox With {.Location = New Point(20, 90), .Width = 380}
+            Dim save As New Button With {.Text = "Apply", .Location = New Point(290, 145), .DialogResult = DialogResult.OK}
+            dialog.Controls.AddRange({actions, hint, input, save})
+            dialog.AcceptButton = save
+            If dialog.ShowDialog(Me) <> DialogResult.OK Then Return
+            Dim result As OperationResult
+            If actions.SelectedIndex = 1 Then
+                result = _revisionService.ReviewRequestResult(requestId, "Under Review", _currentTeacherId)
+            ElseIf actions.SelectedIndex = 2 Then
+                result = _revisionService.RejectRequestResult(requestId, _currentTeacherId, input.Text.Trim())
+            Else
+                Dim score As Double? = Nothing
+                If input.Text.Trim() <> "" Then
+                    Dim value As Double
+                    If Not Double.TryParse(input.Text, NumberStyles.Float, CultureInfo.CurrentCulture, value) OrElse Double.IsNaN(value) OrElse Double.IsInfinity(value) Then
+                        MessageBox.Show("Enter a valid corrected score.")
+                        Return
+                    End If
+                    score = value
+                End If
+                result = _revisionService.ApproveAndApplyRevision(requestId, _currentTeacherId, score)
+            End If
+            If result.Message = "NEEDSCORE" Then
+                MessageBox.Show("This re-check requires a corrected score. Click Review and enter the score before approving.")
+            Else
+                MessageBox.Show(result.Message, If(result.Success, "Request updated", "Request not updated"))
+            End If
+            LoadRequests()
+            LoadClassGrades()
+            LoadAuditLogs()
+            LoadAnalytics()
+            UpdateSelectedStudentDisplay()
+        End Using
+    End Sub
+
+    Private Sub ConfigureProfessorLayout()
+        ComboBox3.Items.Clear()
+        ComboBox3.Items.AddRange({"All", "Midterm", "Finals"})
+        ComboBox3.SelectedIndex = 0
+        AddHandler CustomButton2.Click, Sub(sender, args) LoadClassGrades()
+        AddHandler ComboBox3.SelectedIndexChanged, Sub(sender, args) LoadClassGrades()
+        dgvRequests.ReadOnly = True
+        dgvRequests.EditMode = DataGridViewEditMode.EditProgrammatically
+        dgvRequests.Columns("Action").HeaderText = "Review / Approve"
+        AddHandler Me.Activated, Sub(sender, args)
+                                    If Not isLoading Then
+                                        ComboBox1_SelectedIndexChanged(Nothing, EventArgs.Empty)
+                                    End If
+                                End Sub
+        Label3.Text = "Assessment"
+        Dim inputs() As Control = {Label2, ComboBox2, Label3, ComboBox4, Label4, TextBox1, CustomButton5}
+        Dim y = 40
+        For Each control In inputs
+            control.Anchor = AnchorStyles.Top Or AnchorStyles.Left Or AnchorStyles.Right
+            control.SetBounds(14, y, Math.Max(150, control.Parent.ClientSize.Width - 28), If(TypeOf control Is Label, 22, 30))
+            y += control.Height + 5
+        Next
+        pnlRecordScores.BackColor = Color.White
+        pnlRecordScores.AutoScroll = True
+        TableLayoutPanel1.Dock = DockStyle.Top
+        TableLayoutPanel1.Height = Math.Max(360, y + 20)
+        TableLayoutPanel1.RowStyles.Clear()
+        TableLayoutPanel1.RowStyles.Add(New RowStyle(SizeType.Percent, 100))
+        For Each style As RowStyle In TableLayoutPanel1.RowStyles
+            style.SizeType = SizeType.Percent
+            style.Height = 100
+        Next
+        RoundedPanel11.Dock = DockStyle.Fill
+        RoundedPanel12.Dock = DockStyle.Fill
+        RoundedPanel12.AutoScroll = True
+        RoundedPanel12.AutoScrollMinSize = New Size(0, 300)
+        _pnlRightScoresContainer = RoundedPanel12
+        _isRightPanelInitialized = True
+        UpdateSelectedStudentDisplay()
     End Sub
 
     ' Designer stubs
