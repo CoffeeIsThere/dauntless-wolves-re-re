@@ -90,10 +90,22 @@ Public Class frmAddClass
         End Try
     End Sub
 
+
     Private Sub ShowError(msg As String)
-        lblerror.Text = msg
-        lblerror.Visible = True
+
+        ' Hide the small error label
+        lblerror.Visible = False
+
+        ' Display the full error message
+        MessageBox.Show(
+        msg,
+        "Add Class/Subject",
+        MessageBoxButtons.OK,
+        MessageBoxIcon.Warning
+    )
+
     End Sub
+
 
     ' Designer Event Handlers
     Private Sub Label2_Click(sender As Object, e As EventArgs) Handles Label2.Click
