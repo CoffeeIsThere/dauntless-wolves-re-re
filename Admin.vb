@@ -12,6 +12,26 @@ Public Class Admin
     Private ReadOnly _updatesFilterMenu As New ContextMenuStrip()
 
     Private tabButtons As Button()
+    Private WithEvents updatesTimer As New Global.System.Windows.Forms.Timer With {.Interval = 2000}
+    Private dashboardReady As Boolean
+    Private updatesLoading As Boolean
+    Private updatesRevision As Integer
+
+    Private Async Sub UpdatesTimer_Tick(sender As Object, e As EventArgs) Handles updatesTimer.Tick
+        If dashboardReady AndAlso Visible AndAlso pnlDashboard.Visible AndAlso Not updatesLoading Then
+            Await RefreshDashboardUpdatesAsync(False)
+        End If
+    End Sub
+
+    Private Async Sub Admin_Activated(sender As Object, e As EventArgs) Handles MyBase.Activated
+        If dashboardReady AndAlso pnlDashboard.Visible AndAlso Not updatesLoading Then Await RefreshDashboardUpdatesAsync(False)
+    End Sub
+
+    Private Sub Admin_FormClosed(sender As Object, e As FormClosedEventArgs) Handles MyBase.FormClosed
+        dashboardReady = False
+        updatesTimer.Stop()
+        updatesTimer.Dispose()
+    End Sub
 
     Private Sub Admin_Load(sender As Object, e As EventArgs) Handles MyBase.Load
 
@@ -33,6 +53,8 @@ Public Class Admin
         InitProfessorPage()
         InitStudentPage()
         InitDashboardPage()
+        dashboardReady = True
+        updatesTimer.Start()
     End Sub
 
     Private Sub ShowPanel(p As Panel, activeBtn As Button)
@@ -57,6 +79,7 @@ Public Class Admin
 
     Private Sub btnDashboard_Click(sender As Object, e As EventArgs) Handles btnDashboard.Click
         ShowPanel(pnlDashboard, btnDashboard)
+        If dashboardReady Then LoadDashboard()
     End Sub
 
     Private Sub btnStudents_Click(sender As Object, e As EventArgs) Handles btnStudents.Click
@@ -964,16 +987,22 @@ Public Class Admin
         LoadDashboardUpdates()
     End Sub
 
-    Private Sub LoadDashboardUpdates()
+    Private Async Sub LoadDashboardUpdates()
+        Await RefreshDashboardUpdatesAsync(True)
+    End Sub
 
-        dgvupdates.Rows.Clear()
+    Private Async Function RefreshDashboardUpdatesAsync(showErrors As Boolean) As Task
+        updatesRevision += 1
+        Dim revision = updatesRevision
+        Dim selectedFilter = _selectedUpdatesFilter
+        updatesLoading = True
 
         Dim sql As String =
         "SELECT action, details, logged_at " &
         "FROM auditlog WHERE 1=1"
 
         ' Apply the selected filter
-        Select Case _selectedUpdatesFilter
+        Select Case selectedFilter
 
             Case "Student Accounts"
                 sql &= " AND LOWER(entity_type) = 'student'"
@@ -1004,49 +1033,41 @@ Public Class Admin
         sql &= " ORDER BY logged_at DESC, log_id DESC LIMIT 6"
 
         Try
-            Dim dt As DataTable = DatabaseHelper.ExecuteQuery(sql)
-
-
-
-            If dt IsNot Nothing Then
-                For Each r As DataRow In dt.Rows
-
-                    Dim updateText As String = r("action").ToString()
-                    Dim details As String = r("details").ToString()
-
-                    If Not String.IsNullOrWhiteSpace(details) Then
-                        updateText &= " - " & details
+            Dim dt As DataTable = Await Task.Run(Function() DatabaseHelper.ExecuteQuery(sql))
+            If IsDisposed OrElse Disposing OrElse revision <> updatesRevision OrElse selectedFilter <> _selectedUpdatesFilter Then Return
+            Dim rows As New List(Of String())
+            For Each record As DataRow In dt.Rows
+                Dim text = record("action").ToString()
+                Dim details = record("details").ToString()
+                If Not String.IsNullOrWhiteSpace(details) Then text &= " - " & details
+                rows.Add({text, CDate(record("logged_at")).ToString("MMM d, HH:mm")})
+            Next
+            If rows.Count = 0 Then rows.Add({"No matching updates found.", ""})
+            Dim changed = dgvupdates.Rows.Count <> rows.Count
+            If Not changed Then
+                For i = 0 To rows.Count - 1
+                    If Convert.ToString(dgvupdates.Rows(i).Cells(0).Value) <> rows(i)(0) OrElse Convert.ToString(dgvupdates.Rows(i).Cells(1).Value) <> rows(i)(1) Then
+                        changed = True
+                        Exit For
                     End If
-
-                    Dim updateDate As String =
-                    CDate(r("logged_at")).ToString("MMM d, HH:mm")
-
-                    dgvupdates.Rows.Add(updateText, updateDate)
-
                 Next
             End If
-
-            If dgvupdates.Rows.Count = 0 Then
-                dgvupdates.Rows.Add("No matching updates found.", "")
+            If changed Then
+                dgvupdates.Rows.Clear()
+                For Each values In rows
+                    dgvupdates.Rows.Add(values(0), values(1))
+                Next
+                dgvupdates.ClearSelection()
             End If
-
-            ' Clear selection after loading updates
-            dgvupdates.ClearSelection()
-
-            ' Reset scrolling after the UI finishes updating
-
-
-
         Catch ex As Exception
-            MessageBox.Show(
-            "Unable to load updates: " & ex.Message,
-            "Updates Error",
-            MessageBoxButtons.OK,
-            MessageBoxIcon.Error
-        )
+            ' Keep the current feed intact on a failed automatic refresh.
+            If revision = updatesRevision AndAlso Not IsDisposed AndAlso Not Disposing Then
+                If showErrors Then MessageBox.Show("Unable to load updates: " & ex.Message, "Updates Error", MessageBoxButtons.OK, MessageBoxIcon.Error)
+            End If
+        Finally
+            If revision = updatesRevision Then updatesLoading = False
         End Try
-
-    End Sub
+    End Function
 
     Private Sub btnUpdatesFilter_Click(
     sender As Object,
@@ -1131,6 +1152,7 @@ Public Class Admin
     Private Sub OpenQuickAction(mode As quickactions.FormMode)
         quickForm.ShowMode(mode)
         quickForm.ShowDialog(Me)
+        LoadDashboard()
     End Sub
 
     Private Sub btnEnterGrades_Click(sender As Object, e As EventArgs) Handles btnEnterGrades.Click

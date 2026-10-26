@@ -144,6 +144,8 @@ Public Class frmprof
     End Sub
 
     Private Sub LoadClassGrades()
+        Dim selectedClass = TryCast(ComboBox1.SelectedItem, DataRowView)
+        Label13.Text = If(selectedClass Is Nothing, "No class selected", selectedClass("course_code").ToString() & " - " & selectedClass("section").ToString())
         Dim classId As Integer = SelectedClassId()
         If classId = 0 Then
             Dim emptyDt As New DataTable()
@@ -762,7 +764,10 @@ Public Class frmprof
 
     Private Sub ComboBox1_SelectedIndexChanged(sender As Object, e As EventArgs) Handles ComboBox1.SelectedIndexChanged
         Dim classId As Integer = SelectedClassId()
-        If classId = 0 Then Exit Sub
+        If classId = 0 Then
+            If Not isLoading Then LoadClassGrades()
+            Return
+        End If
 
         ' 1. Load enrolled students
         Dim students As DataTable = _gradeService.GetEnrollmentsByClass(classId, _currentTeacherId)
@@ -790,6 +795,7 @@ Public Class frmprof
         ' 3. Refresh right-side student profile card & class analytics
         UpdateSelectedStudentDisplay()
         LoadAnalytics()
+        If Not isLoading Then LoadClassGrades()
     End Sub
 
     ' =====================================================
@@ -1028,10 +1034,10 @@ Public Class frmprof
     End Sub
 
     Private Sub ReviewRequest(requestId As Integer)
-        Using dialog As New Form With {.Text = "Review clarification", .ClientSize = New Size(480, 350), .StartPosition = FormStartPosition.CenterParent, .FormBorderStyle = FormBorderStyle.FixedDialog, .MaximizeBox = False, .MinimizeBox = False, .ShowInTaskbar = False, .BackColor = Color.White, .Font = New Font("Segoe UI", 10), .AutoScaleMode = AutoScaleMode.Font}
-            Dim layout As New TableLayoutPanel With {.Dock = DockStyle.Fill, .Padding = New Padding(20), .ColumnCount = 1, .RowCount = 7}
+        Using dialog As New Form With {.Text = "Review clarification", .ClientSize = New Size(480, 440), .StartPosition = FormStartPosition.CenterParent, .FormBorderStyle = FormBorderStyle.FixedDialog, .MaximizeBox = False, .MinimizeBox = False, .ShowInTaskbar = False, .BackColor = Color.White, .Font = New Font("Segoe UI", 10), .AutoScaleMode = AutoScaleMode.Font}
+            Dim layout As New TableLayoutPanel With {.Dock = DockStyle.Fill, .Padding = New Padding(20), .ColumnCount = 1, .RowCount = 9}
             layout.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 100))
-            For Each rowHeight As Integer In {32, 58, 24, 36, 42, 44, 48}
+            For Each rowHeight As Integer In {32, 58, 24, 36, 42, 32, 24, 86, 48}
                 layout.RowStyles.Add(New RowStyle(SizeType.Absolute, rowHeight))
             Next
             Dim title As New Label With {.Text = "Review grade clarification", .Dock = DockStyle.Fill, .ForeColor = Color.DarkGreen, .Font = New Font("Segoe UI", 13, FontStyle.Bold)}
@@ -1052,6 +1058,8 @@ Public Class frmprof
             actions.Items.AddRange({"Approve", "Mark Under Review", "Reject / Close"})
             Dim hint As New Label With {.Dock = DockStyle.Fill, .ForeColor = Color.FromArgb(70, 70, 70)}
             Dim input As New TextBox With {.Dock = DockStyle.Fill}
+            Dim responseLabel As New Label With {.Text = "Response to student (optional)", .Dock = DockStyle.Fill, .ForeColor = Color.DarkGreen}
+            Dim response As New TextBox With {.Dock = DockStyle.Fill, .Multiline = True, .ScrollBars = ScrollBars.Vertical, .MaxLength = 350}
             Dim buttons As New FlowLayoutPanel With {.Dock = DockStyle.Fill, .FlowDirection = FlowDirection.RightToLeft, .Padding = New Padding(0, 5, 0, 0)}
             Dim save As New Button With {.Text = "Approve", .AutoSize = True, .BackColor = Color.DarkGreen, .ForeColor = Color.White, .FlatStyle = FlatStyle.Flat, .Padding = New Padding(12, 3, 12, 3)}
             Dim cancel As New Button With {.Text = "Cancel", .AutoSize = True, .DialogResult = DialogResult.Cancel, .Padding = New Padding(12, 3, 12, 3)}
@@ -1059,8 +1067,10 @@ Public Class frmprof
             AddHandler actions.SelectedIndexChanged, Sub(sender, args)
                                                          input.Clear()
                                                          input.Enabled = actions.SelectedIndex <> 1
-                                                         input.Multiline = actions.SelectedIndex = 2
-                                                         hint.Text = If(actions.SelectedIndex = 0, "Corrected score (required for re-checks; otherwise optional)", If(actions.SelectedIndex = 1, "Keep this request open while you investigate.", "Reason for closing (optional)"))
+                                                         input.Multiline = False
+                                                         input.Enabled = actions.SelectedIndex = 0
+                                                         response.Enabled = actions.SelectedIndex <> 1
+                                                         hint.Text = If(actions.SelectedIndex = 0, "Corrected score (required for re-checks; otherwise optional)", If(actions.SelectedIndex = 1, "Keep this request open while you investigate.", "Use the response below to explain why you are closing this request."))
                                                          save.Text = If(actions.SelectedIndex = 0, "Approve", If(actions.SelectedIndex = 1, "Mark Under Review", "Close request"))
                                                      End Sub
             AddHandler save.Click, Sub(sender, args)
@@ -1086,7 +1096,9 @@ Public Class frmprof
             layout.Controls.Add(actions, 0, 3)
             layout.Controls.Add(hint, 0, 4)
             layout.Controls.Add(input, 0, 5)
-            layout.Controls.Add(buttons, 0, 6)
+            layout.Controls.Add(responseLabel, 0, 6)
+            layout.Controls.Add(response, 0, 7)
+            layout.Controls.Add(buttons, 0, 8)
             dialog.Controls.Add(layout)
             dialog.AcceptButton = save
             dialog.CancelButton = cancel
@@ -1095,7 +1107,7 @@ Public Class frmprof
             If actions.SelectedIndex = 1 Then
                 result = _revisionService.ReviewRequestResult(requestId, "Under Review", _currentTeacherId)
             ElseIf actions.SelectedIndex = 2 Then
-                result = _revisionService.RejectRequestResult(requestId, _currentTeacherId, input.Text.Trim())
+                result = _revisionService.RejectRequestResult(requestId, _currentTeacherId, response.Text.Trim())
             Else
                 Dim score As Double? = Nothing
                 If input.Text.Trim() <> "" Then
@@ -1106,7 +1118,7 @@ Public Class frmprof
                     End If
                     score = value
                 End If
-                result = _revisionService.ApproveAndApplyRevision(requestId, _currentTeacherId, score)
+                result = _revisionService.ApproveAndApplyRevision(requestId, _currentTeacherId, score, response.Text.Trim())
             End If
             If result.Message = "NEEDSCORE" Then
                 MessageBox.Show("This re-check requires a corrected score. Click Review and enter the score before approving.")

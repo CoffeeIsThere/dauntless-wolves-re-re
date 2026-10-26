@@ -107,7 +107,11 @@ Public Class RevisionRequestService
     Public Function GetRevisionRequestsByStudent(studentId As String) As DataTable
         Dim sql As String =
             "SELECT r.request_id, r.grade_id, a.title AS assessment_title, sg.score AS current_score, a.total_score, " &
-            "       r.requested_points, r.reason, r.status, r.requested_at, r.reviewed_at " &
+            "       r.requested_points, r.reason, r.status, r.requested_at, r.reviewed_at, " &
+            "       (SELECT al.details FROM auditlog al WHERE al.entity_type = 'RevisionRequest' " &
+            "        AND CAST(al.entity_id AS BINARY) = CAST(CAST(r.request_id AS CHAR) AS BINARY) AND CAST(al.new_value AS BINARY) = CAST(r.status AS BINARY) " &
+            "        AND CAST(al.teacher_id AS BINARY) = CAST(r.reviewed_by AS BINARY) AND al.action = 'Updated request status' " &
+            "        ORDER BY al.log_id DESC LIMIT 1) AS reviewer_response " &
             "FROM revisionrequest r " &
             "JOIN studentgrade sg ON r.grade_id = sg.grade_id " &
             "JOIN enrollment e ON sg.enrollment_id = e.enrollment_id " &
@@ -165,8 +169,9 @@ Public Class RevisionRequestService
     ' When a re-check request needs a typed score the result is Fail with Message = "NEEDSCORE".
     ' Score, request status and audit rows all succeed or all fail together.
     Public Function ApproveAndApplyRevision(requestId As Integer, teacherId As String,
-                                            Optional overrideScore As Double? = Nothing) As OperationResult
-        Return InTransaction(Function(c, t) ApproveTx(c, t, requestId, teacherId, overrideScore))
+                                            Optional overrideScore As Double? = Nothing, Optional reviewerResponse As String = Nothing) As OperationResult
+        If reviewerResponse IsNot Nothing AndAlso reviewerResponse.Length > 350 Then Return OperationResult.Fail("Reviewer response must be at most 350 characters.")
+        Return InTransaction(Function(c, t) ApproveTx(c, t, requestId, teacherId, overrideScore, reviewerResponse))
     End Function
 
     Public Function RejectRequest(requestId As Integer, teacherId As String, Optional reason As String = "") As Boolean
@@ -263,7 +268,7 @@ Public Class RevisionRequestService
 
     Private Function ApproveTx(conn As MySqlConnection, tx As MySqlTransaction,
                                requestId As Integer, teacherId As String,
-                               overrideScore As Double?) As OperationResult
+                               overrideScore As Double?, reviewerResponse As String) As OperationResult
         Dim info As RequestInfo = LoadRequest(conn, tx, requestId)
         Dim check As OperationResult = CheckOpenAndOwned(info, teacherId)
         If Not check.Success Then Return check
@@ -296,7 +301,7 @@ Public Class RevisionRequestService
 
         ' Log the decision itself too (the score change was logged by RecordScoreTx)
         AuditService.LogActionTx(conn, tx, "Teacher", teacherId, "Updated request status", "RevisionRequest",
-                                 requestId.ToString(), info.Status, StatusApproved, "Score set to " & Fmt(target) & "/" & Fmt(info.TotalScore))
+                                 requestId.ToString(), info.Status, StatusApproved, "Score set to " & Fmt(target) & "/" & Fmt(info.TotalScore) & If(String.IsNullOrWhiteSpace(reviewerResponse), "", vbCrLf & reviewerResponse.Trim()))
 
         Return OperationResult.Ok("Request #" & requestId.ToString() & " approved. Score is now " & Fmt(target) & "/" & Fmt(info.TotalScore) & ".")
     End Function
