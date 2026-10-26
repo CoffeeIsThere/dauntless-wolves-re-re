@@ -144,6 +144,8 @@ Public Class frmprof
     End Sub
 
     Private Sub LoadClassGrades()
+        Dim selectedClass = TryCast(ComboBox1.SelectedItem, DataRowView)
+        Label13.Text = If(selectedClass Is Nothing, "No class selected", selectedClass("course_code").ToString() & " - " & selectedClass("section").ToString())
         Dim classId As Integer = SelectedClassId()
         If classId = 0 Then
             Dim emptyDt As New DataTable()
@@ -762,7 +764,10 @@ Public Class frmprof
 
     Private Sub ComboBox1_SelectedIndexChanged(sender As Object, e As EventArgs) Handles ComboBox1.SelectedIndexChanged
         Dim classId As Integer = SelectedClassId()
-        If classId = 0 Then Exit Sub
+        If classId = 0 Then
+            If Not isLoading Then LoadClassGrades()
+            Return
+        End If
 
         ' 1. Load enrolled students
         Dim students As DataTable = _gradeService.GetEnrollmentsByClass(classId, _currentTeacherId)
@@ -790,6 +795,7 @@ Public Class frmprof
         ' 3. Refresh right-side student profile card & class analytics
         UpdateSelectedStudentDisplay()
         LoadAnalytics()
+        If Not isLoading Then LoadClassGrades()
     End Sub
 
     ' =====================================================

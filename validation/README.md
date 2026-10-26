@@ -23,3 +23,11 @@ Additional Windows review:
 
 
 Layout follow-up: verify the four analytics cards retain their entire rounded border beneath the captions. Dashboard Add Assessment must open only the assessment dialog, including CSV import, with no gradebook window appearing; cancelling must leave the dashboard active. Check clarification details, action-specific prompts, Cancel/Escape, and required corrected-score validation. At 1200px window width, gradebook buttons should remain compact and the meetings label/value should wrap as a single unit.
+
+
+Automatic refresh checks on Windows:
+
+- Keep Class Grades open and switch between CS 103 sections A and B. Verify rows and the class heading change immediately, and the current All/Midterm/Finals filter stays selected. Check a class without enrollments clears the previous rows.
+- Leave the admin dashboard open and create a score or audit entry from another application instance. The Updates feed should show committed matching entries within roughly two seconds plus query time, with no tab switch.
+- Select a feed filter, create both matching and nonmatching entries, and confirm the filter stays applied. Switch filters rapidly to verify an older query cannot overwrite the latest filter results.
+- Return from an admin quick action and verify the dashboard refreshes. Interrupt database connectivity temporarily: background refresh should preserve displayed rows without repeated error dialogs, then recover after reconnecting. Close Admin during a refresh to confirm no disposed-control errors.
