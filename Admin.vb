@@ -325,10 +325,40 @@ Public Class Admin
                 DrawPill(e.Graphics, r, Color.FromArgb(250, 190, 190), Color.FromArgb(180, 0, 0), "Inactive")
             End If
 
+
         Else
             Dim rects = ActionRects(e.CellBounds)
-            DrawPill(e.Graphics, rects(0), Color.FromArgb(198, 240, 214), Color.FromArgb(0, 100, 0), "Edit")
-            DrawPill(e.Graphics, rects(1), Color.FromArgb(250, 190, 190), Color.FromArgb(180, 0, 0), "Delete")
+
+            DrawPill(
+        e.Graphics, rects(0),
+        Color.FromArgb(198, 240, 214),
+        Color.FromArgb(0, 100, 0),
+        "Edit"
+    )
+
+            Dim professorStatus As String =
+        Convert.ToString(dgvProf.Rows(e.RowIndex).Cells("colStatus").Value)
+
+            If String.Equals(professorStatus, "Active",
+                     StringComparison.OrdinalIgnoreCase) Then
+
+                DrawPill(
+            e.Graphics, rects(1),
+            Color.FromArgb(250, 190, 190),
+            Color.FromArgb(180, 0, 0),
+            "Disable"
+        )
+
+            Else
+
+                DrawPill(
+            e.Graphics, rects(1),
+            Color.FromArgb(198, 240, 214),
+            Color.FromArgb(0, 100, 0),
+            "Enable"
+        )
+
+            End If
         End If
 
         e.Handled = True
@@ -343,19 +373,122 @@ Public Class Admin
         Dim empId As String = dgvProf.Rows(e.RowIndex).Cells("colEmpId").Value.ToString()
 
         If rects(0).Contains(e.Location) Then
-            MessageBox.Show("Edit " & empId)
-        ElseIf rects(1).Contains(e.Location) Then
-            If MessageBox.Show("Deactivate " & empId & "? They will no longer be able to log in.", "Confirm",
-                               MessageBoxButtons.YesNo, MessageBoxIcon.Question) = DialogResult.Yes Then
-                If _userService.SetUserStatus("Teacher", empId, "Inactive", AppSession.CurrentUser.UserId) Then
+            If Not AppSession.IsAdmin Then
+                MessageBox.Show(
+                    "Administrator access is required.",
+                    "Access Denied",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Warning
+                )
+                Return
+            End If
+
+            Using dlg As New frmUserEditor(frmUserEditor.UserKind.Teacher, empId)
+
+                If dlg.ShowDialog(Me) = DialogResult.OK Then
+
+                    ' Reload professor records from MySQL.
                     LoadProfsFromDb()
+
+                    ' Reapply search and department filters.
+                    ApplyProfFilter()
+
+                    ' Refresh Dashboard statistics and updates.
+                    LoadDashboard()
                 End If
+            End Using
+
+        ElseIf rects(1).Contains(e.Location) Then
+
+            If Not AppSession.IsAdmin Then
+                MessageBox.Show("Administrator access is required.")
+                Return
+            End If
+
+            Dim professorStatus As String =
+                Convert.ToString(dgvProf.Rows(e.RowIndex).Cells("colStatus").Value)
+
+            Dim isActive As Boolean =
+                String.Equals(professorStatus, "Active",
+                              StringComparison.OrdinalIgnoreCase)
+
+            Dim newStatus As String = If(isActive, "Inactive", "Active")
+            Dim actionText As String = If(isActive, "Disable", "Enable")
+
+            Dim confirmation As DialogResult =
+                MessageBox.Show(
+                    actionText & " professor " & empId & "?" & vbCrLf &
+                    If(isActive,
+                       "They will no longer be able to log in.",
+                       "They will be able to log in again."),
+                    "Confirm Account Status",
+                    MessageBoxButtons.YesNo,
+                    MessageBoxIcon.Question
+                )
+
+            If confirmation <> DialogResult.Yes Then Return
+
+            Dim result As OperationResult =
+                _userService.SetUserStatusResult(
+                    "Teacher",
+                    empId,
+                    newStatus,
+                    AppSession.CurrentUser.UserId
+                )
+
+            If result.Success Then
+
+                MessageBox.Show(
+                    "Professor account is now " & newStatus & ".",
+                    "Account Updated",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Information
+                )
+
+                LoadProfsFromDb()
+                LoadDashboard()
+
+            Else
+
+                MessageBox.Show(
+                    result.Message,
+                    "Account Update Failed",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Warning
+                )
+
             End If
         End If
     End Sub
+    Private Sub btnAddProf_Click(
+    sender As Object,
+    e As EventArgs
+) Handles btnAddProf.Click
 
-    Private Sub btnAddProf_Click(sender As Object, e As EventArgs) Handles btnAddProf.Click
-        MessageBox.Show("Open Add Professor form here")
+        If Not AppSession.IsAdmin Then
+            MessageBox.Show(
+            "Administrator access is required.",
+            "Access Denied",
+            MessageBoxButtons.OK,
+            MessageBoxIcon.Warning
+        )
+            Return
+        End If
+
+        Using dlg As New frmUserEditor(frmUserEditor.UserKind.Teacher)
+
+            If dlg.ShowDialog(Me) = DialogResult.OK Then
+
+                ' Reload the professor records from MySQL.
+                LoadProfsFromDb()
+
+                ' Refresh dashboard statistics and recent updates.
+                LoadDashboard()
+
+            End If
+
+        End Using
+
     End Sub
 
     Private Sub pnlStudents_Paint(sender As Object, e As PaintEventArgs) Handles pnlStudents.Paint
@@ -585,9 +718,31 @@ Public Class Admin
         ApplyStudentFilter()
     End Sub
 
-    Private Sub btnAddStudent_Click(sender As Object, e As EventArgs) Handles btnaddstudent.Click
-        MessageBox.Show("Open Add Student form here")
+
+    Private Sub btnAddStudent_Click(
+    sender As Object,
+    e As EventArgs
+) Handles btnaddstudent.Click
+
+        Using dlg As New frmUserEditor(frmUserEditor.UserKind.Student)
+
+            If dlg.ShowDialog(Me) = DialogResult.OK Then
+
+                ' Reload student accounts from MySQL.
+                LoadStudentsFromDb()
+
+                ' Refresh the displayed student list.
+                ApplyStudentFilter()
+
+                ' Update dashboard statistics.
+                LoadDashboard()
+
+            End If
+
+        End Using
+
     End Sub
+
 
     Private Sub dgvStudents_CellPainting(sender As Object, e As DataGridViewCellPaintingEventArgs) Handles dgvstudents.CellPainting
         If e.RowIndex < 0 Then Return
@@ -607,9 +762,41 @@ Public Class Admin
                 DrawPill(e.Graphics, r, Color.FromArgb(250, 190, 190), Color.FromArgb(180, 0, 0), "Inactive")
             End If
         Else
+
             Dim rects = ActionRects(e.CellBounds)
-            DrawPill(e.Graphics, rects(0), Color.FromArgb(198, 240, 214), Color.FromArgb(0, 100, 0), "Edit")
-            DrawPill(e.Graphics, rects(1), Color.FromArgb(250, 190, 190), Color.FromArgb(180, 0, 0), "Delete")
+
+            DrawPill(
+                e.Graphics, rects(0),
+                Color.FromArgb(198, 240, 214),
+                Color.FromArgb(0, 100, 0),
+                "Edit"
+            )
+
+            Dim studentStatus As String =
+                Convert.ToString(dgvstudents.Rows(e.RowIndex).Cells("colStatus").Value)
+
+
+            If String.Equals(studentStatus, "Active", StringComparison.OrdinalIgnoreCase) Then
+
+                DrawPill(
+                    e.Graphics, rects(1),
+                    Color.FromArgb(250, 190, 190),
+                    Color.FromArgb(180, 0, 0),
+                    "Disable"
+                )
+
+            Else
+
+                DrawPill(
+                    e.Graphics, rects(1),
+                    Color.FromArgb(198, 240, 214),
+                    Color.FromArgb(0, 100, 0),
+                    "Enable"
+                )
+
+            End If
+
+
         End If
 
         e.Handled = True
@@ -624,14 +811,78 @@ Public Class Admin
         Dim id As String = dgvstudents.Rows(e.RowIndex).Cells("colStudentId").Value.ToString()
 
         If rects(0).Contains(e.Location) Then
-            MessageBox.Show("Edit " & id)
-        ElseIf rects(1).Contains(e.Location) Then
-            If MessageBox.Show("Deactivate " & id & "? They will no longer be able to log in.", "Confirm",
-                               MessageBoxButtons.YesNo, MessageBoxIcon.Question) = DialogResult.Yes Then
-                If _userService.SetUserStatus("Student", id, "Inactive", AppSession.CurrentUser.UserId) Then
+            Using dlg As New frmUserEditor(frmUserEditor.UserKind.Student, id)
+
+                If dlg.ShowDialog(Me) = DialogResult.OK Then
+
+                    ' Refresh student records after editing.
                     LoadStudentsFromDb()
                     ApplyStudentFilter()
+
+                    ' Refresh dashboard statistics and updates.
+                    LoadDashboard()
+
                 End If
+
+            End Using
+        ElseIf rects(1).Contains(e.Location) Then
+            If Not AppSession.IsAdmin Then
+                MessageBox.Show("Administrator access is required.")
+                Return
+            End If
+
+            Dim studentStatus As String =
+                Convert.ToString(dgvstudents.Rows(e.RowIndex).Cells("colStatus").Value)
+
+            Dim isActive As Boolean =
+                String.Equals(studentStatus, "Active", StringComparison.OrdinalIgnoreCase)
+
+            Dim newStatus As String = If(isActive, "Inactive", "Active")
+            Dim actionText As String = If(isActive, "Deactivate", "Activate")
+
+            Dim confirmation As DialogResult =
+                MessageBox.Show(
+                    actionText & " student " & id & "?" & vbCrLf &
+                    If(isActive,
+                       "They will no longer be able to log in.",
+                       "They will be able to log in again."),
+                    "Confirm Account Status",
+                    MessageBoxButtons.YesNo,
+                    MessageBoxIcon.Question
+                )
+
+            If confirmation <> DialogResult.Yes Then Return
+
+            Dim result As OperationResult =
+                _userService.SetUserStatusResult(
+                    "Student",
+                    id,
+                    newStatus,
+                    AppSession.CurrentUser.UserId
+                )
+
+            If result.Success Then
+
+                MessageBox.Show(
+                    "Student account is now " & newStatus & ".",
+                    "Account Updated",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Information
+                )
+
+                LoadStudentsFromDb()
+                ApplyStudentFilter()
+                LoadDashboard()
+
+            Else
+
+                MessageBox.Show(
+                    result.Message,
+                    "Account Update Failed",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Warning
+                )
+
             End If
         End If
     End Sub
@@ -860,6 +1111,7 @@ Public Class Admin
 
                 ' Refresh dashboard after adding a class
                 LoadDashboard()
+                LoadProfsFromDb()
 
                 MessageBox.Show(
                 "Class/Subject added successfully!",

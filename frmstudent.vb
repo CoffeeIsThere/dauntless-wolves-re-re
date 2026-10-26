@@ -85,6 +85,192 @@ Public Class frmStudent
         If activeTab Is btnMyPerformance Then UpdateBars()
     End Sub
 
+    Private Sub btnChangePassword_Click(
+    sender As Object,
+    e As EventArgs
+        ) Handles btnChangePassword.Click
+
+        If Not AppSession.IsStudent OrElse
+       AppSession.CurrentUser Is Nothing Then
+
+            MessageBox.Show(
+            "Please log in as a student.",
+            "Access Denied",
+            MessageBoxButtons.OK,
+            MessageBoxIcon.Warning
+        )
+            Return
+        End If
+
+        Using dlg As New Form()
+
+            dlg.Text = "Change Password"
+            dlg.Size = New Size(400, 330)
+            dlg.StartPosition = FormStartPosition.CenterParent
+            dlg.FormBorderStyle = FormBorderStyle.FixedDialog
+            dlg.MaximizeBox = False
+            dlg.MinimizeBox = False
+
+            Dim lblCurrent As New Label With {
+            .Text = "Current Password",
+            .Location = New Point(25, 20),
+            .AutoSize = True
+        }
+
+            Dim txtCurrent As New TextBox With {
+            .Location = New Point(25, 43),
+            .Size = New Size(330, 25),
+            .UseSystemPasswordChar = True
+        }
+
+            Dim lblNew As New Label With {
+            .Text = "New Password",
+            .Location = New Point(25, 85),
+            .AutoSize = True
+        }
+
+            Dim txtNew As New TextBox With {
+            .Location = New Point(25, 108),
+            .Size = New Size(330, 25),
+            .UseSystemPasswordChar = True
+        }
+
+            Dim lblConfirm As New Label With {
+            .Text = "Confirm New Password",
+            .Location = New Point(25, 150),
+            .AutoSize = True
+        }
+
+            Dim txtConfirm As New TextBox With {
+            .Location = New Point(25, 173),
+            .Size = New Size(330, 25),
+            .UseSystemPasswordChar = True
+        }
+
+            Dim btnSave As New Button With {
+            .Text = "Change Password",
+            .Location = New Point(180, 230),
+            .Size = New Size(120, 32)
+        }
+
+            Dim btnCancel As New Button With {
+            .Text = "Cancel",
+            .Location = New Point(305, 230),
+            .Size = New Size(65, 32),
+            .DialogResult = DialogResult.Cancel
+        }
+
+            dlg.Controls.AddRange(
+            New Control() {
+                lblCurrent, txtCurrent,
+                lblNew, txtNew,
+                lblConfirm, txtConfirm,
+                btnSave, btnCancel
+            }
+        )
+
+            dlg.AcceptButton = btnSave
+            dlg.CancelButton = btnCancel
+
+            AddHandler btnSave.Click,
+            Sub()
+
+                If String.IsNullOrWhiteSpace(txtCurrent.Text) Then
+                    MessageBox.Show("Enter your current password.")
+                    Return
+                End If
+
+                If txtNew.Text <> txtConfirm.Text Then
+                    MessageBox.Show(
+                        "New passwords do not match.",
+                        "Password Mismatch",
+                        MessageBoxButtons.OK,
+                        MessageBoxIcon.Warning
+                    )
+                    Return
+                End If
+
+                If txtNew.Text.Length < 4 Then
+                    MessageBox.Show(
+                        "New password must contain at least 4 characters.",
+                        "Invalid Password",
+                        MessageBoxButtons.OK,
+                        MessageBoxIcon.Warning
+                    )
+                    Return
+                End If
+
+                If txtCurrent.Text = txtNew.Text Then
+                    MessageBox.Show(
+                        "Choose a different password from your current one.",
+                        "Invalid Password",
+                        MessageBoxButtons.OK,
+                        MessageBoxIcon.Warning
+                    )
+                    Return
+                End If
+
+                If Not AppSession.IsStudent OrElse
+                   AppSession.CurrentUser Is Nothing Then
+                    MessageBox.Show("Student session is no longer valid.")
+                    Return
+                End If
+
+                Try
+                    btnSave.Enabled = False
+
+                    Dim auth As New AuthService()
+
+                    Dim result As OperationResult =
+                        auth.ChangePassword(
+                            "Student",
+                            AppSession.CurrentUser.UserId,
+                            txtCurrent.Text,
+                            txtNew.Text
+                        )
+
+                    If result.Success Then
+
+                        MessageBox.Show(
+                            "Your password was changed successfully!",
+                            "Success",
+                            MessageBoxButtons.OK,
+                            MessageBoxIcon.Information
+                        )
+
+                        dlg.DialogResult = DialogResult.OK
+                        dlg.Close()
+
+                    Else
+
+                        MessageBox.Show(
+                            result.Message,
+                            "Password Change Failed",
+                            MessageBoxButtons.OK,
+                            MessageBoxIcon.Warning
+                        )
+
+                    End If
+
+                Catch ex As Exception
+
+                    MessageBox.Show(
+                        "Unable to change password: " & ex.Message,
+                        "Error",
+                        MessageBoxButtons.OK,
+                        MessageBoxIcon.Error
+                    )
+
+                Finally
+                    btnSave.Enabled = True
+                End Try
+
+            End Sub
+            dlg.ShowDialog(Me)
+        End Using
+    End Sub
+
+
     Private Sub btnLogout_Click(sender As Object, e As EventArgs) Handles btnLogout.Click
         AppSession.ClearSession()
 

@@ -120,9 +120,12 @@ Public Class UserService
         If cleanId.Length > 10 Then Return OperationResult.Fail("Employee ID can have at most 10 characters.")
         If cleanDept = "" Then Return OperationResult.Fail("Department is required.")
         If Not ValidationHelper.IsValidEmail(cleanEmail) Then Return OperationResult.Fail("Enter a valid email address.")
-        If Not ValidationHelper.IsStrongPassword(rawPassword) Then
-            Return OperationResult.Fail("Password needs 8+ characters with an uppercase letter, a lowercase letter, a number and a symbol.")
-        End If
+        ' If no password was entered, use the Student ID as the default.
+        Dim finalPassword As String = If(
+                String.IsNullOrWhiteSpace(rawPassword),
+                cleanId,
+                rawPassword
+            )
         Dim emp As String = If(String.Equals(employmentType, "Part-time", StringComparison.OrdinalIgnoreCase), "Part-time", "Full-time")
 
         Dim sql As String = "INSERT INTO teacher (teacher_id, full_name, email, password_hash, department, employment_type, status) " &
@@ -131,7 +134,7 @@ Public Class UserService
             New MySqlParameter("@TeacherId", cleanId),
             New MySqlParameter("@FullName", cleanName),
             New MySqlParameter("@Email", cleanEmail),
-            New MySqlParameter("@PasswordHash", SecurityHelper.HashPassword(rawPassword)),
+            New MySqlParameter("@PasswordHash", SecurityHelper.HashPassword(finalPassword)),
             New MySqlParameter("@Department", cleanDept),
             New MySqlParameter("@Emp", emp)
         }
@@ -155,9 +158,11 @@ Public Class UserService
         If cleanId.Length > 10 Then Return OperationResult.Fail("Student ID can have at most 10 characters (example 25-00418).")
         If cleanProgram = "" OrElse cleanSection = "" Then Return OperationResult.Fail("Program and section are required.")
         If Not ValidationHelper.IsValidEmail(cleanEmail) Then Return OperationResult.Fail("Enter a valid email address.")
-        If Not ValidationHelper.IsStrongPassword(rawPassword) Then
-            Return OperationResult.Fail("Password needs 8+ characters with an uppercase letter, a lowercase letter, a number and a symbol.")
-        End If
+        Dim finalPassword As String = If(
+                    String.IsNullOrWhiteSpace(rawPassword),
+                    cleanId,
+                    rawPassword
+                )
         If yearLevel < 1 OrElse yearLevel > 6 Then Return OperationResult.Fail("Year level must be between 1 and 6.")
 
         Dim sql As String = "INSERT INTO student (student_id, full_name, email, password_hash, program, year_level, section, status) " &
@@ -166,7 +171,7 @@ Public Class UserService
             New MySqlParameter("@StudentId", cleanId),
             New MySqlParameter("@FullName", cleanName),
             New MySqlParameter("@Email", cleanEmail),
-            New MySqlParameter("@PasswordHash", SecurityHelper.HashPassword(rawPassword)),
+            New MySqlParameter("@PasswordHash", SecurityHelper.HashPassword(finalPassword)),
             New MySqlParameter("@Program", cleanProgram),
             New MySqlParameter("@YearLevel", yearLevel),
             New MySqlParameter("@Section", cleanSection)
@@ -238,9 +243,10 @@ Public Class UserService
         Dim isTeacher As Boolean = String.Equals(userRole, "Teacher", StringComparison.OrdinalIgnoreCase)
         Dim isStudent As Boolean = String.Equals(userRole, "Student", StringComparison.OrdinalIgnoreCase)
         If Not isTeacher AndAlso Not isStudent Then Return OperationResult.Fail("Role must be Teacher or Student.")
-        If Not ValidationHelper.IsStrongPassword(newPassword) Then
-            Return OperationResult.Fail("Password needs 8+ characters with an uppercase letter, a lowercase letter, a number and a symbol.")
+        If String.IsNullOrWhiteSpace(newPassword) OrElse newPassword.Length < 4 Then
+            Return OperationResult.Fail("Password must contain at least 4 characters.")
         End If
+
 
         Dim tableName As String = If(isTeacher, "teacher", "student")
         Dim idColumn As String = If(isTeacher, "teacher_id", "student_id")

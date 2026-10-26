@@ -80,9 +80,14 @@ Public Class AuthService
 
     ' Change your own password (needs the current one)
     Public Function ChangePassword(role As String, userId As String, currentPassword As String, newPassword As String) As OperationResult
-        If Not ValidationHelper.IsStrongPassword(newPassword) Then
-            Return OperationResult.Fail("New password needs 8+ characters with an uppercase letter, a lowercase letter, a number and a symbol.")
+        If String.IsNullOrWhiteSpace(newPassword) OrElse
+           newPassword.Length < 4 Then
+
+            Return OperationResult.Fail(
+                "New password must contain at least 4 characters."
+            )
         End If
+
 
         Dim tableName As String
         Dim idColumn As String

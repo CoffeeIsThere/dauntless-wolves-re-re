@@ -31,12 +31,98 @@ Public Class GradeService
         End Try
     End Function
 
+    Public Function RecordScoreAsAdmin(
+    enrollmentId As Integer,
+    assessmentId As Integer,
+    newScore As Double,
+    Optional reason As String = Nothing
+) As OperationResult
+
+        ' Only a logged-in Admin may use this operation.
+        If AppSession.CurrentUser Is Nothing OrElse Not AppSession.IsAdmin Then
+            Return OperationResult.Fail("Administrator access is required.")
+        End If
+
+        Dim adminId As String = AppSession.CurrentUser.UserId
+
+        Try
+            Using conn As MySqlConnection = DatabaseHelper.GetConnection()
+                Using tx As MySqlTransaction = conn.BeginTransaction()
+                    Try
+                        Dim result As OperationResult =
+                        RecordScoreCoreTx(
+                            conn, tx,
+                            enrollmentId, assessmentId, newScore,
+                            "Admin", adminId, reason
+                        )
+
+                        If result.Success Then
+                            tx.Commit()
+                        Else
+                            tx.Rollback()
+                        End If
+
+                        Return result
+
+                    Catch
+                        tx.Rollback()
+                        Throw
+                    End Try
+                End Using
+            End Using
+
+        Catch ex As Exception
+            Console.WriteLine("[ADMIN RECORD SCORE ERROR] " & ex.Message)
+            Return OperationResult.Fail("Could not save the score: " & ex.Message)
+        End Try
+
+    End Function
+
+
+    Public Function RecordScoreTx(
+    conn As MySqlConnection,
+    tx As MySqlTransaction,
+    enrollmentId As Integer,
+    assessmentId As Integer,
+    newScore As Double,
+    teacherId As String,
+    Optional reason As String = Nothing
+) As OperationResult
+
+        Return RecordScoreCoreTx(
+        conn, tx,
+        enrollmentId, assessmentId, newScore,
+        "Teacher", teacherId, reason
+    )
+
+    End Function
+
+
+
     ' Same logic inside a transaction somebody else owns (the clarification approval will reuse this).
     ' It never commits or rolls back by itself.
-    Public Function RecordScoreTx(conn As MySqlConnection, tx As MySqlTransaction,
-                                  enrollmentId As Integer, assessmentId As Integer,
-                                  newScore As Double, teacherId As String,
-                                  Optional reason As String = Nothing) As OperationResult
+    Private Function RecordScoreCoreTx(
+    conn As MySqlConnection,
+    tx As MySqlTransaction,
+    enrollmentId As Integer,
+    assessmentId As Integer,
+    newScore As Double,
+    actorRole As String,
+    actorId As String,
+    reason As String
+    ) As OperationResult
+
+
+        ' Only supported grading roles may use this shared operation.
+        If actorRole <> "Teacher" AndAlso actorRole <> "Admin" Then
+            Return OperationResult.Fail("Unauthorized grading role.")
+        End If
+
+        ' Every grading operation must identify the person responsible.
+        If String.IsNullOrWhiteSpace(actorId) Then
+            Return OperationResult.Fail("A valid user identity is required.")
+        End If
+
 
         ' 1) Who owns this class, and how many points is the assessment worth?
         Dim totalScore As Double = 0
@@ -63,8 +149,12 @@ Public Class GradeService
             End Using
         End Using
 
-        If Not String.Equals(ownerId, teacherId, StringComparison.OrdinalIgnoreCase) Then
-            Return OperationResult.Fail("You can only record scores for your own classes.")
+        If actorRole = "Teacher" Then
+            If Not String.Equals(ownerId, actorId, StringComparison.OrdinalIgnoreCase) Then
+                Return OperationResult.Fail(
+            "You can only record scores for your own classes."
+        )
+            End If
         End If
         If Not sameClass Then
             Return OperationResult.Fail("That assessment belongs to a different class.")
@@ -113,10 +203,23 @@ Public Class GradeService
         Dim oldText As String = Nothing
         If oldScore.HasValue Then oldText = Fmt(oldScore.Value) & "/" & Fmt(totalScore)
 
-        AuditService.LogActionTx(conn, tx, "Teacher", teacherId,
-                                 If(oldScore.HasValue, "Updated score", "Recorded score"),
-                                 "StudentGrade", gradeId,
-                                 oldText, Fmt(newScore) & "/" & Fmt(totalScore), reason)
+
+        Dim auditSaved As Boolean = AuditService.LogActionTx(
+                conn, tx,
+                actorRole, actorId,
+                If(oldScore.HasValue, "Updated score", "Recorded score"),
+                "StudentGrade", gradeId,
+                oldText,
+                Fmt(newScore) & "/" & Fmt(totalScore),
+                reason
+            )
+
+        If Not auditSaved Then
+            Return OperationResult.Fail(
+                    "Audit logging failed. The grade change was cancelled."
+                )
+        End If
+
 
         Return OperationResult.Ok("Saved " & title & ": " & Fmt(newScore) & "/" & Fmt(totalScore))
     End Function

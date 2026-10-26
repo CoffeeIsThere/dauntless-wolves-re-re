@@ -40,6 +40,8 @@ Partial Class quickactions
         dgvLogs = New DataGridView()
         pnlRequests = New Panel()
         dgvrequests = New DataGridView()
+        cboAssessment = New ComboBox()
+        lblAssessment = New Label()
         Panel2.SuspendLayout()
         Panel1.SuspendLayout()
         Panel3.SuspendLayout()
@@ -70,7 +72,7 @@ Partial Class quickactions
         ' 
         ' Label2
         ' 
-        Label2.Font = New Font("Segoe UI", 9F, FontStyle.Bold, GraphicsUnit.Point, CByte(0))
+        Label2.Font = New Font("Segoe UI", 9.0F, FontStyle.Bold, GraphicsUnit.Point, CByte(0))
         Label2.ForeColor = Color.DarkGreen
         Label2.Location = New Point(3, 4)
         Label2.Name = "Label2"
@@ -113,7 +115,6 @@ Partial Class quickactions
         ' btnPrimary
         ' 
         btnPrimary.Anchor = AnchorStyles.Bottom Or AnchorStyles.Right
-        btnPrimary.DialogResult = DialogResult.None
         btnPrimary.Location = New Point(357, 8)
         btnPrimary.Name = "btnPrimary"
         btnPrimary.Size = New Size(75, 23)
@@ -123,6 +124,8 @@ Partial Class quickactions
         ' 
         ' pnlGrades
         ' 
+        pnlGrades.Controls.Add(lblAssessment)
+        pnlGrades.Controls.Add(cboAssessment)
         pnlGrades.Controls.Add(cboSubject)
         pnlGrades.Controls.Add(cboStudent)
         pnlGrades.Controls.Add(lblSubject)
@@ -138,7 +141,7 @@ Partial Class quickactions
         ' cboSubject
         ' 
         cboSubject.FormattingEnabled = True
-        cboSubject.Location = New Point(87, 134)
+        cboSubject.Location = New Point(87, 117)
         cboSubject.Name = "cboSubject"
         cboSubject.Size = New Size(275, 23)
         cboSubject.TabIndex = 23
@@ -146,7 +149,7 @@ Partial Class quickactions
         ' cboStudent
         ' 
         cboStudent.FormattingEnabled = True
-        cboStudent.Location = New Point(87, 75)
+        cboStudent.Location = New Point(87, 58)
         cboStudent.Name = "cboStudent"
         cboStudent.Size = New Size(275, 23)
         cboStudent.TabIndex = 22
@@ -154,9 +157,9 @@ Partial Class quickactions
         ' lblSubject
         ' 
         lblSubject.AutoSize = True
-        lblSubject.Font = New Font("Segoe UI Semibold", 9F, FontStyle.Bold, GraphicsUnit.Point, CByte(0))
+        lblSubject.Font = New Font("Segoe UI Semibold", 9.0F, FontStyle.Bold, GraphicsUnit.Point, CByte(0))
         lblSubject.ForeColor = Color.DarkGreen
-        lblSubject.Location = New Point(85, 117)
+        lblSubject.Location = New Point(85, 100)
         lblSubject.Name = "lblSubject"
         lblSubject.Size = New Size(47, 15)
         lblSubject.TabIndex = 21
@@ -165,9 +168,9 @@ Partial Class quickactions
         ' lblGrade
         ' 
         lblGrade.AutoSize = True
-        lblGrade.Font = New Font("Segoe UI Semibold", 9F, FontStyle.Bold, GraphicsUnit.Point, CByte(0))
+        lblGrade.Font = New Font("Segoe UI Semibold", 9.0F, FontStyle.Bold, GraphicsUnit.Point, CByte(0))
         lblGrade.ForeColor = Color.DarkGreen
-        lblGrade.Location = New Point(86, 173)
+        lblGrade.Location = New Point(86, 211)
         lblGrade.Name = "lblGrade"
         lblGrade.Size = New Size(38, 15)
         lblGrade.TabIndex = 19
@@ -176,9 +179,9 @@ Partial Class quickactions
         ' lblStudent
         ' 
         lblStudent.AutoSize = True
-        lblStudent.Font = New Font("Segoe UI Semibold", 9F, FontStyle.Bold, GraphicsUnit.Point, CByte(0))
+        lblStudent.Font = New Font("Segoe UI Semibold", 9.0F, FontStyle.Bold, GraphicsUnit.Point, CByte(0))
         lblStudent.ForeColor = Color.DarkGreen
-        lblStudent.Location = New Point(86, 56)
+        lblStudent.Location = New Point(86, 39)
         lblStudent.Name = "lblStudent"
         lblStudent.Size = New Size(49, 15)
         lblStudent.TabIndex = 18
@@ -186,7 +189,7 @@ Partial Class quickactions
         ' 
         ' txtGrade
         ' 
-        txtGrade.Location = New Point(85, 189)
+        txtGrade.Location = New Point(85, 227)
         txtGrade.Name = "txtGrade"
         txtGrade.Size = New Size(277, 23)
         txtGrade.TabIndex = 16
@@ -235,9 +238,29 @@ Partial Class quickactions
         dgvrequests.Size = New Size(444, 324)
         dgvrequests.TabIndex = 0
         ' 
+        ' cboAssessment
+        ' 
+        cboAssessment.DropDownStyle = ComboBoxStyle.DropDownList
+        cboAssessment.FormattingEnabled = True
+        cboAssessment.Location = New Point(87, 176)
+        cboAssessment.Name = "cboAssessment"
+        cboAssessment.Size = New Size(275, 23)
+        cboAssessment.TabIndex = 24
+        ' 
+        ' lblAssessment
+        ' 
+        lblAssessment.AutoSize = True
+        lblAssessment.Font = New Font("Segoe UI Semibold", 9.0F, FontStyle.Bold, GraphicsUnit.Point, CByte(0))
+        lblAssessment.ForeColor = Color.DarkGreen
+        lblAssessment.Location = New Point(88, 158)
+        lblAssessment.Name = "lblAssessment"
+        lblAssessment.Size = New Size(69, 15)
+        lblAssessment.TabIndex = 25
+        lblAssessment.Text = "Assessment"
+        ' 
         ' quickactions
         ' 
-        AutoScaleDimensions = New SizeF(7F, 15F)
+        AutoScaleDimensions = New SizeF(7.0F, 15.0F)
         AutoScaleMode = AutoScaleMode.Font
         ClientSize = New Size(444, 431)
         Controls.Add(pnlGrades)
@@ -285,4 +308,6 @@ Partial Class quickactions
     Friend WithEvents btnPrimary As Button
     Friend WithEvents dgvrequests As DataGridView
     Friend WithEvents dgvLogs As DataGridView
+    Friend WithEvents cboAssessment As ComboBox
+    Friend WithEvents lblAssessment As Label
 End Class

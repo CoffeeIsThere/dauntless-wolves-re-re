@@ -70,8 +70,15 @@ Public Class frmUserEditor
         AddRow("Email", txtEmail)
         If Not _isEdit Then
             txtPassword.UseSystemPasswordChar = True
+
+            If _kind = UserKind.Student Then
+                txtPassword.PlaceholderText =
+            "Leave blank to use Student ID"
+            End If
+
             AddRow("Password", txtPassword)
         End If
+
 
         If _kind = UserKind.Student Then
             cboGroup.DropDownStyle = ComboBoxStyle.DropDown
@@ -201,7 +208,12 @@ Public Class frmUserEditor
     End Sub
 
     Private Sub btnReset_Click(sender As Object, e As EventArgs)
-        Dim pw As String = UiKit.PromptPassword(Me, "Reset password", "Type the new password for " & _editId & " (8+ characters, upper and lower case, number, symbol):")
+        Dim pw As String = UiKit.PromptPassword(
+            Me,
+            "Reset password",
+            "Enter a new password for " & _editId &
+            " (minimum 4 characters):"
+        )
         If pw Is Nothing Then Return
 
         Dim role As String = If(_kind = UserKind.Student, "Student", "Teacher")
