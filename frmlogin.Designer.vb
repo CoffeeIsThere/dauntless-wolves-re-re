@@ -229,6 +229,7 @@ Partial Class frmlogin
         Controls.Add(Panel2)
         Controls.Add(Panel1)
         Name = "frmlogin"
+        StartPosition = FormStartPosition.CenterScreen
         Text = "Form1"
         Panel1.ResumeLayout(False)
         Panel1.PerformLayout()

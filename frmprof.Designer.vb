@@ -1582,6 +1582,7 @@ Partial Class frmprof
         Name = "frmprof"
         StartPosition = FormStartPosition.CenterScreen
         Text = "frmprof"
+        WindowState = FormWindowState.Maximized
         pnlHeader.ResumeLayout(False)
         pnlHeader.PerformLayout()
         pnlTabs.ResumeLayout(False)

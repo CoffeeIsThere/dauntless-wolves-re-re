@@ -33,6 +33,28 @@ Partial Class frmstudent
         btnGradeHistory = New Button()
         btnMyGrades = New Button()
         pnlContent = New Panel()
+        pnlRequestRevision = New Panel()
+        tlprevision = New TableLayoutPanel()
+        cardSubmit = New CustomPanel()
+        btnSubmitRequest = New Button()
+        txtReason = New TextBox()
+        Label9 = New Label()
+        txtCurrentGrade = New TextBox()
+        Label8 = New Label()
+        Label7 = New Label()
+        cboAssessment = New ComboBox()
+        Panel2 = New Panel()
+        pnlSubmitHeader = New Panel()
+        PictureBox4 = New PictureBox()
+        Label6 = New Label()
+        cardStatus = New CustomPanel()
+        dgvRequests = New DataGridView()
+        pnlStatusHeader = New Panel()
+        PictureBox5 = New PictureBox()
+        lblStatusTitle = New Label()
+        pnlclassbar = New Panel()
+        lblClass = New Label()
+        cboclass = New ComboBox()
         pnlMyPerformance = New Panel()
         cardPerformance = New CustomPanel()
         tlpbars = New TableLayoutPanel()
@@ -81,28 +103,6 @@ Partial Class frmstudent
         cboterm = New ComboBox()
         PictureBox2 = New PictureBox()
         cboCourse = New ComboBox()
-        pnlRequestRevision = New Panel()
-        tlprevision = New TableLayoutPanel()
-        cardSubmit = New CustomPanel()
-        btnSubmitRequest = New Button()
-        txtReason = New TextBox()
-        Label9 = New Label()
-        txtCurrentGrade = New TextBox()
-        Label8 = New Label()
-        Label7 = New Label()
-        cboAssessment = New ComboBox()
-        Panel2 = New Panel()
-        pnlSubmitHeader = New Panel()
-        PictureBox4 = New PictureBox()
-        Label6 = New Label()
-        cardStatus = New CustomPanel()
-        dgvRequests = New DataGridView()
-        pnlStatusHeader = New Panel()
-        PictureBox5 = New PictureBox()
-        lblStatusTitle = New Label()
-        pnlclassbar = New Panel()
-        lblClass = New Label()
-        cboclass = New ComboBox()
         pnlGradeHistory = New Panel()
         RoundedPanel2 = New CustomPanel()
         dgvHistory = New DataGridView()
@@ -122,6 +122,16 @@ Partial Class frmstudent
         Pnlheaderheader.SuspendLayout()
         Pnltabs.SuspendLayout()
         pnlContent.SuspendLayout()
+        pnlRequestRevision.SuspendLayout()
+        tlprevision.SuspendLayout()
+        cardSubmit.SuspendLayout()
+        pnlSubmitHeader.SuspendLayout()
+        CType(PictureBox4, ComponentModel.ISupportInitialize).BeginInit()
+        cardStatus.SuspendLayout()
+        CType(dgvRequests, ComponentModel.ISupportInitialize).BeginInit()
+        pnlStatusHeader.SuspendLayout()
+        CType(PictureBox5, ComponentModel.ISupportInitialize).BeginInit()
+        pnlclassbar.SuspendLayout()
         pnlMyPerformance.SuspendLayout()
         cardPerformance.SuspendLayout()
         tlpbars.SuspendLayout()
@@ -145,16 +155,6 @@ Partial Class frmstudent
         CType(dgvgrades, ComponentModel.ISupportInitialize).BeginInit()
         Panel4.SuspendLayout()
         CType(PictureBox2, ComponentModel.ISupportInitialize).BeginInit()
-        pnlRequestRevision.SuspendLayout()
-        tlprevision.SuspendLayout()
-        cardSubmit.SuspendLayout()
-        pnlSubmitHeader.SuspendLayout()
-        CType(PictureBox4, ComponentModel.ISupportInitialize).BeginInit()
-        cardStatus.SuspendLayout()
-        CType(dgvRequests, ComponentModel.ISupportInitialize).BeginInit()
-        pnlStatusHeader.SuspendLayout()
-        CType(PictureBox5, ComponentModel.ISupportInitialize).BeginInit()
-        pnlclassbar.SuspendLayout()
         pnlGradeHistory.SuspendLayout()
         RoundedPanel2.SuspendLayout()
         CType(dgvHistory, ComponentModel.ISupportInitialize).BeginInit()
@@ -292,6 +292,273 @@ Partial Class frmstudent
         pnlContent.Name = "pnlContent"
         pnlContent.Size = New Size(1199, 421)
         pnlContent.TabIndex = 7
+        ' 
+        ' pnlRequestRevision
+        ' 
+        pnlRequestRevision.BackColor = Color.WhiteSmoke
+        pnlRequestRevision.Controls.Add(tlprevision)
+        pnlRequestRevision.Controls.Add(pnlclassbar)
+        pnlRequestRevision.Dock = DockStyle.Fill
+        pnlRequestRevision.Location = New Point(0, 3)
+        pnlRequestRevision.Name = "pnlRequestRevision"
+        pnlRequestRevision.Padding = New Padding(30, 15, 30, 30)
+        pnlRequestRevision.Size = New Size(1199, 418)
+        pnlRequestRevision.TabIndex = 10
+        pnlRequestRevision.Visible = False
+        ' 
+        ' tlprevision
+        ' 
+        tlprevision.BackColor = Color.WhiteSmoke
+        tlprevision.ColumnCount = 2
+        tlprevision.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 50F))
+        tlprevision.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 50F))
+        tlprevision.Controls.Add(cardSubmit, 0, 0)
+        tlprevision.Controls.Add(cardStatus, 1, 0)
+        tlprevision.Dock = DockStyle.Fill
+        tlprevision.Location = New Point(30, 40)
+        tlprevision.Name = "tlprevision"
+        tlprevision.RowCount = 1
+        tlprevision.RowStyles.Add(New RowStyle(SizeType.Percent, 100F))
+        tlprevision.RowStyles.Add(New RowStyle(SizeType.Absolute, 467F))
+        tlprevision.Size = New Size(1139, 348)
+        tlprevision.TabIndex = 1
+        ' 
+        ' cardSubmit
+        ' 
+        cardSubmit.BackColor = Color.White
+        cardSubmit.BorderColor = Color.FromArgb(CByte(0), CByte(85), CByte(0))
+        cardSubmit.Controls.Add(btnSubmitRequest)
+        cardSubmit.Controls.Add(txtReason)
+        cardSubmit.Controls.Add(Label9)
+        cardSubmit.Controls.Add(txtCurrentGrade)
+        cardSubmit.Controls.Add(Label8)
+        cardSubmit.Controls.Add(Label7)
+        cardSubmit.Controls.Add(cboAssessment)
+        cardSubmit.Controls.Add(Panel2)
+        cardSubmit.Controls.Add(pnlSubmitHeader)
+        cardSubmit.Dock = DockStyle.Fill
+        cardSubmit.Location = New Point(10, 10)
+        cardSubmit.Margin = New Padding(10)
+        cardSubmit.Name = "cardSubmit"
+        cardSubmit.Padding = New Padding(14)
+        cardSubmit.Size = New Size(549, 328)
+        cardSubmit.TabIndex = 0
+        ' 
+        ' btnSubmitRequest
+        ' 
+        btnSubmitRequest.Anchor = AnchorStyles.Top Or AnchorStyles.Left Or AnchorStyles.Right
+        btnSubmitRequest.Font = New Font("Segoe UI", 9.75F, FontStyle.Bold, GraphicsUnit.Point, CByte(0))
+        btnSubmitRequest.ForeColor = Color.DarkGreen
+        btnSubmitRequest.ImageAlign = ContentAlignment.MiddleLeft
+        btnSubmitRequest.Location = New Point(66, 401)
+        btnSubmitRequest.Name = "btnSubmitRequest"
+        btnSubmitRequest.Size = New Size(399, 32)
+        btnSubmitRequest.TabIndex = 19
+        btnSubmitRequest.Text = "Submit Request"
+        btnSubmitRequest.UseVisualStyleBackColor = True
+        ' 
+        ' txtReason
+        ' 
+        txtReason.Anchor = AnchorStyles.Top Or AnchorStyles.Left Or AnchorStyles.Right
+        txtReason.BackColor = Color.WhiteSmoke
+        txtReason.Location = New Point(36, 282)
+        txtReason.Multiline = True
+        txtReason.Name = "txtReason"
+        txtReason.Size = New Size(462, 105)
+        txtReason.TabIndex = 18
+        ' 
+        ' Label9
+        ' 
+        Label9.Anchor = AnchorStyles.Top Or AnchorStyles.Left Or AnchorStyles.Right
+        Label9.AutoSize = True
+        Label9.BackColor = Color.White
+        Label9.Font = New Font("Segoe UI", 9.75F, FontStyle.Bold)
+        Label9.ForeColor = Color.DarkGreen
+        Label9.Location = New Point(36, 261)
+        Label9.Name = "Label9"
+        Label9.Size = New Size(127, 17)
+        Label9.TabIndex = 17
+        Label9.Text = "Reason for Request"
+        ' 
+        ' txtCurrentGrade
+        ' 
+        txtCurrentGrade.Anchor = AnchorStyles.Top Or AnchorStyles.Left Or AnchorStyles.Right
+        txtCurrentGrade.BackColor = Color.WhiteSmoke
+        txtCurrentGrade.Location = New Point(37, 205)
+        txtCurrentGrade.Name = "txtCurrentGrade"
+        txtCurrentGrade.ReadOnly = True
+        txtCurrentGrade.Size = New Size(462, 23)
+        txtCurrentGrade.TabIndex = 16
+        ' 
+        ' Label8
+        ' 
+        Label8.Anchor = AnchorStyles.Top Or AnchorStyles.Left Or AnchorStyles.Right
+        Label8.AutoSize = True
+        Label8.BackColor = Color.White
+        Label8.Font = New Font("Segoe UI", 9.75F, FontStyle.Bold)
+        Label8.ForeColor = Color.DarkGreen
+        Label8.Location = New Point(36, 185)
+        Label8.Name = "Label8"
+        Label8.Size = New Size(94, 17)
+        Label8.TabIndex = 15
+        Label8.Text = "Current Grade"
+        ' 
+        ' Label7
+        ' 
+        Label7.Anchor = AnchorStyles.Top Or AnchorStyles.Left Or AnchorStyles.Right
+        Label7.AutoSize = True
+        Label7.BackColor = Color.White
+        Label7.Font = New Font("Segoe UI", 9.75F, FontStyle.Bold)
+        Label7.ForeColor = Color.DarkGreen
+        Label7.Location = New Point(35, 101)
+        Label7.Name = "Label7"
+        Label7.Size = New Size(80, 17)
+        Label7.TabIndex = 13
+        Label7.Text = "Assessment"
+        ' 
+        ' cboAssessment
+        ' 
+        cboAssessment.Anchor = AnchorStyles.Top Or AnchorStyles.Left Or AnchorStyles.Right
+        cboAssessment.BackColor = Color.WhiteSmoke
+        cboAssessment.DropDownStyle = ComboBoxStyle.DropDownList
+        cboAssessment.FormattingEnabled = True
+        cboAssessment.ItemHeight = 15
+        cboAssessment.Location = New Point(37, 120)
+        cboAssessment.MaxDropDownItems = 10
+        cboAssessment.Name = "cboAssessment"
+        cboAssessment.Size = New Size(462, 23)
+        cboAssessment.TabIndex = 12
+        ' 
+        ' Panel2
+        ' 
+        Panel2.BackColor = Color.DimGray
+        Panel2.Dock = DockStyle.Top
+        Panel2.Location = New Point(14, 80)
+        Panel2.Name = "Panel2"
+        Panel2.Size = New Size(521, 2)
+        Panel2.TabIndex = 20
+        ' 
+        ' pnlSubmitHeader
+        ' 
+        pnlSubmitHeader.Controls.Add(PictureBox4)
+        pnlSubmitHeader.Controls.Add(Label6)
+        pnlSubmitHeader.Dock = DockStyle.Top
+        pnlSubmitHeader.Location = New Point(14, 14)
+        pnlSubmitHeader.Name = "pnlSubmitHeader"
+        pnlSubmitHeader.Size = New Size(521, 66)
+        pnlSubmitHeader.TabIndex = 21
+        ' 
+        ' PictureBox4
+        ' 
+        PictureBox4.Image = CType(resources.GetObject("PictureBox4.Image"), Image)
+        PictureBox4.Location = New Point(9, 5)
+        PictureBox4.Name = "PictureBox4"
+        PictureBox4.Size = New Size(54, 57)
+        PictureBox4.SizeMode = PictureBoxSizeMode.Zoom
+        PictureBox4.TabIndex = 11
+        PictureBox4.TabStop = False
+        ' 
+        ' Label6
+        ' 
+        Label6.AutoSize = True
+        Label6.BackColor = Color.White
+        Label6.Font = New Font("Segoe UI", 15.75F, FontStyle.Bold, GraphicsUnit.Point, CByte(0))
+        Label6.ForeColor = Color.DarkGreen
+        Label6.Location = New Point(65, 17)
+        Label6.Name = "Label6"
+        Label6.Size = New Size(293, 30)
+        Label6.TabIndex = 10
+        Label6.Text = "Submit Clarification Request"
+        ' 
+        ' cardStatus
+        ' 
+        cardStatus.BackColor = Color.White
+        cardStatus.BorderColor = Color.FromArgb(CByte(0), CByte(85), CByte(0))
+        cardStatus.Controls.Add(dgvRequests)
+        cardStatus.Controls.Add(pnlStatusHeader)
+        cardStatus.Dock = DockStyle.Fill
+        cardStatus.Location = New Point(579, 10)
+        cardStatus.Margin = New Padding(10)
+        cardStatus.Name = "cardStatus"
+        cardStatus.Padding = New Padding(14)
+        cardStatus.Size = New Size(550, 328)
+        cardStatus.TabIndex = 0
+        ' 
+        ' dgvRequests
+        ' 
+        dgvRequests.BackgroundColor = Color.White
+        dgvRequests.ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.AutoSize
+        dgvRequests.Dock = DockStyle.Fill
+        dgvRequests.Location = New Point(14, 75)
+        dgvRequests.Name = "dgvRequests"
+        dgvRequests.RowHeadersWidth = 51
+        dgvRequests.Size = New Size(522, 239)
+        dgvRequests.TabIndex = 1
+        ' 
+        ' pnlStatusHeader
+        ' 
+        pnlStatusHeader.Controls.Add(PictureBox5)
+        pnlStatusHeader.Controls.Add(lblStatusTitle)
+        pnlStatusHeader.Dock = DockStyle.Top
+        pnlStatusHeader.Location = New Point(14, 14)
+        pnlStatusHeader.Name = "pnlStatusHeader"
+        pnlStatusHeader.Size = New Size(522, 61)
+        pnlStatusHeader.TabIndex = 13
+        ' 
+        ' PictureBox5
+        ' 
+        PictureBox5.Image = CType(resources.GetObject("PictureBox5.Image"), Image)
+        PictureBox5.Location = New Point(4, 4)
+        PictureBox5.Name = "PictureBox5"
+        PictureBox5.Size = New Size(63, 52)
+        PictureBox5.SizeMode = PictureBoxSizeMode.Zoom
+        PictureBox5.TabIndex = 12
+        PictureBox5.TabStop = False
+        ' 
+        ' lblStatusTitle
+        ' 
+        lblStatusTitle.AutoSize = True
+        lblStatusTitle.BackColor = Color.White
+        lblStatusTitle.Font = New Font("Segoe UI", 15.75F, FontStyle.Bold, GraphicsUnit.Point, CByte(0))
+        lblStatusTitle.ForeColor = Color.DarkGreen
+        lblStatusTitle.Location = New Point(66, 15)
+        lblStatusTitle.Name = "lblStatusTitle"
+        lblStatusTitle.Size = New Size(194, 30)
+        lblStatusTitle.TabIndex = 11
+        lblStatusTitle.Text = "My Request Status"
+        ' 
+        ' pnlclassbar
+        ' 
+        pnlclassbar.Controls.Add(lblClass)
+        pnlclassbar.Controls.Add(cboclass)
+        pnlclassbar.Dock = DockStyle.Top
+        pnlclassbar.Location = New Point(30, 15)
+        pnlclassbar.Name = "pnlclassbar"
+        pnlclassbar.Size = New Size(1139, 25)
+        pnlclassbar.TabIndex = 22
+        ' 
+        ' lblClass
+        ' 
+        lblClass.AutoSize = True
+        lblClass.Font = New Font("Segoe UI", 11.25F, FontStyle.Bold, GraphicsUnit.Point, CByte(0))
+        lblClass.ForeColor = Color.DarkGreen
+        lblClass.Location = New Point(14, 2)
+        lblClass.Name = "lblClass"
+        lblClass.Size = New Size(57, 20)
+        lblClass.TabIndex = 1
+        lblClass.Text = "Course"
+        ' 
+        ' cboclass
+        ' 
+        cboclass.BackColor = Color.White
+        cboclass.Font = New Font("Segoe UI Semibold", 9F, FontStyle.Bold, GraphicsUnit.Point, CByte(0))
+        cboclass.ForeColor = Color.FromArgb(CByte(0), CByte(64), CByte(0))
+        cboclass.FormattingEnabled = True
+        cboclass.Location = New Point(71, 2)
+        cboclass.Name = "cboclass"
+        cboclass.Size = New Size(265, 23)
+        cboclass.TabIndex = 0
+        cboclass.Text = "CS - 103 OBJECT ORIENTED PROGRAMMING"
         ' 
         ' pnlMyPerformance
         ' 
@@ -899,273 +1166,6 @@ Partial Class frmstudent
         cboCourse.Size = New Size(277, 23)
         cboCourse.TabIndex = 2
         ' 
-        ' pnlRequestRevision
-        ' 
-        pnlRequestRevision.BackColor = Color.WhiteSmoke
-        pnlRequestRevision.Controls.Add(tlprevision)
-        pnlRequestRevision.Controls.Add(pnlclassbar)
-        pnlRequestRevision.Dock = DockStyle.Fill
-        pnlRequestRevision.Location = New Point(0, 3)
-        pnlRequestRevision.Name = "pnlRequestRevision"
-        pnlRequestRevision.Padding = New Padding(30, 15, 30, 30)
-        pnlRequestRevision.Size = New Size(1199, 418)
-        pnlRequestRevision.TabIndex = 10
-        pnlRequestRevision.Visible = False
-        ' 
-        ' tlprevision
-        ' 
-        tlprevision.BackColor = Color.WhiteSmoke
-        tlprevision.ColumnCount = 2
-        tlprevision.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 50F))
-        tlprevision.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 50F))
-        tlprevision.Controls.Add(cardSubmit, 0, 0)
-        tlprevision.Controls.Add(cardStatus, 1, 0)
-        tlprevision.Dock = DockStyle.Fill
-        tlprevision.Location = New Point(30, 40)
-        tlprevision.Name = "tlprevision"
-        tlprevision.RowCount = 1
-        tlprevision.RowStyles.Add(New RowStyle(SizeType.Percent, 100F))
-        tlprevision.RowStyles.Add(New RowStyle(SizeType.Absolute, 467F))
-        tlprevision.Size = New Size(1139, 348)
-        tlprevision.TabIndex = 1
-        ' 
-        ' cardSubmit
-        ' 
-        cardSubmit.BackColor = Color.White
-        cardSubmit.BorderColor = Color.FromArgb(CByte(0), CByte(85), CByte(0))
-        cardSubmit.Controls.Add(btnSubmitRequest)
-        cardSubmit.Controls.Add(txtReason)
-        cardSubmit.Controls.Add(Label9)
-        cardSubmit.Controls.Add(txtCurrentGrade)
-        cardSubmit.Controls.Add(Label8)
-        cardSubmit.Controls.Add(Label7)
-        cardSubmit.Controls.Add(cboAssessment)
-        cardSubmit.Controls.Add(Panel2)
-        cardSubmit.Controls.Add(pnlSubmitHeader)
-        cardSubmit.Dock = DockStyle.Fill
-        cardSubmit.Location = New Point(10, 10)
-        cardSubmit.Margin = New Padding(10)
-        cardSubmit.Name = "cardSubmit"
-        cardSubmit.Padding = New Padding(14)
-        cardSubmit.Size = New Size(549, 328)
-        cardSubmit.TabIndex = 0
-        ' 
-        ' btnSubmitRequest
-        ' 
-        btnSubmitRequest.Anchor = AnchorStyles.Top Or AnchorStyles.Left Or AnchorStyles.Right
-        btnSubmitRequest.Font = New Font("Segoe UI", 9.75F, FontStyle.Bold, GraphicsUnit.Point, CByte(0))
-        btnSubmitRequest.ForeColor = Color.DarkGreen
-        btnSubmitRequest.ImageAlign = ContentAlignment.MiddleLeft
-        btnSubmitRequest.Location = New Point(66, 401)
-        btnSubmitRequest.Name = "btnSubmitRequest"
-        btnSubmitRequest.Size = New Size(399, 32)
-        btnSubmitRequest.TabIndex = 19
-        btnSubmitRequest.Text = "Submit Request"
-        btnSubmitRequest.UseVisualStyleBackColor = True
-        ' 
-        ' txtReason
-        ' 
-        txtReason.Anchor = AnchorStyles.Top Or AnchorStyles.Left Or AnchorStyles.Right
-        txtReason.BackColor = Color.WhiteSmoke
-        txtReason.Location = New Point(36, 282)
-        txtReason.Multiline = True
-        txtReason.Name = "txtReason"
-        txtReason.Size = New Size(462, 105)
-        txtReason.TabIndex = 18
-        ' 
-        ' Label9
-        ' 
-        Label9.Anchor = AnchorStyles.Top Or AnchorStyles.Left Or AnchorStyles.Right
-        Label9.AutoSize = True
-        Label9.BackColor = Color.White
-        Label9.Font = New Font("Segoe UI", 9.75F, FontStyle.Bold)
-        Label9.ForeColor = Color.DarkGreen
-        Label9.Location = New Point(36, 261)
-        Label9.Name = "Label9"
-        Label9.Size = New Size(127, 17)
-        Label9.TabIndex = 17
-        Label9.Text = "Reason for Request"
-        ' 
-        ' txtCurrentGrade
-        ' 
-        txtCurrentGrade.Anchor = AnchorStyles.Top Or AnchorStyles.Left Or AnchorStyles.Right
-        txtCurrentGrade.BackColor = Color.WhiteSmoke
-        txtCurrentGrade.Location = New Point(37, 205)
-        txtCurrentGrade.Name = "txtCurrentGrade"
-        txtCurrentGrade.ReadOnly = True
-        txtCurrentGrade.Size = New Size(462, 23)
-        txtCurrentGrade.TabIndex = 16
-        ' 
-        ' Label8
-        ' 
-        Label8.Anchor = AnchorStyles.Top Or AnchorStyles.Left Or AnchorStyles.Right
-        Label8.AutoSize = True
-        Label8.BackColor = Color.White
-        Label8.Font = New Font("Segoe UI", 9.75F, FontStyle.Bold)
-        Label8.ForeColor = Color.DarkGreen
-        Label8.Location = New Point(36, 185)
-        Label8.Name = "Label8"
-        Label8.Size = New Size(94, 17)
-        Label8.TabIndex = 15
-        Label8.Text = "Current Grade"
-        ' 
-        ' Label7
-        ' 
-        Label7.Anchor = AnchorStyles.Top Or AnchorStyles.Left Or AnchorStyles.Right
-        Label7.AutoSize = True
-        Label7.BackColor = Color.White
-        Label7.Font = New Font("Segoe UI", 9.75F, FontStyle.Bold)
-        Label7.ForeColor = Color.DarkGreen
-        Label7.Location = New Point(35, 101)
-        Label7.Name = "Label7"
-        Label7.Size = New Size(80, 17)
-        Label7.TabIndex = 13
-        Label7.Text = "Assessment"
-        ' 
-        ' cboAssessment
-        ' 
-        cboAssessment.Anchor = AnchorStyles.Top Or AnchorStyles.Left Or AnchorStyles.Right
-        cboAssessment.BackColor = Color.WhiteSmoke
-        cboAssessment.DropDownStyle = ComboBoxStyle.DropDownList
-        cboAssessment.FormattingEnabled = True
-        cboAssessment.ItemHeight = 15
-        cboAssessment.Location = New Point(37, 120)
-        cboAssessment.MaxDropDownItems = 10
-        cboAssessment.Name = "cboAssessment"
-        cboAssessment.Size = New Size(462, 23)
-        cboAssessment.TabIndex = 12
-        ' 
-        ' Panel2
-        ' 
-        Panel2.BackColor = Color.DimGray
-        Panel2.Dock = DockStyle.Top
-        Panel2.Location = New Point(14, 80)
-        Panel2.Name = "Panel2"
-        Panel2.Size = New Size(521, 2)
-        Panel2.TabIndex = 20
-        ' 
-        ' pnlSubmitHeader
-        ' 
-        pnlSubmitHeader.Controls.Add(PictureBox4)
-        pnlSubmitHeader.Controls.Add(Label6)
-        pnlSubmitHeader.Dock = DockStyle.Top
-        pnlSubmitHeader.Location = New Point(14, 14)
-        pnlSubmitHeader.Name = "pnlSubmitHeader"
-        pnlSubmitHeader.Size = New Size(521, 66)
-        pnlSubmitHeader.TabIndex = 21
-        ' 
-        ' PictureBox4
-        ' 
-        PictureBox4.Image = CType(resources.GetObject("PictureBox4.Image"), Image)
-        PictureBox4.Location = New Point(9, 5)
-        PictureBox4.Name = "PictureBox4"
-        PictureBox4.Size = New Size(54, 57)
-        PictureBox4.SizeMode = PictureBoxSizeMode.Zoom
-        PictureBox4.TabIndex = 11
-        PictureBox4.TabStop = False
-        ' 
-        ' Label6
-        ' 
-        Label6.AutoSize = True
-        Label6.BackColor = Color.White
-        Label6.Font = New Font("Segoe UI", 15.75F, FontStyle.Bold, GraphicsUnit.Point, CByte(0))
-        Label6.ForeColor = Color.DarkGreen
-        Label6.Location = New Point(65, 17)
-        Label6.Name = "Label6"
-        Label6.Size = New Size(293, 30)
-        Label6.TabIndex = 10
-        Label6.Text = "Submit Clarification Request"
-        ' 
-        ' cardStatus
-        ' 
-        cardStatus.BackColor = Color.White
-        cardStatus.BorderColor = Color.FromArgb(CByte(0), CByte(85), CByte(0))
-        cardStatus.Controls.Add(dgvRequests)
-        cardStatus.Controls.Add(pnlStatusHeader)
-        cardStatus.Dock = DockStyle.Fill
-        cardStatus.Location = New Point(579, 10)
-        cardStatus.Margin = New Padding(10)
-        cardStatus.Name = "cardStatus"
-        cardStatus.Padding = New Padding(14)
-        cardStatus.Size = New Size(550, 328)
-        cardStatus.TabIndex = 0
-        ' 
-        ' dgvRequests
-        ' 
-        dgvRequests.BackgroundColor = Color.White
-        dgvRequests.ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.AutoSize
-        dgvRequests.Dock = DockStyle.Fill
-        dgvRequests.Location = New Point(14, 75)
-        dgvRequests.Name = "dgvRequests"
-        dgvRequests.RowHeadersWidth = 51
-        dgvRequests.Size = New Size(522, 239)
-        dgvRequests.TabIndex = 1
-        ' 
-        ' pnlStatusHeader
-        ' 
-        pnlStatusHeader.Controls.Add(PictureBox5)
-        pnlStatusHeader.Controls.Add(lblStatusTitle)
-        pnlStatusHeader.Dock = DockStyle.Top
-        pnlStatusHeader.Location = New Point(14, 14)
-        pnlStatusHeader.Name = "pnlStatusHeader"
-        pnlStatusHeader.Size = New Size(522, 61)
-        pnlStatusHeader.TabIndex = 13
-        ' 
-        ' PictureBox5
-        ' 
-        PictureBox5.Image = CType(resources.GetObject("PictureBox5.Image"), Image)
-        PictureBox5.Location = New Point(4, 4)
-        PictureBox5.Name = "PictureBox5"
-        PictureBox5.Size = New Size(63, 52)
-        PictureBox5.SizeMode = PictureBoxSizeMode.Zoom
-        PictureBox5.TabIndex = 12
-        PictureBox5.TabStop = False
-        ' 
-        ' lblStatusTitle
-        ' 
-        lblStatusTitle.AutoSize = True
-        lblStatusTitle.BackColor = Color.White
-        lblStatusTitle.Font = New Font("Segoe UI", 15.75F, FontStyle.Bold, GraphicsUnit.Point, CByte(0))
-        lblStatusTitle.ForeColor = Color.DarkGreen
-        lblStatusTitle.Location = New Point(66, 15)
-        lblStatusTitle.Name = "lblStatusTitle"
-        lblStatusTitle.Size = New Size(194, 30)
-        lblStatusTitle.TabIndex = 11
-        lblStatusTitle.Text = "My Request Status"
-        ' 
-        ' pnlclassbar
-        ' 
-        pnlclassbar.Controls.Add(lblClass)
-        pnlclassbar.Controls.Add(cboclass)
-        pnlclassbar.Dock = DockStyle.Top
-        pnlclassbar.Location = New Point(30, 15)
-        pnlclassbar.Name = "pnlclassbar"
-        pnlclassbar.Size = New Size(1139, 25)
-        pnlclassbar.TabIndex = 22
-        ' 
-        ' lblClass
-        ' 
-        lblClass.AutoSize = True
-        lblClass.Font = New Font("Segoe UI", 11.25F, FontStyle.Bold, GraphicsUnit.Point, CByte(0))
-        lblClass.ForeColor = Color.DarkGreen
-        lblClass.Location = New Point(14, 2)
-        lblClass.Name = "lblClass"
-        lblClass.Size = New Size(57, 20)
-        lblClass.TabIndex = 1
-        lblClass.Text = "Course"
-        ' 
-        ' cboclass
-        ' 
-        cboclass.BackColor = Color.White
-        cboclass.Font = New Font("Segoe UI Semibold", 9F, FontStyle.Bold, GraphicsUnit.Point, CByte(0))
-        cboclass.ForeColor = Color.FromArgb(CByte(0), CByte(64), CByte(0))
-        cboclass.FormattingEnabled = True
-        cboclass.Location = New Point(71, 2)
-        cboclass.Name = "cboclass"
-        cboclass.Size = New Size(265, 23)
-        cboclass.TabIndex = 0
-        cboclass.Text = "CS - 103 OBJECT ORIENTED PROGRAMMING"
-        ' 
         ' pnlGradeHistory
         ' 
         pnlGradeHistory.BackColor = Color.White
@@ -1347,10 +1347,25 @@ Partial Class frmstudent
         Name = "frmstudent"
         StartPosition = FormStartPosition.CenterScreen
         Text = "Transparent Grading System - Dauntless Wolves"
+        WindowState = FormWindowState.Maximized
         Pnlheaderheader.ResumeLayout(False)
         Pnlheaderheader.PerformLayout()
         Pnltabs.ResumeLayout(False)
         pnlContent.ResumeLayout(False)
+        pnlRequestRevision.ResumeLayout(False)
+        tlprevision.ResumeLayout(False)
+        cardSubmit.ResumeLayout(False)
+        cardSubmit.PerformLayout()
+        pnlSubmitHeader.ResumeLayout(False)
+        pnlSubmitHeader.PerformLayout()
+        CType(PictureBox4, ComponentModel.ISupportInitialize).EndInit()
+        cardStatus.ResumeLayout(False)
+        CType(dgvRequests, ComponentModel.ISupportInitialize).EndInit()
+        pnlStatusHeader.ResumeLayout(False)
+        pnlStatusHeader.PerformLayout()
+        CType(PictureBox5, ComponentModel.ISupportInitialize).EndInit()
+        pnlclassbar.ResumeLayout(False)
+        pnlclassbar.PerformLayout()
         pnlMyPerformance.ResumeLayout(False)
         cardPerformance.ResumeLayout(False)
         tlpbars.ResumeLayout(False)
@@ -1380,20 +1395,6 @@ Partial Class frmstudent
         CType(dgvgrades, ComponentModel.ISupportInitialize).EndInit()
         Panel4.ResumeLayout(False)
         CType(PictureBox2, ComponentModel.ISupportInitialize).EndInit()
-        pnlRequestRevision.ResumeLayout(False)
-        tlprevision.ResumeLayout(False)
-        cardSubmit.ResumeLayout(False)
-        cardSubmit.PerformLayout()
-        pnlSubmitHeader.ResumeLayout(False)
-        pnlSubmitHeader.PerformLayout()
-        CType(PictureBox4, ComponentModel.ISupportInitialize).EndInit()
-        cardStatus.ResumeLayout(False)
-        CType(dgvRequests, ComponentModel.ISupportInitialize).EndInit()
-        pnlStatusHeader.ResumeLayout(False)
-        pnlStatusHeader.PerformLayout()
-        CType(PictureBox5, ComponentModel.ISupportInitialize).EndInit()
-        pnlclassbar.ResumeLayout(False)
-        pnlclassbar.PerformLayout()
         pnlGradeHistory.ResumeLayout(False)
         RoundedPanel2.ResumeLayout(False)
         CType(dgvHistory, ComponentModel.ISupportInitialize).EndInit()

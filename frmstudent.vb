@@ -36,6 +36,29 @@ Public Class frmStudent
         _currentStudentId = AppSession.CurrentUser.UserId
         lblstudentname.Text = AppSession.CurrentUser.FullName
 
+        ' My Profile button beside Change Password
+        Dim btnMyProfile As New Button With {
+            .Name = "btnMyProfile",
+            .Text = "My Profile",
+            .Size = New Size(105, btnChangePassword.Height),
+            .Location = New Point(btnChangePassword.Left - 115,
+                                  btnChangePassword.Top),
+            .Anchor = AnchorStyles.Top Or AnchorStyles.Right,
+            .BackColor = Color.White,
+            .ForeColor = Color.DarkGreen,
+            .FlatStyle = FlatStyle.Flat,
+            .Cursor = Cursors.Hand
+        }
+
+        btnMyProfile.FlatAppearance.BorderColor = Color.DarkGreen
+
+        AddHandler btnMyProfile.Click, AddressOf ShowMyProfile
+
+        btnChangePassword.Parent.Controls.Add(btnMyProfile)
+        btnMyProfile.BringToFront()
+
+
+
         ' 2. Bind Navigation Pages
         pages.Clear()
         pages.Add(btnMyGrades, pnlMyGrades)
@@ -313,6 +336,55 @@ Public Class frmStudent
         End Using
     End Sub
 
+    Private Sub ShowMyProfile(sender As Object, e As EventArgs)
+
+        If Not AppSession.IsStudent Then Return
+
+        Try
+            Dim sql As String =
+            "SELECT student_id, full_name, email, program, " &
+            "year_level, section, status " &
+            "FROM student WHERE student_id = @StudentId"
+
+            Dim dt As DataTable = DatabaseHelper.ExecuteQuery(
+            sql,
+            New MySqlParameter("@StudentId",
+                               AppSession.CurrentUser.UserId)
+        )
+
+            If dt.Rows.Count = 0 Then
+                MessageBox.Show("Student profile not found.",
+                            "My Profile",
+                            MessageBoxButtons.OK,
+                            MessageBoxIcon.Warning)
+                Return
+            End If
+
+            Dim r As DataRow = dt.Rows(0)
+
+            Dim profile As String =
+            "Student ID: " & r("student_id").ToString() & vbCrLf &
+            "Full Name: " & r("full_name").ToString() & vbCrLf &
+            "Email: " & r("email").ToString() & vbCrLf &
+            "Program: " & r("program").ToString() & vbCrLf &
+            "Year Level: " & r("year_level").ToString() & vbCrLf &
+            "Section: " & r("section").ToString() & vbCrLf &
+            "Account Status: " & r("status").ToString()
+
+            MessageBox.Show(profile,
+                        "My Student Profile",
+                        MessageBoxButtons.OK,
+                        MessageBoxIcon.Information)
+
+        Catch ex As Exception
+            MessageBox.Show(
+            "Unable to load profile: " & ex.Message,
+            "Profile Error",
+            MessageBoxButtons.OK,
+            MessageBoxIcon.Error)
+        End Try
+
+    End Sub
 
     Private Sub btnLogout_Click(sender As Object, e As EventArgs) Handles btnLogout.Click
         AppSession.ClearSession()
@@ -824,15 +896,13 @@ Public Class frmStudent
                                 projScores.Add(pct)
                         End Select
                     End If
-                Else
-                    pendingCount += 1
                 End If
             Next
 
             Dim avgPct As Double = If(scoreCount > 0, Math.Round(totalPct / scoreCount, 1), 0.0)
             SetStat(lblAverageValue, avgPct.ToString("0.0"), "CURRENT AVERAGE")
             SetStat(lblPassedValue, passedCount.ToString(), "ACTIVITIES PASSED")
-            SetStat(lblPendingValue, pendingCount.ToString(), "PENDING")
+            SetStat(lblPendingValue, pendingCount.ToString(), "OPEN REQUESTS")
             SetStat(lblHighestValue, maxPct.ToString("0.0"), "HIGHEST SCORE")
 
             quizPct = If(quizScores.Count > 0, CInt(quizScores.Average()), 0)
@@ -842,7 +912,7 @@ Public Class frmStudent
         Else
             SetStat(lblAverageValue, "--", "CURRENT AVERAGE")
             SetStat(lblPassedValue, "--", "ACTIVITIES PASSED")
-            SetStat(lblPendingValue, "--", "PENDING")
+            SetStat(lblPendingValue, "--", "OPEN REQUESTS")
             SetStat(lblHighestValue, "--", "HIGHEST SCORE")
             quizPct = 0 : activityPct = 0 : examPct = 0 : projectPct = 0
         End If
