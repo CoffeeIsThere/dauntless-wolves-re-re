@@ -61,12 +61,15 @@ Module Program
             End Using
             Check(revision.ApproveAndApplyRevision(requestId, teacher).Message = "NEEDSCORE", "recheck requires corrected score")
             Check(Not revision.ApproveAndApplyRevision(requestId, teacher, 25).Success, "reject invalid corrected score")
-            Check(revision.ApproveAndApplyRevision(requestId, teacher, 18).Success, "approve corrected recheck score")
+            Check(revision.ApproveAndApplyRevision(requestId, teacher, 18, "Rechecked your submitted answer.").Success, "approve corrected recheck score")
+            Check(revision.GetRevisionRequestsByStudent(student).Select("request_id=" & requestId)(0)("reviewer_response").ToString().Contains("Rechecked your submitted answer."), "student sees approval response")
             Using cmd As New MySqlCommand("INSERT INTO revisionrequest (grade_id, reason, status) SELECT grade_id, 'Close test', 'Pending' FROM studentgrade WHERE assessment_id=@Id AND score=18 LIMIT 1; SELECT LAST_INSERT_ID();", conn)
                 cmd.Parameters.AddWithValue("@Id", id)
                 requestId = CInt(cmd.ExecuteScalar())
             End Using
             Check(revision.RejectRequestResult(requestId, teacher, "Insufficient evidence").Success, "close request with reason")
+            Check(revision.GetRevisionRequestsByStudent(student).Select("request_id=" & requestId)(0)("reviewer_response").ToString() = "Insufficient evidence", "student sees closure reason")
+            Check(revision.GetRevisionRequestsByStudent("not-this-student").Rows.Count = 0, "other student cannot read responses")
         End Using
     End Sub
     Sub Check(ok As Boolean, name As String)

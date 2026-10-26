@@ -703,7 +703,32 @@ Public Class frmStudent
 
     End Sub
 
+    Private requestResponse As TextBox
+
+    Private Sub ConfigureRequestResponse()
+        If requestResponse IsNot Nothing Then Return
+        Dim panel As New Panel With {.Dock = DockStyle.Bottom, .Height = 145, .Padding = New Padding(8), .BackColor = Color.FromArgb(240, 250, 240)}
+        Dim caption As New Label With {.Dock = DockStyle.Top, .Height = 28, .Text = "Reviewer response", .ForeColor = Color.DarkGreen, .Font = New Font("Segoe UI", 10, FontStyle.Bold)}
+        requestResponse = New TextBox With {.Dock = DockStyle.Fill, .Multiline = True, .ReadOnly = True, .BorderStyle = BorderStyle.None, .ScrollBars = ScrollBars.Vertical, .BackColor = panel.BackColor, .Font = New Font("Segoe UI", 10)}
+        panel.Controls.Add(requestResponse)
+        panel.Controls.Add(caption)
+        dgvRequests.Parent.Controls.Add(panel)
+        dgvRequests.BringToFront()
+        dgvRequests.SelectionMode = DataGridViewSelectionMode.FullRowSelect
+        dgvRequests.MultiSelect = False
+    End Sub
+
+    Private Sub RequestSelectionChanged(sender As Object, e As EventArgs) Handles dgvRequests.SelectionChanged
+        If requestResponse Is Nothing Then Return
+        If dgvRequests.SelectedRows.Count = 0 Then
+            requestResponse.Text = "Select a request to view the reviewer's response."
+            Return
+        End If
+        requestResponse.Text = Convert.ToString(dgvRequests.SelectedRows(0).Tag)
+    End Sub
+
     Private Sub LoadRequests()
+        ConfigureRequestResponse()
         dgvRequests.Rows.Clear()
         If dgvRequests.Columns.Count = 0 Then
             For Each h In {"Assessment", "Requested", "Status"}
@@ -720,11 +745,17 @@ Public Class frmStudent
                 Dim reqPts As String = If(IsDBNull(row("requested_points")), "Re-check", "+" & row("requested_points").ToString() & " pts")
                 Dim status As String = row("status").ToString()
 
-                dgvRequests.Rows.Add(title, reqPts, status)
+                Dim index = dgvRequests.Rows.Add(title, reqPts, status)
+                Dim response = Convert.ToString(row("reviewer_response"))
+                If String.IsNullOrWhiteSpace(response) Then response = If(status = "Approved" OrElse status = "Closed", "No reviewer response was provided.", "Your request is awaiting review.")
+                If Not IsDBNull(row("reviewed_at")) Then response = "Reviewed " & CDate(row("reviewed_at")).ToString("MMM d, yyyy HH:mm") & vbCrLf & vbCrLf & response
+                dgvRequests.Rows(index).Tag = response
             Next
         End If
 
         dgvRequests.ClearSelection()
+        If dgvRequests.Rows.Count > 0 Then dgvRequests.Rows(0).Selected = True
+        RequestSelectionChanged(Me, EventArgs.Empty)
     End Sub
 
     Private Sub btnSubmitRequest_Click(sender As Object, e As EventArgs) Handles btnSubmitRequest.Click
@@ -952,10 +983,21 @@ Public Class frmStudent
 
     Private Sub SetBar(track As Panel, fill As Panel, lbl As Label, pct As Integer)
         pct = Math.Max(0, Math.Min(100, pct))
-        Dim usable As Integer = track.ClientSize.Width - track.Padding.Horizontal
-        fill.Visible = (pct > 0)
-        fill.Width = Math.Max(fill.Height, CInt(usable * pct / 100))
+        track.Height = Math.Max(32, lbl.Font.Height + 12)
+        tlpbars.MinimumSize = New Size(0, 160)
+        ' Keep the number outside the fill so even a small percentage is readable.
+        If lbl.Parent IsNot track Then track.Controls.Add(lbl)
+        lbl.AutoSize = False
+        lbl.Dock = DockStyle.None
+        lbl.SetBounds(Math.Max(4, track.ClientSize.Width - 58), 4, 50, track.ClientSize.Height - 8)
+        lbl.TextAlign = ContentAlignment.MiddleCenter
+        lbl.BackColor = Color.White
+        lbl.ForeColor = Color.DarkGreen
         lbl.Text = pct & "%"
+        lbl.BringToFront()
+        fill.Dock = DockStyle.None
+        fill.SetBounds(4, 4, Math.Max(0, CInt(Math.Max(0, track.ClientSize.Width - 68) * pct / 100.0)), track.ClientSize.Height - 8)
+        fill.Visible = pct > 0 AndAlso fill.Width > 0
     End Sub
 
     Private Sub tlpBars_SizeChanged(sender As Object, e As EventArgs) Handles tlpbars.SizeChanged
