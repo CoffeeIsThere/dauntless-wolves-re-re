@@ -58,6 +58,16 @@ Public Class frmGradebook
     Private lblMeetings As New Label()
     Private txtMeetings As New TextBox()
 
+    Private assessmentOwner As Form
+
+    Public Sub ShowAssessmentForClass(classId As Integer, owner As Form)
+        assessmentOwner = owner
+        InitialClassId = classId
+        ' Prepare the shared assessment workflow without showing the gradebook window.
+        frmGradebook_Load(Me, EventArgs.Empty)
+        OpenAddAssessment()
+    End Sub
+
     Public Property InitialClassId As Integer
 
     Public Sub SelectClass(classId As Integer)
@@ -1227,7 +1237,7 @@ Public Class frmGradebook
             dlg.CancelButton = btnCancel
             dlg.ActiveControl = txtSurname
 
-            dlg.ShowDialog(Me)
+            dlg.ShowDialog(If(assessmentOwner, Me))
 
             If accepted Then
                 fullName = BuildName(txtSurname.Text, txtFirst.Text, txtMI.Text)
@@ -1390,7 +1400,7 @@ Public Class frmGradebook
             dlg.CancelButton = btnCancel
             dlg.ActiveControl = txtCode
 
-            dlg.ShowDialog(Me)
+            dlg.ShowDialog(If(assessmentOwner, Me))
         End Using
 
         Return result
@@ -1590,7 +1600,7 @@ Public Class frmGradebook
             dlg.CancelButton = btnCancel
             dlg.ActiveControl = cboType
 
-            dlg.ShowDialog(Me)
+            dlg.ShowDialog(If(assessmentOwner, Me))
         End Using
 
         If accepted Then
@@ -1683,7 +1693,7 @@ Public Class frmGradebook
             dlg.ActiveControl = txt
             txt.SelectAll()
 
-            If dlg.ShowDialog(Me) = DialogResult.OK Then
+            If dlg.ShowDialog(If(assessmentOwner, Me)) = DialogResult.OK Then
                 Return txt.Text.Trim()
             End If
             Return ""
@@ -2109,21 +2119,36 @@ Public Class frmGradebook
     End Function
 
     Private Sub ConfigureToolbar()
-        Dim toolbar As New FlowLayoutPanel With {.Dock = DockStyle.Fill, .WrapContents = True, .AutoScroll = True, .Padding = New Padding(12), .BackColor = Color.White}
+        Dim toolbar As New FlowLayoutPanel With {.Dock = DockStyle.Fill, .WrapContents = True, .AutoScroll = True, .Padding = New Padding(8), .BackColor = Color.White}
         Dim controls() As Control = {Label1, cboCourse, btnAddClass, btnAddStudent, btnAddAssessment, CustomButton2, lblMeetings, txtMeetings, CustomButton1}
         For Each control In controls
             control.Dock = DockStyle.None
             control.Anchor = AnchorStyles.Top Or AnchorStyles.Left
-            control.Margin = New Padding(5)
-            control.Height = 32
-            If TypeOf control Is Button Then control.Width = Math.Max(145, control.PreferredSize.Width + 20)
+            control.Margin = New Padding(4, 3, 4, 3)
+            control.Height = 26
+            If TypeOf control Is Button Then
+                control.Font = New Font("Segoe UI", 9)
+                control.Width = TextRenderer.MeasureText(control.Text, control.Font).Width + 20
+            End If
             toolbar.Controls.Add(control)
         Next
+        Label1.Font = New Font("Segoe UI", 12, FontStyle.Bold)
+        Label1.Width = 180
+        cboCourse.Width = 190
+        ' Keep the meetings label and value together when the toolbar wraps.
+        Dim meetingsGroup As New FlowLayoutPanel With {.AutoSize = True, .WrapContents = False, .Margin = New Padding(4, 3, 4, 3)}
+        lblMeetings.AutoSize = True
+        lblMeetings.Margin = New Padding(0, 4, 4, 0)
+        txtMeetings.Width = 42
+        txtMeetings.Margin = New Padding(0)
+        meetingsGroup.Controls.AddRange({lblMeetings, txtMeetings})
+        toolbar.Controls.Add(meetingsGroup)
+        toolbar.Controls.SetChildIndex(meetingsGroup, toolbar.Controls.IndexOf(CustomButton1))
         PictureBox1.Visible = False
         Panel2.Controls.Add(toolbar)
         toolbar.BringToFront()
         Dim resizeToolbar As EventHandler = Sub(sender, args)
-                                                Panel2.Height = Math.Max(90, toolbar.GetPreferredSize(New Size(Math.Max(300, Panel2.ClientSize.Width), 0)).Height + 12)
+                                                Panel2.Height = Math.Max(58, toolbar.GetPreferredSize(New Size(Math.Max(300, Panel2.ClientSize.Width), 0)).Height + 12)
                                             End Sub
         AddHandler Panel2.SizeChanged, resizeToolbar
         resizeToolbar(Me, EventArgs.Empty)

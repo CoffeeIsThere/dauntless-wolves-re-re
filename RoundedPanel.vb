@@ -4,6 +4,10 @@ Imports System.Windows.Forms
 Public Class RoundedPanel
     Inherits Panel
 
+    Public Sub New()
+        SetStyle(ControlStyles.ResizeRedraw Or ControlStyles.OptimizedDoubleBuffer, True)
+    End Sub
+
     ' How round the corners are
     Public Property CornerRadius As Integer = 20
 

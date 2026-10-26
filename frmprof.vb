@@ -529,6 +529,7 @@ Public Class frmprof
         Dim captions = {"Class Average", "Passing Students", "At-Risk Students", "Highest Grade"}
         For i As Integer = 0 To tiles.Length - 1
             tiles(i).Height = 100
+            tiles(i).Padding = New Padding(6)
             For Each old As Label In tiles(i).Controls.OfType(Of Label)().ToList()
                 If old IsNot valueLabels(i) Then old.Visible = False
             Next
@@ -987,12 +988,22 @@ Public Class frmprof
     End Sub
 
     Private Sub OpenAssessmentManager(addAssessment As Boolean)
+        If addAssessment Then
+            If SelectedClassId() = 0 Then
+                MessageBox.Show("Select a class first.")
+                Return
+            End If
+            Using assessmentHost As New frmGradebook()
+                assessmentHost.ShowAssessmentForClass(SelectedClassId(), Me)
+            End Using
+            ComboBox1_SelectedIndexChanged(Nothing, EventArgs.Empty)
+            Return
+        End If
         Dim book = My.Forms.frmGradebook
         book.InitialClassId = SelectedClassId()
         book.Show()
         book.SelectClass(SelectedClassId())
         book.BringToFront()
-        If addAssessment Then book.OpenAddAssessment()
     End Sub
 
     Private Sub ExportAudit(sender As Object, e As EventArgs) Handles CustomButton1.Click
@@ -1017,15 +1028,68 @@ Public Class frmprof
     End Sub
 
     Private Sub ReviewRequest(requestId As Integer)
-        Using dialog As New Form With {.Text = "Review clarification", .Size = New Size(440, 260), .StartPosition = FormStartPosition.CenterParent}
-            Dim actions As New ComboBox With {.DropDownStyle = ComboBoxStyle.DropDownList, .Location = New Point(20, 20), .Width = 380}
+        Using dialog As New Form With {.Text = "Review clarification", .ClientSize = New Size(480, 350), .StartPosition = FormStartPosition.CenterParent, .FormBorderStyle = FormBorderStyle.FixedDialog, .MaximizeBox = False, .MinimizeBox = False, .ShowInTaskbar = False, .BackColor = Color.White, .Font = New Font("Segoe UI", 10), .AutoScaleMode = AutoScaleMode.Font}
+            Dim layout As New TableLayoutPanel With {.Dock = DockStyle.Fill, .Padding = New Padding(20), .ColumnCount = 1, .RowCount = 7}
+            layout.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 100))
+            For Each rowHeight As Integer In {32, 58, 24, 36, 42, 44, 48}
+                layout.RowStyles.Add(New RowStyle(SizeType.Absolute, rowHeight))
+            Next
+            Dim title As New Label With {.Text = "Review grade clarification", .Dock = DockStyle.Fill, .ForeColor = Color.DarkGreen, .Font = New Font("Segoe UI", 13, FontStyle.Bold)}
+            Dim details As New Label With {.Dock = DockStyle.Fill, .ForeColor = Color.FromArgb(70, 70, 70)}
+            Dim needsCorrectedScore As Boolean = False
+            Dim table = TryCast(dgvRequests.DataSource, DataTable)
+            If table IsNot Nothing Then
+                For Each request As DataRow In table.Rows
+                    If CInt(request("RequestId")) = requestId Then
+                        needsCorrectedScore = request("Requested").ToString() = "Re-check"
+                        details.Text = request("Student").ToString() & " · " & request("Assessment").ToString() & vbCrLf & "Current: " & request("CurrentGrade").ToString() & "   Requested: " & request("Requested").ToString()
+                        Exit For
+                    End If
+                Next
+            End If
+            Dim actionLabel As New Label With {.Text = "Action", .Dock = DockStyle.Fill, .ForeColor = Color.DarkGreen}
+            Dim actions As New ComboBox With {.DropDownStyle = ComboBoxStyle.DropDownList, .Dock = DockStyle.Fill}
             actions.Items.AddRange({"Approve", "Mark Under Review", "Reject / Close"})
+            Dim hint As New Label With {.Dock = DockStyle.Fill, .ForeColor = Color.FromArgb(70, 70, 70)}
+            Dim input As New TextBox With {.Dock = DockStyle.Fill}
+            Dim buttons As New FlowLayoutPanel With {.Dock = DockStyle.Fill, .FlowDirection = FlowDirection.RightToLeft, .Padding = New Padding(0, 5, 0, 0)}
+            Dim save As New Button With {.Text = "Approve", .AutoSize = True, .BackColor = Color.DarkGreen, .ForeColor = Color.White, .FlatStyle = FlatStyle.Flat, .Padding = New Padding(12, 3, 12, 3)}
+            Dim cancel As New Button With {.Text = "Cancel", .AutoSize = True, .DialogResult = DialogResult.Cancel, .Padding = New Padding(12, 3, 12, 3)}
+            buttons.Controls.AddRange({save, cancel})
+            AddHandler actions.SelectedIndexChanged, Sub(sender, args)
+                                                         input.Clear()
+                                                         input.Enabled = actions.SelectedIndex <> 1
+                                                         input.Multiline = actions.SelectedIndex = 2
+                                                         hint.Text = If(actions.SelectedIndex = 0, "Corrected score (required for re-checks; otherwise optional)", If(actions.SelectedIndex = 1, "Keep this request open while you investigate.", "Reason for closing (optional)"))
+                                                         save.Text = If(actions.SelectedIndex = 0, "Approve", If(actions.SelectedIndex = 1, "Mark Under Review", "Close request"))
+                                                     End Sub
+            AddHandler save.Click, Sub(sender, args)
+                                       If actions.SelectedIndex = 0 AndAlso needsCorrectedScore AndAlso input.Text.Trim() = "" Then
+                                           MessageBox.Show(dialog, "Enter the corrected score for this re-check.")
+                                           input.Focus()
+                                           Return
+                                       End If
+                                       If actions.SelectedIndex = 0 AndAlso input.Text.Trim() <> "" Then
+                                           Dim value As Double
+                                           If Not Double.TryParse(input.Text, NumberStyles.Float, CultureInfo.CurrentCulture, value) OrElse Not Double.IsFinite(value) OrElse value < 0 Then
+                                               MessageBox.Show(dialog, "Enter a valid nonnegative corrected score.")
+                                               input.Focus()
+                                               Return
+                                           End If
+                                       End If
+                                       dialog.DialogResult = DialogResult.OK
+                                   End Sub
             actions.SelectedIndex = 0
-            Dim hint As New Label With {.Text = "Corrected score for re-checks, or reason for closing:", .Location = New Point(20, 60), .AutoSize = True}
-            Dim input As New TextBox With {.Location = New Point(20, 90), .Width = 380}
-            Dim save As New Button With {.Text = "Apply", .Location = New Point(290, 145), .DialogResult = DialogResult.OK}
-            dialog.Controls.AddRange({actions, hint, input, save})
+            layout.Controls.Add(title, 0, 0)
+            layout.Controls.Add(details, 0, 1)
+            layout.Controls.Add(actionLabel, 0, 2)
+            layout.Controls.Add(actions, 0, 3)
+            layout.Controls.Add(hint, 0, 4)
+            layout.Controls.Add(input, 0, 5)
+            layout.Controls.Add(buttons, 0, 6)
+            dialog.Controls.Add(layout)
             dialog.AcceptButton = save
+            dialog.CancelButton = cancel
             If dialog.ShowDialog(Me) <> DialogResult.OK Then Return
             Dim result As OperationResult
             If actions.SelectedIndex = 1 Then
