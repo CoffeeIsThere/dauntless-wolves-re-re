@@ -421,8 +421,8 @@ Partial Class frmprof
         ' 
         pnlContent.Anchor = AnchorStyles.Top Or AnchorStyles.Bottom Or AnchorStyles.Left Or AnchorStyles.Right
         pnlContent.BackColor = Color.White
-        pnlContent.Controls.Add(pnlClarificationRequests)
         pnlContent.Controls.Add(pnlClassGrades)
+        pnlContent.Controls.Add(pnlClarificationRequests)
         pnlContent.Controls.Add(pnlAnalytics)
         pnlContent.Controls.Add(pnlRecordScores)
         pnlContent.Controls.Add(pnlAuditLogs)
@@ -658,7 +658,7 @@ Partial Class frmprof
         ' 
         cboHW1.FormattingEnabled = True
         cboHW1.Items.AddRange(New Object() {"HW1", "HW2", "HW3", "HW4", "HW5"})
-        cboHW1.Location = New Point(281, 8)
+        cboHW1.Location = New Point(281, 2)
         cboHW1.Margin = New Padding(3, 2, 3, 2)
         cboHW1.Name = "cboHW1"
         cboHW1.Size = New Size(67, 23)
@@ -668,7 +668,7 @@ Partial Class frmprof
         ' 
         cboQuiz1.FormattingEnabled = True
         cboQuiz1.Items.AddRange(New Object() {"Quiz1", "Quiz2", "Quiz3", "Quiz4", "Quiz5"})
-        cboQuiz1.Location = New Point(363, 8)
+        cboQuiz1.Location = New Point(363, 2)
         cboQuiz1.Margin = New Padding(3, 2, 3, 2)
         cboQuiz1.Name = "cboQuiz1"
         cboQuiz1.Size = New Size(67, 23)
@@ -678,7 +678,7 @@ Partial Class frmprof
         ' 
         cboSW1.FormattingEnabled = True
         cboSW1.Items.AddRange(New Object() {"SW1", "SW2", "SW3", "SW4", "SW5"})
-        cboSW1.Location = New Point(197, 8)
+        cboSW1.Location = New Point(197, 2)
         cboSW1.Margin = New Padding(3, 2, 3, 2)
         cboSW1.Name = "cboSW1"
         cboSW1.Size = New Size(67, 23)
