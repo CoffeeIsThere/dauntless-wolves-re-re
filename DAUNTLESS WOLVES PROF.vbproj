@@ -10,6 +10,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <None Remove="BackendCode.txt" />
     <None Remove="combined2.txt" />
     <None Remove="combined3.txt" />
     <None Remove="combined4.txt" />
