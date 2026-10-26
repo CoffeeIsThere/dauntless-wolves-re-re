@@ -67,18 +67,21 @@ Public Class frmAddClass
             Dim currentAdminId As String = If(AppSession.CurrentUser IsNot Nothing, AppSession.CurrentUser.UserId, "1")
 
             ' Save offering to MySQL via ClassService & log audit event
-            Dim success As Boolean = _classService.CreateClass(
-                courseCode:=SubjectCode,
-                section:=SectionName,
-                semester:="1st Semester",
-                academicYear:="2026-2027",
-                teacherId:=teacherId,
-                adminUserId:=currentAdminId
-            )
+            Dim result As OperationResult = _classService.CreateClass(
+    courseCode:=SubjectCode,
+    courseName:=SubjectName,
+    section:=SectionName,
+    semester:="1st Semester",
+    academicYear:="2026-2027",
+    teacherId:=teacherId,
+    adminUserId:=currentAdminId
+)
 
-            If success Then
+            If result.Success Then
                 Me.DialogResult = DialogResult.OK
                 Me.Close()
+            Else
+                ShowError(result.Message)
             End If
 
         Catch ex As Exception

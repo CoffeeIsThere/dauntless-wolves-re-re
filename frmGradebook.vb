@@ -869,26 +869,14 @@ Public Class frmGradebook
     End Function
 
     Private Sub btnAddClass_Click(sender As Object, e As EventArgs) Handles btnAddClass.Click
-        Dim info As ClassInfo = ShowClassDialog()
-        If info Is Nothing Then Return
 
-        ' Persist to MySQL database
-        Dim success As Boolean = _classService.CreateClass(
-            info.Code,
-            info.Name,
-            AppSession.CurrentUser.UserId,
-            info.Term,
-            info.SY,
-            info.Schedule
-        )
+        MessageBox.Show(
+        "Please use the Admin Dashboard to create and assign classes.",
+        "Class Management",
+        MessageBoxButtons.OK,
+        MessageBoxIcon.Information
+    )
 
-        If success Then
-            LoadClassesFromDatabase()
-            cboCourse.SelectedItem = $"{info.Code} - {info.Name}"
-            MessageBox.Show("Class created and saved to database!", "Success", MessageBoxButtons.OK, MessageBoxIcon.Information)
-        Else
-            MessageBox.Show("Failed to save class to database.", "Database Error", MessageBoxButtons.OK, MessageBoxIcon.Error)
-        End If
     End Sub
 
     ' Hover over the class box to see its schedule, term and school year

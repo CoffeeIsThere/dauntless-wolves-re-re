@@ -5,6 +5,11 @@ Public Class Admin
 
     ' Instantiate backend service
     Private ReadOnly _userService As New UserService()
+    ' Keeps track of the selected Updates filter
+    Private _selectedUpdatesFilter As String = "All Updates"
+
+    ' Dropdown menu for the Updates filter
+    Private ReadOnly _updatesFilterMenu As New ContextMenuStrip()
 
     Private tabButtons As Button()
 
@@ -657,7 +662,20 @@ Public Class Admin
     End Sub
 
     Private Sub SetupUpdatesGrid()
+        dgvupdates.Dock = DockStyle.None
+        dgvupdates.Location = New Point(13, Panel1.Bottom + 5)
+        dgvupdates.Size = New Size(
+    pnlupdatesheader.ClientSize.Width - 26,
+    pnlupdatesheader.ClientSize.Height - dgvupdates.Top - 6
+)
+        dgvupdates.Anchor = AnchorStyles.Top Or AnchorStyles.Bottom Or
+                    AnchorStyles.Left Or AnchorStyles.Right
         With dgvupdates
+            .ScrollBars = ScrollBars.Vertical
+            .MultiSelect = False
+            .SelectionMode = DataGridViewSelectionMode.FullRowSelect
+            .AllowUserToOrderColumns = False
+            .AllowUserToResizeColumns = False
             .Columns.Clear()
             .AllowUserToAddRows = False
             .AllowUserToDeleteRows = False
@@ -692,31 +710,168 @@ Public Class Admin
         Dim pendingObj As Object = DatabaseHelper.ExecuteScalar("SELECT COUNT(*) FROM revisionrequest WHERE status IN ('Pending','Under Review')")
         lblStatPending.Text = If(pendingObj IsNot Nothing AndAlso Not IsDBNull(pendingObj), Convert.ToInt32(pendingObj).ToString("N0"), "0")
 
+        LoadDashboardUpdates()
+    End Sub
+
+    Private Sub LoadDashboardUpdates()
+
         dgvupdates.Rows.Clear()
-        Dim dt As DataTable = DatabaseHelper.ExecuteQuery(
-            "SELECT action, details, logged_at FROM auditlog ORDER BY logged_at DESC, log_id DESC LIMIT 6")
-        If dt IsNot Nothing Then
-            For Each r As DataRow In dt.Rows
-                Dim text As String = r("action").ToString()
-                If r("details").ToString() <> "" Then text &= " - " & r("details").ToString()
-                dgvupdates.Rows.Add(text, "-" & CDate(r("logged_at")).ToString("MMM d, HH:mm"))
-            Next
-        End If
-        dgvupdates.ClearSelection()
-    End Sub
 
-    Private Sub btnUpdatesFilter_Click(sender As Object, e As EventArgs) Handles btnupdatesfilter.Click
-        MessageBox.Show("Updates filter goes here")
-    End Sub
+        Dim sql As String =
+        "SELECT action, details, logged_at " &
+        "FROM auditlog WHERE 1=1"
 
-    ' Quick Actions
-    Private Sub btnAddClass_Click(sender As Object, e As EventArgs) Handles btnAddClass.Click
-        Using dlg As New frmAddClass()
-            dlg.LoadProfessors(allProfs.Select(Function(p) p.Name))
-            If dlg.ShowDialog(Me) = DialogResult.OK Then
-                LoadDashboard()
+        ' Apply the selected filter
+        Select Case _selectedUpdatesFilter
+
+            Case "Student Accounts"
+                sql &= " AND LOWER(entity_type) = 'student'"
+
+            Case "Professor Accounts"
+                sql &= " AND LOWER(entity_type) = 'teacher'"
+
+            Case "Class/Subjects"
+                sql &= " AND LOWER(entity_type) IN " &
+                   "('class', 'course', 'enrollment')"
+
+            Case "Grade Changes"
+                sql &= " AND LOWER(entity_type) = 'studentgrade' " &
+                   "AND UPPER(action) NOT LIKE '%REQUEST%' " &
+                   "AND UPPER(action) NOT LIKE '%CLARIFICATION%'"
+
+            Case "Revision Requests"
+                sql &= " AND (LOWER(entity_type) = 'revisionrequest' " &
+                   "OR UPPER(action) LIKE '%REQUEST%' " &
+                   "OR UPPER(action) LIKE '%CLARIFICATION%')"
+
+            Case "All Updates"
+                ' No additional filter
+
+        End Select
+
+        ' Retrieve the six most recent matching records
+        sql &= " ORDER BY logged_at DESC, log_id DESC LIMIT 6"
+
+        Try
+            Dim dt As DataTable = DatabaseHelper.ExecuteQuery(sql)
+
+
+
+            If dt IsNot Nothing Then
+                For Each r As DataRow In dt.Rows
+
+                    Dim updateText As String = r("action").ToString()
+                    Dim details As String = r("details").ToString()
+
+                    If Not String.IsNullOrWhiteSpace(details) Then
+                        updateText &= " - " & details
+                    End If
+
+                    Dim updateDate As String =
+                    CDate(r("logged_at")).ToString("MMM d, HH:mm")
+
+                    dgvupdates.Rows.Add(updateText, updateDate)
+
+                Next
             End If
+
+            If dgvupdates.Rows.Count = 0 Then
+                dgvupdates.Rows.Add("No matching updates found.", "")
+            End If
+
+            ' Clear selection after loading updates
+            dgvupdates.ClearSelection()
+
+            ' Reset scrolling after the UI finishes updating
+
+
+
+        Catch ex As Exception
+            MessageBox.Show(
+            "Unable to load updates: " & ex.Message,
+            "Updates Error",
+            MessageBoxButtons.OK,
+            MessageBoxIcon.Error
+        )
+        End Try
+
+    End Sub
+
+    Private Sub btnUpdatesFilter_Click(
+    sender As Object,
+    e As EventArgs
+) Handles btnupdatesfilter.Click
+
+        ' Clear previous menu items
+        _updatesFilterMenu.Items.Clear()
+
+        Dim filters As String() = {
+        "All Updates",
+        "Student Accounts",
+        "Professor Accounts",
+        "Class/Subjects",
+        "Grade Changes",
+        "Revision Requests"
+    }
+
+        For Each filterName As String In filters
+
+            Dim menuItem As New ToolStripMenuItem(filterName)
+
+            ' Show a checkmark beside the selected filter
+            menuItem.Checked = (filterName = _selectedUpdatesFilter)
+
+            AddHandler menuItem.Click, AddressOf UpdatesFilterItem_Click
+
+            _updatesFilterMenu.Items.Add(menuItem)
+
+        Next
+
+        ' Display the dropdown below the Filter button
+        _updatesFilterMenu.Show(
+        btnupdatesfilter,
+        New Point(0, btnupdatesfilter.Height)
+    )
+
+    End Sub
+
+
+    Private Sub UpdatesFilterItem_Click(
+    sender As Object,
+    e As EventArgs
+)
+
+        Dim selectedItem As ToolStripMenuItem =
+        DirectCast(sender, ToolStripMenuItem)
+
+        ' Store the selected filter
+        _selectedUpdatesFilter = selectedItem.Text
+
+        ' Reload the filtered records from MySQL
+        LoadDashboardUpdates()
+
+    End Sub
+
+    Private Sub btnAddClass_Click(sender As Object, e As EventArgs) Handles btnAddClass.Click
+
+        Using dlg As New frmAddClass()
+
+            If dlg.ShowDialog(Me) = DialogResult.OK Then
+
+                ' Refresh dashboard after adding a class
+                LoadDashboard()
+
+                MessageBox.Show(
+                "Class/Subject added successfully!",
+                "Success",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Information
+            )
+
+            End If
+
         End Using
+
     End Sub
 
     Private ReadOnly quickForm As New quickactions()
