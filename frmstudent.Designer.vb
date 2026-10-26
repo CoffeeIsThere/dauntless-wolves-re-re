@@ -112,13 +112,13 @@ Partial Class frmstudent
         Label4 = New Label()
         Panel7 = New Panel()
         pnlheader = New Panel()
+        btnChangePassword = New Button()
         Panel6 = New Panel()
         lblrole = New Label()
         lblstudentname = New Label()
         PictureBox1 = New PictureBox()
         btnLogout = New Button()
         BackgroundWorker1 = New ComponentModel.BackgroundWorker()
-        btnChangePassword = New Button()
         Pnlheaderheader.SuspendLayout()
         Pnltabs.SuspendLayout()
         pnlContent.SuspendLayout()
@@ -243,7 +243,7 @@ Partial Class frmstudent
         btnRequestRevision.Name = "btnRequestRevision"
         btnRequestRevision.Size = New Size(145, 35)
         btnRequestRevision.TabIndex = 6
-        btnRequestRevision.Text = "Request Revision"
+        btnRequestRevision.Text = "Request Clarification"
         btnRequestRevision.TextImageRelation = TextImageRelation.ImageBeforeText
         btnRequestRevision.UseVisualStyleBackColor = False
         ' 
@@ -282,9 +282,9 @@ Partial Class frmstudent
         ' pnlContent
         ' 
         pnlContent.BackColor = Color.White
+        pnlContent.Controls.Add(pnlRequestRevision)
         pnlContent.Controls.Add(pnlMyPerformance)
         pnlContent.Controls.Add(pnlMyGrades)
-        pnlContent.Controls.Add(pnlRequestRevision)
         pnlContent.Controls.Add(pnlGradeHistory)
         pnlContent.Controls.Add(Panel7)
         pnlContent.Dock = DockStyle.Fill
@@ -300,7 +300,7 @@ Partial Class frmstudent
         pnlMyPerformance.Dock = DockStyle.Fill
         pnlMyPerformance.Location = New Point(0, 3)
         pnlMyPerformance.Name = "pnlMyPerformance"
-        pnlMyPerformance.Padding = New Padding(30, 30, 30, 30)
+        pnlMyPerformance.Padding = New Padding(30)
         pnlMyPerformance.Size = New Size(1199, 418)
         pnlMyPerformance.TabIndex = 8
         pnlMyPerformance.Visible = False
@@ -316,7 +316,7 @@ Partial Class frmstudent
         cardPerformance.Dock = DockStyle.Fill
         cardPerformance.Location = New Point(30, 30)
         cardPerformance.Name = "cardPerformance"
-        cardPerformance.Padding = New Padding(20, 20, 20, 20)
+        cardPerformance.Padding = New Padding(20)
         cardPerformance.Size = New Size(1139, 358)
         cardPerformance.TabIndex = 0
         ' 
@@ -355,7 +355,7 @@ Partial Class frmstudent
         trackProject.CornerRadius = 13
         trackProject.Location = New Point(113, 96)
         trackProject.Name = "trackProject"
-        trackProject.Padding = New Padding(7, 7, 7, 7)
+        trackProject.Padding = New Padding(7)
         trackProject.Size = New Size(983, 25)
         trackProject.TabIndex = 22
         ' 
@@ -392,7 +392,7 @@ Partial Class frmstudent
         trackExam.CornerRadius = 13
         trackExam.Location = New Point(113, 65)
         trackExam.Name = "trackExam"
-        trackExam.Padding = New Padding(6, 6, 6, 6)
+        trackExam.Padding = New Padding(6)
         trackExam.Size = New Size(983, 25)
         trackExam.TabIndex = 21
         ' 
@@ -430,7 +430,7 @@ Partial Class frmstudent
         trackActivity.CornerRadius = 13
         trackActivity.Location = New Point(113, 34)
         trackActivity.Name = "trackActivity"
-        trackActivity.Padding = New Padding(6, 6, 6, 6)
+        trackActivity.Padding = New Padding(6)
         trackActivity.Size = New Size(983, 25)
         trackActivity.TabIndex = 20
         ' 
@@ -467,7 +467,7 @@ Partial Class frmstudent
         trackQuiz.CornerRadius = 13
         trackQuiz.Location = New Point(113, 3)
         trackQuiz.Name = "trackQuiz"
-        trackQuiz.Padding = New Padding(6, 6, 6, 6)
+        trackQuiz.Padding = New Padding(6)
         trackQuiz.Size = New Size(983, 25)
         trackQuiz.TabIndex = 19
         ' 
@@ -570,9 +570,9 @@ Partial Class frmstudent
         RoundedPanel6.Controls.Add(lblAverageValue)
         RoundedPanel6.Dock = DockStyle.Fill
         RoundedPanel6.Location = New Point(10, 10)
-        RoundedPanel6.Margin = New Padding(10, 10, 10, 10)
+        RoundedPanel6.Margin = New Padding(10)
         RoundedPanel6.Name = "RoundedPanel6"
-        RoundedPanel6.Padding = New Padding(6, 6, 6, 6)
+        RoundedPanel6.Padding = New Padding(6)
         RoundedPanel6.Size = New Size(254, 92)
         RoundedPanel6.TabIndex = 11
         ' 
@@ -610,9 +610,9 @@ Partial Class frmstudent
         RoundedPanel8.Controls.Add(lblPassedValue)
         RoundedPanel8.Dock = DockStyle.Bottom
         RoundedPanel8.Location = New Point(284, 10)
-        RoundedPanel8.Margin = New Padding(10, 10, 10, 10)
+        RoundedPanel8.Margin = New Padding(10)
         RoundedPanel8.Name = "RoundedPanel8"
-        RoundedPanel8.Padding = New Padding(6, 6, 6, 6)
+        RoundedPanel8.Padding = New Padding(6)
         RoundedPanel8.Size = New Size(254, 92)
         RoundedPanel8.TabIndex = 12
         ' 
@@ -650,9 +650,9 @@ Partial Class frmstudent
         RoundedPanel7.Controls.Add(lblPendingValue)
         RoundedPanel7.Dock = DockStyle.Fill
         RoundedPanel7.Location = New Point(558, 10)
-        RoundedPanel7.Margin = New Padding(10, 10, 10, 10)
+        RoundedPanel7.Margin = New Padding(10)
         RoundedPanel7.Name = "RoundedPanel7"
-        RoundedPanel7.Padding = New Padding(6, 6, 6, 6)
+        RoundedPanel7.Padding = New Padding(6)
         RoundedPanel7.Size = New Size(254, 92)
         RoundedPanel7.TabIndex = 12
         ' 
@@ -690,9 +690,9 @@ Partial Class frmstudent
         RoundedPanel9.Controls.Add(lblHighestValue)
         RoundedPanel9.Dock = DockStyle.Fill
         RoundedPanel9.Location = New Point(832, 10)
-        RoundedPanel9.Margin = New Padding(10, 10, 10, 10)
+        RoundedPanel9.Margin = New Padding(10)
         RoundedPanel9.Name = "RoundedPanel9"
-        RoundedPanel9.Padding = New Padding(6, 6, 6, 6)
+        RoundedPanel9.Padding = New Padding(6)
         RoundedPanel9.Size = New Size(257, 92)
         RoundedPanel9.TabIndex = 12
         ' 
@@ -818,7 +818,7 @@ Partial Class frmstudent
         RoundedPanel1.Controls.Add(Panel4)
         RoundedPanel1.Location = New Point(140, 40)
         RoundedPanel1.Name = "RoundedPanel1"
-        RoundedPanel1.Padding = New Padding(14, 14, 14, 14)
+        RoundedPanel1.Padding = New Padding(14)
         RoundedPanel1.Size = New Size(929, 325)
         RoundedPanel1.TabIndex = 0
         ' 
@@ -944,9 +944,9 @@ Partial Class frmstudent
         cardSubmit.Controls.Add(pnlSubmitHeader)
         cardSubmit.Dock = DockStyle.Fill
         cardSubmit.Location = New Point(10, 10)
-        cardSubmit.Margin = New Padding(10, 10, 10, 10)
+        cardSubmit.Margin = New Padding(10)
         cardSubmit.Name = "cardSubmit"
-        cardSubmit.Padding = New Padding(14, 14, 14, 14)
+        cardSubmit.Padding = New Padding(14)
         cardSubmit.Size = New Size(549, 328)
         cardSubmit.TabIndex = 0
         ' 
@@ -1084,9 +1084,9 @@ Partial Class frmstudent
         cardStatus.Controls.Add(pnlStatusHeader)
         cardStatus.Dock = DockStyle.Fill
         cardStatus.Location = New Point(579, 10)
-        cardStatus.Margin = New Padding(10, 10, 10, 10)
+        cardStatus.Margin = New Padding(10)
         cardStatus.Name = "cardStatus"
-        cardStatus.Padding = New Padding(14, 14, 14, 14)
+        cardStatus.Padding = New Padding(14)
         cardStatus.Size = New Size(550, 328)
         cardStatus.TabIndex = 0
         ' 
@@ -1187,7 +1187,7 @@ Partial Class frmstudent
         RoundedPanel2.Controls.Add(pnlHistoryHeader)
         RoundedPanel2.Location = New Point(80, 50)
         RoundedPanel2.Name = "RoundedPanel2"
-        RoundedPanel2.Padding = New Padding(14, 14, 14, 14)
+        RoundedPanel2.Padding = New Padding(14)
         RoundedPanel2.Size = New Size(1026, 228)
         RoundedPanel2.TabIndex = 0
         ' 
@@ -1269,6 +1269,18 @@ Partial Class frmstudent
         pnlheader.Size = New Size(1199, 36)
         pnlheader.TabIndex = 2
         ' 
+        ' btnChangePassword
+        ' 
+        btnChangePassword.Anchor = AnchorStyles.Top Or AnchorStyles.Right
+        btnChangePassword.FlatStyle = FlatStyle.Flat
+        btnChangePassword.Font = New Font("Segoe UI", 8.25F, FontStyle.Regular, GraphicsUnit.Point, CByte(0))
+        btnChangePassword.Location = New Point(981, 4)
+        btnChangePassword.Name = "btnChangePassword"
+        btnChangePassword.Size = New Size(135, 29)
+        btnChangePassword.TabIndex = 11
+        btnChangePassword.Text = "Change Password"
+        btnChangePassword.UseVisualStyleBackColor = True
+        ' 
         ' Panel6
         ' 
         Panel6.BackColor = Color.DimGray
@@ -1321,18 +1333,6 @@ Partial Class frmstudent
         btnLogout.TabIndex = 8
         btnLogout.Text = "Log out"
         btnLogout.UseVisualStyleBackColor = True
-        ' 
-        ' btnChangePassword
-        ' 
-        btnChangePassword.Anchor = AnchorStyles.Top Or AnchorStyles.Right
-        btnChangePassword.FlatStyle = FlatStyle.Flat
-        btnChangePassword.Font = New Font("Segoe UI", 8.25F, FontStyle.Regular, GraphicsUnit.Point, CByte(0))
-        btnChangePassword.Location = New Point(981, 4)
-        btnChangePassword.Name = "btnChangePassword"
-        btnChangePassword.Size = New Size(135, 29)
-        btnChangePassword.TabIndex = 11
-        btnChangePassword.Text = "Change Password"
-        btnChangePassword.UseVisualStyleBackColor = True
         ' 
         ' frmstudent
         ' 

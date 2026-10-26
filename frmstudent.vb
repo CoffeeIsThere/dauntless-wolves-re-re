@@ -15,7 +15,7 @@ Public Class frmStudent
 
     Private _currentStudentId As String = ""
     Private ReadOnly gradeRows As New List(Of String())
-    Private ReadOnly assessmentMap As New Dictionary(Of String, DataRow)() ' Assessment Title -> DataRow (grade_id, score, total_score)
+    Private ReadOnly assessmentMap As New Dictionary(Of Integer, DataRow)()
 
 
     Private quizPct, activityPct, examPct, projectPct As Integer
@@ -23,7 +23,8 @@ Public Class frmStudent
 
     Private Sub frmStudent_Load(sender As Object, e As EventArgs) Handles MyBase.Load
         ' 1. Session Guard Check
-        If Not AppSession.IsLoggedIn OrElse AppSession.CurrentUser Is Nothing Then
+
+        If Not AppSession.IsStudent Then
             MessageBox.Show("Please log in to access this page.", "Access Denied", MessageBoxButtons.OK, MessageBoxIcon.Warning)
 
             Dim loginForm As New frmlogin()
@@ -70,7 +71,49 @@ Public Class frmStudent
     ' ---------- NAVIGATION & TAB CONTROL ----------
 
     Private Sub Tab_Click(sender As Object, e As EventArgs)
-        ShowPage(DirectCast(sender, Button))
+
+        If Not AppSession.IsStudent Then Return
+
+        Dim selectedTab As Button = DirectCast(sender, Button)
+
+        ' Reload data only when the student selects a page.
+        Try
+
+            If selectedTab Is btnMyGrades Then
+
+                LoadGrades()
+
+            ElseIf selectedTab Is btnGradeHistory Then
+
+                LoadHistory()
+
+            ElseIf selectedTab Is btnRequestRevision Then
+
+                LoadRequests()
+
+                ' Refresh assessment choices for the selected class.
+                cboClass_SelectedIndexChanged(cboclass, EventArgs.Empty)
+
+            ElseIf selectedTab Is btnMyPerformance Then
+
+                ShowPerformance()
+
+            End If
+
+        Catch ex As Exception
+
+            MessageBox.Show(
+            "Could not refresh student data: " & ex.Message,
+            "Refresh Error",
+            MessageBoxButtons.OK,
+            MessageBoxIcon.Warning
+        )
+
+        End Try
+
+        ' Switch to the selected page.
+        ShowPage(selectedTab)
+
     End Sub
 
     Private Sub ShowPage(activeTab As Button)
@@ -387,14 +430,29 @@ Public Class frmStudent
                     Dim runningGradeStr As String = "Pending"
                     Dim statusStr As String = "Not Yet"
 
-                    If Not IsDBNull(row("score")) AndAlso Not IsDBNull(row("total_score")) Then
+                    If Not IsDBNull(row("score")) AndAlso
+                        Not IsDBNull(row("total_score")) Then
+
                         Dim scoreVal As Double = Convert.ToDouble(row("score"))
                         Dim totalVal As Double = Convert.ToDouble(row("total_score"))
 
+                        ' Always show the recorded score.
                         scoreStr = $"{scoreVal:0.#}/{totalVal:0.#}"
-                        Dim pct As Double = (scoreVal / totalVal) * 100.0
-                        runningGradeStr = $"{pct:0.0}"
-                        statusStr = If(pct >= 75.0, "Passed", "At Risk")
+
+                        ' Only calculate percentages when maximum points are valid.
+                        If totalVal > 0 Then
+
+                            Dim pct As Double = (scoreVal / totalVal) * 100.0
+
+                            runningGradeStr = $"{pct:0.0}"
+                            statusStr = If(pct >= 75.0, "Passed", "At Risk")
+
+                        Else
+
+                            runningGradeStr = "N/A"
+                            statusStr = "Invalid Maximum"
+
+                        End If
                     End If
 
                     ' Row structure: {Term, Assessment, Score, Weight, Running Grade, Status}
@@ -483,13 +541,15 @@ Public Class frmStudent
                            "a.title AS assessment_title, " &
                            "IFNULL(al.old_value, '---') AS old_score, " &
                            "IFNULL(al.new_value, '---') AS new_score, " &
-                           "IFNULL(t.full_name, 'System') AS changed_by, " &
+                           "COALESCE(t.full_name, adm.full_name, s.full_name, 'System') AS changed_by, " &
                            "IFNULL(al.details, 'Grade Update') AS reason " &
                            "FROM auditlog al " &
                            "LEFT JOIN studentgrade sg ON al.entity_id COLLATE utf8mb4_unicode_ci = CAST(sg.grade_id AS CHAR) COLLATE utf8mb4_unicode_ci " &
                            "LEFT JOIN enrollment e ON sg.enrollment_id = e.enrollment_id " &
                            "LEFT JOIN assessment a ON sg.assessment_id = a.assessment_id " &
                            "LEFT JOIN teacher t ON al.teacher_id COLLATE utf8mb4_unicode_ci = t.teacher_id COLLATE utf8mb4_unicode_ci " &
+                           "LEFT JOIN admin adm ON al.admin_id = adm.admin_id " &
+                           "LEFT JOIN student s ON al.student_id COLLATE utf8mb4_unicode_ci = s.student_id COLLATE utf8mb4_unicode_ci " &
                            "WHERE e.student_id COLLATE utf8mb4_unicode_ci = @StudentId OR al.student_id COLLATE utf8mb4_unicode_ci = @StudentId " &
                            "ORDER BY al.logged_at DESC"
 
@@ -524,10 +584,15 @@ Public Class frmStudent
             If dt IsNot Nothing AndAlso dt.Rows.Count > 0 Then
                 For Each row As DataRow In dt.Rows
                     Dim title As String = row("title").ToString()
-                    cboAssessment.Items.Add(title)
-                    If Not assessmentMap.ContainsKey(title) Then
-                        assessmentMap.Add(title, row)
-                    End If
+                    Dim gradeId As Integer = Convert.ToInt32(row("grade_id"))
+
+                    Dim itemIndex As Integer = cboAssessment.Items.Count
+
+                    ' Include the unique grade ID so identical titles are distinguishable.
+                    cboAssessment.Items.Add(title & " (Grade #" & gradeId & ")")
+
+                    ' Store the exact database row for this dropdown position.
+                    assessmentMap.Add(itemIndex, row)
                 Next
                 cboAssessment.Enabled = True
             Else
@@ -543,15 +608,27 @@ Public Class frmStudent
         Next
     End Sub
 
-    Private Sub cboAssessment_SelectedIndexChanged(sender As Object, e As EventArgs) Handles cboAssessment.SelectedIndexChanged
+    Private Sub cboAssessment_SelectedIndexChanged(
+        sender As Object,
+        e As EventArgs
+    ) Handles cboAssessment.SelectedIndexChanged
+
         txtCurrentGrade.Clear()
 
-        If cboAssessment.SelectedIndex <> -1 AndAlso assessmentMap.ContainsKey(cboAssessment.Text) Then
-            Dim row As DataRow = assessmentMap(cboAssessment.Text)
-            Dim scoreVal As Double = Convert.ToDouble(row("score"))
-            Dim totalVal As Double = Convert.ToDouble(row("total_score"))
-            txtCurrentGrade.Text = $"{scoreVal:0.#}/{totalVal:0.#}"
+        Dim selectedIndex As Integer = cboAssessment.SelectedIndex
+
+        If selectedIndex < 0 OrElse
+       Not assessmentMap.ContainsKey(selectedIndex) Then
+            Return
         End If
+
+        Dim row As DataRow = assessmentMap(selectedIndex)
+
+        Dim scoreVal As Double = Convert.ToDouble(row("score"))
+        Dim totalVal As Double = Convert.ToDouble(row("total_score"))
+
+        txtCurrentGrade.Text = $"{scoreVal:0.#}/{totalVal:0.#}"
+
     End Sub
 
     Private Sub LoadRequests()
@@ -579,7 +656,7 @@ Public Class frmStudent
     End Sub
 
     Private Sub btnSubmitRequest_Click(sender As Object, e As EventArgs) Handles btnSubmitRequest.Click
-        If cboAssessment.SelectedIndex = -1 OrElse Not assessmentMap.ContainsKey(cboAssessment.Text) Then
+        If cboAssessment.SelectedIndex = -1 OrElse Not assessmentMap.ContainsKey(cboAssessment.SelectedIndex) Then
             MessageBox.Show("Please select an assessment item.", "Missing Info", MessageBoxButtons.OK, MessageBoxIcon.Warning)
             Return
         End If
@@ -590,37 +667,43 @@ Public Class frmStudent
             Return
         End If
 
-        ' Block duplicate open requests for the same assessment in dgvRequests
-        For Each row As DataGridViewRow In dgvRequests.Rows
-            If row.Cells(0).Value IsNot Nothing AndAlso row.Cells(0).Value.ToString() = cboAssessment.Text Then
-                Dim status = row.Cells(2).Value.ToString()
-                If status = "Pending" OrElse status = "Under Review" Then
-                    MessageBox.Show("You already have an open request for this assessment.", "Duplicate Request", MessageBoxButtons.OK, MessageBoxIcon.Information)
-                    Return
-                End If
-            End If
-        Next
-
         ' Create & submit RevisionRequest entity
-        Dim selectedRow As DataRow = assessmentMap(cboAssessment.Text)
+        Dim selectedRow As DataRow = assessmentMap(cboAssessment.SelectedIndex)
         Dim gradeId As Integer = Convert.ToInt32(selectedRow("grade_id"))
 
         Dim req As New RevisionRequest With {
             .GradeId = gradeId,
             .Reason = txtReason.Text.Trim()
         }
+        Dim result As OperationResult =
+            _revisionService.SubmitRequestResult(req, _currentStudentId)
 
-        Dim success As Boolean = _revisionService.SubmitRequest(req, _currentStudentId)
+        If result.Success Then
 
-        If success Then
-            MessageBox.Show("Request submitted successfully!", "Success", MessageBoxButtons.OK, MessageBoxIcon.Information)
+            MessageBox.Show(
+                result.Message,
+                "Request Submitted",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Information
+            )
+
             cboAssessment.SelectedIndex = -1
             txtCurrentGrade.Clear()
             txtReason.Clear()
+
             LoadRequests()
+
         Else
-            MessageBox.Show("Failed to submit request to database. Please try again.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error)
+
+            MessageBox.Show(
+                result.Message,
+                "Unable to Submit Request",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Warning
+            )
+
         End If
+
     End Sub
 
     Private Sub dgvRequests_CellFormatting(sender As Object, e As DataGridViewCellFormattingEventArgs) Handles dgvRequests.CellFormatting
@@ -667,15 +750,22 @@ Public Class frmStudent
         Dim termFilter As String = cboperfterm.Text
         Dim courseFilter As String = cboperfcourse.Text
 
-        ' Updated query selecting a.assessment_type AS type
-        Dim sql As String = "SELECT a.term, a.assessment_type AS type, sg.score, a.total_score, r.status AS req_status " &
-                           "FROM assessment a " &
-                           "JOIN enrollment e ON a.class_id = e.class_id " &
-                           "JOIN class c ON e.class_id = c.class_id " &
-                           "JOIN course co ON c.course_code = co.course_code " &
-                           "LEFT JOIN studentgrade sg ON a.assessment_id = sg.assessment_id AND sg.enrollment_id = e.enrollment_id " &
-                           "LEFT JOIN revisionrequest r ON sg.grade_id = r.grade_id " &
-                           "WHERE e.student_id = @StudentId"
+        Dim sql As String =
+            "SELECT a.term, a.assessment_type AS type, " &
+            "sg.score, a.total_score, " &
+            "CASE WHEN EXISTS ( " &
+            "    SELECT 1 FROM revisionrequest r " &
+            "    WHERE r.grade_id = sg.grade_id " &
+            "    AND r.status IN ('Pending', 'Under Review') " &
+            ") THEN 'Pending' ELSE NULL END AS req_status " &
+            "FROM assessment a " &
+            "JOIN enrollment e ON a.class_id = e.class_id " &
+            "JOIN class c ON e.class_id = c.class_id " &
+            "JOIN course co ON c.course_code = co.course_code " &
+            "LEFT JOIN studentgrade sg " &
+            "ON a.assessment_id = sg.assessment_id " &
+            "AND sg.enrollment_id = e.enrollment_id " &
+            "WHERE e.student_id = @StudentId"
 
         Dim params As New List(Of MySqlParameter) From {New MySqlParameter("@StudentId", _currentStudentId)}
 
