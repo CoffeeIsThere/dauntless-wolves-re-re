@@ -175,49 +175,25 @@ Public Class frmprof
     End Function
 
     Private Sub AlignGridToHeader()
-        If dgvClassGrades.Columns.Count = 0 Then Exit Sub
-
-        Dim names() As String = {"Student", "SW1", "HW1", "Quiz1", "Act4", "Act5", "Act6", "Midterms", "Running Grade", "Status"}
-
-        For Each colName As String In names
-            If Not dgvClassGrades.Columns.Contains(colName) Then Exit Sub
+        If dgvClassGrades.Columns.Count = 0 Then Return
+        dgvClassGrades.ColumnHeadersVisible = True
+        dgvClassGrades.ScrollBars = ScrollBars.Both
+        For Each col As DataGridViewColumn In dgvClassGrades.Columns
+            col.Visible = col.Name <> "EnrollmentId" AndAlso col.Name <> "StudentId"
+            col.AutoSizeMode = DataGridViewAutoSizeColumnMode.AllCells
+            If col.Name = "Student" Then col.MinimumWidth = 180
+            If col.Name = "RunningGrade" Then col.HeaderText = "Running Grade"
         Next
-
-        Dim cSW1 As Integer = HeaderCenterX(cboSW1)
-        Dim cHW1 As Integer = HeaderCenterX(cboHW1)
-        Dim cQuiz As Integer = HeaderCenterX(cboQuiz1)
-        Dim cMid As Integer = HeaderCenterX(lblMidterms)
-        Dim cRun As Integer = HeaderCenterX(lblRunningGrade)
-        Dim cStat As Integer = HeaderCenterX(lblStatus)
-        Dim gap As Double = (cMid - cQuiz) / 4
-
-        Dim centers() As Double = {0, cSW1, cHW1, cQuiz,
-                                   cQuiz + gap, cQuiz + 2 * gap, cQuiz + 3 * gap,
-                                   cMid, cRun, cStat}
-
-        Dim startX As Double = 0
-        For i As Integer = 0 To names.Length - 2
-            Dim endX As Double
-            If i = 0 Then
-                endX = cSW1 - 55
-            Else
-                endX = (centers(i) + centers(i + 1)) / 2
-            End If
-
-            With dgvClassGrades.Columns(names(i))
-                .AutoSizeMode = DataGridViewAutoSizeColumnMode.None
-                .Width = CInt(Math.Max(endX - startX, 40))
-                .DefaultCellStyle.Alignment = If(i = 0,
-                    DataGridViewContentAlignment.MiddleLeft,
-                    DataGridViewContentAlignment.MiddleCenter)
-            End With
-            startX = endX
+        Dim table = TryCast(dgvClassGrades.DataSource, DataTable)
+        If table IsNot Nothing Then
+            For Each col As DataColumn In table.Columns
+                dgvClassGrades.Columns(col.ColumnName).HeaderText = col.Caption
+            Next
+        End If
+        ' The designer's fixed assessment headings do not describe dynamic classes.
+        For Each heading As Control In {cboSW1, cboHW1, cboQuiz1, lblMidterms, lblRunningGrade, lblStatus}
+            heading.Visible = False
         Next
-
-        With dgvClassGrades.Columns("Status")
-            .AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill
-            .DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter
-        End With
     End Sub
 
     Private Sub dgvClassGrades_CellFormatting(sender As Object, e As DataGridViewCellFormattingEventArgs) _
@@ -237,7 +213,7 @@ Public Class frmprof
             e.CellStyle.SelectionBackColor = e.CellStyle.BackColor
             e.CellStyle.SelectionForeColor = e.CellStyle.ForeColor
 
-        ElseIf colName = "Running Grade" Then
+        ElseIf colName = "RunningGrade" Then
             Dim g As Double
             If Double.TryParse(e.Value.ToString(), g) Then
                 e.CellStyle.BackColor = If(g < 75, Color.FromArgb(255, 240, 170), Color.FromArgb(190, 235, 200))
@@ -345,7 +321,7 @@ Public Class frmprof
 
             Dim reason As String = row("reason").ToString()
             Dim status As String = row("status").ToString()
-            Dim action As String = If(status.Equals("Pending", StringComparison.OrdinalIgnoreCase), "Approve", "Closed")
+            Dim action As String = If(status = "Pending" OrElse status = "Under Review", "Approve", "Closed")
 
             dt.Rows.Add(reqId, enrolId, assessId, reqPtsVal, studentName, assessTitle, currScore, reqPtsStr, reason, status, action)
         Next
@@ -476,7 +452,7 @@ Public Class frmprof
     End Sub
 
     Private Sub LoadAuditLogs()
-        Dim dtDb As DataTable = AuditService.GetLogsByActor("Teacher", _currentTeacherId)
+        Dim dtDb As DataTable = _gradeService.GetAuditLogsForTeacher(_currentTeacherId)
 
         Dim dt As New DataTable()
         For Each c In {"Action", "Student", "Item", "DateTime", "ChangedBy"}
@@ -485,16 +461,11 @@ Public Class frmprof
 
         If dtDb IsNot Nothing AndAlso dtDb.Rows.Count > 0 Then
             For Each row As DataRow In dtDb.Rows
-                Dim actionName As String = Convert.ToString(row("action"))
-                Dim studentName As String = If(dtDb.Columns.Contains("student_name") AndAlso Not IsDBNull(row("student_name")), Convert.ToString(row("student_name")), "System")
-                Dim itemTitle As String = If(dtDb.Columns.Contains("item") AndAlso Not IsDBNull(row("item")), Convert.ToString(row("item")), "N/A")
-
-                Dim dtFormatted As String = DateTime.Now.ToString("yyyy-MM-dd HH:mm")
-                If dtDb.Columns.Contains("created_at") AndAlso Not IsDBNull(row("created_at")) Then
-                    dtFormatted = Convert.ToDateTime(row("created_at")).ToString("yyyy-MM-dd HH:mm")
-                End If
-
-                Dim changedBy As String = If(dtDb.Columns.Contains("actor_name") AndAlso Not IsDBNull(row("actor_name")), Convert.ToString(row("actor_name")), _currentTeacherId)
+                Dim actionName = Convert.ToString(row("Action"))
+                Dim studentName = Convert.ToString(row("Student"))
+                Dim itemTitle = Convert.ToString(row("Item"))
+                Dim dtFormatted = Convert.ToString(row("DateTime"))
+                Dim changedBy = Convert.ToString(row("ChangedBy"))
 
                 dt.Rows.Add(actionName, studentName, itemTitle, dtFormatted, changedBy)
             Next

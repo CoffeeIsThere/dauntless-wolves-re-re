@@ -1,0 +1,48 @@
+Imports MySql.Data.MySqlClient
+Public Module AppSession
+    Public IsAdmin As Boolean = False
+    Public CurrentUser As New User()
+End Module
+Public Class User
+    Public UserId As String
+End Class
+Module Program
+    Sub Main()
+        Dim service As New GradeService()
+        Using conn = DatabaseHelper.GetConnection()
+            Dim teacher As String
+            Dim classId As Integer
+            Using cmd As New MySqlCommand("SELECT teacher_id,class_id FROM class ORDER BY class_id LIMIT 1", conn)
+                Using r = cmd.ExecuteReader()
+                    r.Read()
+                    teacher = r.GetString(0)
+                    classId = r.GetInt32(1)
+                End Using
+            End Using
+            Check(Not service.CreateAssessment(classId, "Denied", "Quiz", 20, "Midterm", "not-owner").Success, "reject other teacher")
+            Check(Not service.CreateAssessment(classId, "Invalid", "Quiz", 20, "1st Semester", teacher).Success, "reject semester as term")
+            Check(service.CreateAssessment(classId, "Review test", "Quiz", 20, "Midterm", teacher, 10).Success, "create assessment")
+            Dim id As Integer
+            Using cmd As New MySqlCommand("SELECT MAX(assessment_id) FROM assessment", conn)
+                id = CInt(cmd.ExecuteScalar())
+            End Using
+            Dim student As String
+            Using cmd As New MySqlCommand("SELECT student_id FROM enrollment WHERE class_id=" & classId & " LIMIT 1", conn)
+                student = CStr(cmd.ExecuteScalar())
+            End Using
+            Check(service.SaveAssessmentScore(student, classId, id, 15, teacher).Success, "save score")
+            Check(Not service.SaveAssessmentScore(student, classId, id, 25, teacher).Success, "reject out of range")
+            Check(Not service.SaveAssessmentScore(student, classId, id, Nothing, teacher).Success, "reject silent clearing")
+            Using cmd As New MySqlCommand("SELECT score FROM studentgrade WHERE assessment_id=" & id & " AND enrollment_id=(SELECT enrollment_id FROM enrollment WHERE class_id=" & classId & " AND student_id=@Student)", conn)
+                cmd.Parameters.AddWithValue("@Student", student)
+                Check(CDbl(cmd.ExecuteScalar()) = 15, "saved score survives rejected edits")
+            End Using
+            Check(service.GetClassGradeSheet(classId, teacher).Columns.Contains("A" & id), "grade sheet uses assessment ID")
+            Check(service.GetAuditLogsForTeacher(teacher).Rows.Count > 0, "audit query returns changes")
+        End Using
+    End Sub
+    Sub Check(ok As Boolean, name As String)
+        If Not ok Then Throw New Exception("FAIL: " & name)
+        Console.WriteLine("PASS: " & name)
+    End Sub
+End Module
