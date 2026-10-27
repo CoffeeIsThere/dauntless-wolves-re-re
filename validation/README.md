@@ -6,7 +6,7 @@ Run only against a disposable database populated with the supplied grading-syste
 2. Place `dbconfig.json` next to the generated `validation/bin/Debug/net8.0/professor-services.dll`, using DatabaseHelper's Host, Port, Database, User and Password fields. Do not commit credentials.
 3. Run: `dotnet validation/bin/Debug/net8.0/professor-services.dll`.
 
-Eighty-two checks exercise CSV import validation, request approval/status transitions, re-check score overrides, duplicate approval protection, and assessment ownership, term validation, assessment creation, score saving, range validation, rejected clearing, persisted values, grade-sheet columns and audit queries. The harness compiles the actual grading services for Linux without loading Windows Forms. Its session stub is used only by the test executable.
+Ninety-two checks exercise CSV import validation, request approval/status transitions, re-check score overrides, duplicate approval protection, and assessment ownership, term validation, assessment creation, score saving, range validation, rejected clearing, persisted values, grade-sheet columns and audit queries. The harness compiles the actual grading services for Linux without loading Windows Forms. Its session stub is used only by the test executable.
 
 Windows manual checks: switch between sections of the same course; confirm assessment titles and maximum scores match each section; edit and paste scores, reopen and verify persistence; enroll an existing student; create a weighted Midterm/Finals assessment; approve an Under Review request; inspect audit timestamps and exported class headers. Gradebook inputs now represent persisted assessment scores, and summaries use the shared weighted calculator. The old attendance/bonus/project/exam worksheet-only inputs are hidden to avoid conflicting grades. Removing a saved grade or changing an existing assessment maximum is explicitly blocked on this screen rather than silently changing only the display.
 
@@ -86,3 +86,8 @@ Manually check the Record Scores page:
 - Temporarily disconnect the database or deactivate the professor account and submit. A failed save must not advance or clear the entry. Reconnect/reactivate before further testing.
 - Save for the last student. The dropdown must stay on that student and the feedback must read All students completed; the empty Score box remains focused. The professor may manually select another student or assessment afterward.
 - Switch away and back to the professor window, and dismiss a validation warning, while positioned midway through the roster. A same-class refresh must preserve the student and assessment rather than reset to the first entries.
+
+
+Surname sorting: Record Scores students, Class Grades rows, and gradebook rows use the shared surname ordering. Keep original display names. Verify names such as Jasmine Faye Catapang, Kyla Mae Dimaculangan and Elijah Rebolledo are ordered by Catapang/Dimaculangan/Rebolledo rather than their first names. Equal surnames use given names and then student IDs as tie breakers. Verify Enter-to-submit follows this new order while retaining the class/assessment, and clicking the Class Grades Student header restores surname A–Z after another column sort.
+
+The schema has only full_name, so the sorter supports First Last and Last, First formats, common surname particles and suffixes. Ambiguous multiword surnames should use the explicit Last, First format (e.g. Garcia Lopez, Juan) rather than relying on surname inference. No names are rewritten and no database migration is needed.

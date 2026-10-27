@@ -15,6 +15,14 @@ Module Program
         Check(Not ValidationHelper.TryAssessmentImportRow({"Quiz", "Quiz", "20", "1st Semester", "10"}, maximum, weight), "reject import semester")
         Check(Not ValidationHelper.TryAssessmentImportRow({"Quiz", "Quiz", "20", "Finals", "101"}, maximum, weight), "reject invalid import weight")
         Check(Not ValidationHelper.TryAssessmentImportRow({"Unknown", "CW", "20", "Finals", "10"}, maximum, weight), "reject unsupported import type")
+        Check(StudentNameOrder.CompareNames("Jerome Pagdanganan", "Elijah Rebolledo") < 0, "sort uses surname rather than first name")
+        Check(StudentNameOrder.CompareNames("Ana Garcia", "Zoe Garcia") < 0, "same surname sorts by given name")
+        Check(StudentNameOrder.Surname("Cruz, Juan") = "Cruz", "surname-first format is supported")
+        Check(StudentNameOrder.Surname("Juan de la Cruz") = "de la Cruz", "compound surname particles are preserved")
+        Check(StudentNameOrder.Surname("Juan Cruz Jr.") = "Cruz", "suffix does not become surname")
+        Check(StudentNameOrder.Surname("Juan Cruz, Jr.") = "Cruz", "comma suffix does not become surname")
+        Check(StudentNameOrder.CompareNames("Juan Álvarez", "John Brown") < 0, "accented surname sorts alphabetically")
+        Check(StudentNameOrder.Surname("") = "", "empty name is safe")
         Dim service As New GradeService()
         Using conn = DatabaseHelper.GetConnection()
             Dim teacher As String
@@ -45,6 +53,10 @@ Module Program
                 Check(CDbl(cmd.ExecuteScalar()) = 15, "saved score survives rejected edits")
             End Using
             Check(service.GetClassGradeSheet(classId, teacher).Columns.Contains("A" & id), "grade sheet uses assessment ID")
+            Dim orderedStudents = service.GetEnrollmentsByClass(classId, teacher)
+            Check(orderedStudents.AsEnumerable().Zip(orderedStudents.AsEnumerable().Skip(1), Function(a, b) StudentNameOrder.CompareNames(a("full_name").ToString(), b("full_name").ToString()) <= 0).All(Function(value) value), "dropdown data is sorted by surname A-Z")
+            Dim gradeSheet = service.GetClassGradeSheet(classId, teacher)
+            Check(orderedStudents.AsEnumerable().Select(Function(row) row("student_id").ToString()).SequenceEqual(gradeSheet.AsEnumerable().Select(Function(row) row("StudentId").ToString())), "grade sheet and dropdown share surname order")
             Check(service.GetAuditLogsForTeacher(teacher).Rows.Count > 0, "audit query returns changes")
             Dim revision As New RevisionRequestService()
             Dim requestId As Integer

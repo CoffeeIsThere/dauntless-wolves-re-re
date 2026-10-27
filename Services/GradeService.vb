@@ -319,7 +319,7 @@ Public Class GradeService
             Dim grade = GradeCalculator.CalculateRunningGrade(items)
             student("running_grade") = If(grade.HasValue, CObj(grade.GetValueOrDefault()), DBNull.Value)
         Next
-        Return students
+        Return StudentNameOrder.Sort(students, "full_name", "student_id")
     End Function
 
     ' Student's own classes (for the course dropdown on My Grades)
