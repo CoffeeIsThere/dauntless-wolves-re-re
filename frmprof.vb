@@ -176,6 +176,14 @@ Public Class frmprof
         AlignGridToHeader()
     End Sub
 
+    Private Sub SortClassStudents(sender As Object, e As DataGridViewCellMouseEventArgs) Handles dgvClassGrades.ColumnHeaderMouseClick
+        If e.ColumnIndex < 0 OrElse dgvClassGrades.Columns(e.ColumnIndex).Name <> "Student" Then Return
+        Dim table = TryCast(dgvClassGrades.DataSource, DataTable)
+        If table Is Nothing OrElse Not table.Columns.Contains("StudentId") Then Return
+        dgvClassGrades.DataSource = StudentNameOrder.Sort(table, "Student", "StudentId")
+        AlignGridToHeader()
+    End Sub
+
     Private Function HeaderCenterX(ctrl As Control) As Integer
         Dim screenPt As Point = ctrl.Parent.PointToScreen(
             New Point(ctrl.Left + ctrl.Width \ 2, 0))
@@ -198,6 +206,13 @@ Public Class frmprof
             For Each col As DataColumn In table.Columns
                 dgvClassGrades.Columns(col.ColumnName).HeaderText = col.Caption
             Next
+        End If
+        If dgvClassGrades.Columns.Contains("Student") Then
+            With dgvClassGrades.Columns("Student")
+                .SortMode = DataGridViewColumnSortMode.Programmatic
+                .HeaderCell.SortGlyphDirection = SortOrder.Ascending
+                .ToolTipText = "Click to sort students by surname A–Z."
+            End With
         End If
         ' The designer's fixed assessment headings do not describe dynamic classes.
         For Each heading As Control In {cboSW1, cboHW1, cboQuiz1, lblMidterms, lblRunningGrade, lblStatus}
@@ -1138,6 +1153,7 @@ Public Class frmprof
                                         ComboBox1_SelectedIndexChanged(Nothing, EventArgs.Empty)
                                     End If
                                 End Sub
+        Label2.Text = "Student (surname A–Z)"
         Label3.Text = "Assessment"
         Dim inputs() As Control = {Label2, ComboBox2, Label3, ComboBox4, Label4, TextBox1, CustomButton5}
         Dim y = 40

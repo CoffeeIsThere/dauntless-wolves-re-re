@@ -498,9 +498,7 @@ Public Class frmGradebook
     End Function
 
     Private Function CompareNames(a As String, b As String) As Integer
-        Dim c As Integer = String.Compare(Surname(a), Surname(b), StringComparison.CurrentCultureIgnoreCase)
-        If c <> 0 Then Return c
-        Return String.Compare(GivenName(a), GivenName(b), StringComparison.CurrentCultureIgnoreCase)
+        Return StudentNameOrder.CompareNames(a, b)
     End Function
 
     ' Sorts all students A-Z by surname, renumbers the No. column 1..n, and refills blank rows
@@ -521,7 +519,10 @@ Public Class frmGradebook
             End If
         Next
 
-        studentList.Sort(Function(a, b) CompareNames(Convert.ToString(a.Item1(nameIdx)), Convert.ToString(b.Item1(nameIdx))))
+        studentList.Sort(Function(a, b)
+                             Dim order = CompareNames(Convert.ToString(a.Item1(nameIdx)), Convert.ToString(b.Item1(nameIdx)))
+                             Return If(order <> 0, order, StringComparer.OrdinalIgnoreCase.Compare(a.Item2, b.Item2))
+                         End Function)
 
         dgvGrades.Rows.Clear()
 
