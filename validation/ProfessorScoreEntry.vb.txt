@@ -1,0 +1,64 @@
+Imports System.Reflection
+Imports System.Windows.Forms
+Imports DAUNTLESS_WOLVES_PROF
+Imports DAUNTLESS_WOLVES_PROF.Models
+
+' Windows only. Mutates an isolated assessment in a disposable seeded database.
+Module Program
+    Private Const Flags As BindingFlags = BindingFlags.Instance Or BindingFlags.NonPublic
+    <STAThread>
+    Sub Main()
+        Application.EnableVisualStyles()
+        Dim fixture = DatabaseHelper.ExecuteQuery("SELECT c.class_id,c.teacher_id FROM class c JOIN enrollment e ON e.class_id=c.class_id GROUP BY c.class_id,c.teacher_id HAVING COUNT(*)>=2 ORDER BY c.class_id LIMIT 1").Rows(0)
+        Dim classId = CInt(fixture("class_id"))
+        Dim teacher = fixture("teacher_id").ToString()
+        AppSession.StartSession(New UserModel With {.UserId = teacher, .FullName = "Score entry tester", .Role = "Teacher"})
+        Dim title = "Entry " & Guid.NewGuid().ToString("N").Substring(0, 8)
+        Check(New GradeService().CreateAssessment(classId, title, "Quiz", 20, "Midterm", teacher).Success, "create isolated assessment")
+        Dim assessmentId = CInt(DatabaseHelper.ExecuteScalar("SELECT MAX(assessment_id) FROM assessment WHERE class_id=" & classId))
+        Using form As New frmprof()
+            form.Show()
+            form.ReloadClasses(classId)
+            form.Activate()
+            Application.DoEvents()
+            Dim students = Control(Of ComboBox)(form, "ComboBox2")
+            Dim assessments = Control(Of ComboBox)(form, "ComboBox4")
+            Dim classes = Control(Of ComboBox)(form, "ComboBox1")
+            Dim score = Control(Of TextBox)(form, "TextBox1")
+            Dim submit = Control(Of Button)(form, "CustomButton5")
+            assessments.SelectedValue = assessmentId
+            students.SelectedIndex = 0
+            Dim firstEnrollment = CInt(students.SelectedValue)
+            score.Text = "15"
+            score.Focus()
+            Dim enter As New KeyEventArgs(Keys.Enter)
+            GetType(frmprof).GetMethod("ScoreBox_KeyDown", Flags).Invoke(form, {score, enter})
+            Check(enter.Handled AndAlso enter.SuppressKeyPress, "Enter is consumed by score submission")
+            Check(students.SelectedIndex = 1, "Enter advances to next student")
+            Check(score.Text = "" AndAlso score.Focused, "cleared score box retains caret focus")
+            Check(CInt(classes.SelectedValue) = classId AndAlso CInt(assessments.SelectedValue) = assessmentId, "class and assessment stay selected")
+            Dim persisted = DatabaseHelper.ExecuteScalar("SELECT score FROM studentgrade WHERE enrollment_id=" & firstEnrollment & " AND assessment_id=" & assessmentId)
+            Check(CDbl(persisted) = 15, "score is saved for original student")
+            GetType(frmprof).GetMethod("ScoreBox_KeyDown", Flags).Invoke(form, {score, New KeyEventArgs(Keys.Enter)})
+            Check(students.SelectedIndex = 1, "repeated Enter on empty box does not advance")
+            students.SelectedIndex = students.Items.Count - 1
+            Dim lastEnrollment = CInt(students.SelectedValue)
+            score.Text = "18"
+            submit.PerformClick()
+            Check(CInt(students.SelectedValue) = lastEnrollment, "last student does not wrap to first")
+            Dim feedback = DirectCast(GetType(frmprof).GetField("scoreFeedback", Flags).GetValue(form), Label)
+            Check(feedback.Text.Contains("All students completed"), "last save displays completion feedback")
+            Check(score.Text = "" AndAlso score.Focused, "button submission restores input focus")
+            GetType(frmprof).GetMethod("ComboBox1_SelectedIndexChanged", Flags).Invoke(form, {Nothing, EventArgs.Empty})
+            Check(CInt(students.SelectedValue) = lastEnrollment AndAlso CInt(assessments.SelectedValue) = assessmentId, "same-class refresh preserves entry progress")
+            form.Close()
+        End Using
+    End Sub
+    Private Function Control(Of T As System.Windows.Forms.Control)(form As frmprof, name As String) As T
+        Return DirectCast(GetType(frmprof).GetProperty(name, Flags).GetValue(form), T)
+    End Function
+    Private Sub Check(condition As Boolean, name As String)
+        If Not condition Then Throw New Exception("FAIL: " & name)
+        Console.WriteLine("PASS: " & name)
+    End Sub
+End Module

@@ -113,6 +113,13 @@ Public Class GradeService
     ) As OperationResult
 
 
+        If Not AccountAccess.IsActive(conn, tx, actorRole, actorId) Then Return OperationResult.Fail("Your account is inactive or unavailable. Please log in again.")
+        ' Serialize edits across all assessments of this enrollment before taking a grade snapshot.
+        Using enrollmentLock As New MySqlCommand("SELECT enrollment_id FROM enrollment WHERE enrollment_id=@Id FOR UPDATE", conn, tx)
+            enrollmentLock.Parameters.AddWithValue("@Id", enrollmentId)
+            If enrollmentLock.ExecuteScalar() Is Nothing Then Return OperationResult.Fail("Enrollment not found.")
+        End Using
+
         ' Only supported grading roles may use this shared operation.
         If actorRole <> "Teacher" AndAlso actorRole <> "Admin" Then
             Return OperationResult.Fail("Unauthorized grading role.")
@@ -300,14 +307,19 @@ Public Class GradeService
 
     ' Students in one of the teacher's classes
     Public Function GetEnrollmentsByClass(classId As Integer, teacherId As String) As DataTable
-        Dim sql As String =
-            "SELECT e.enrollment_id, s.student_id, s.full_name, e.running_grade " &
-            "FROM enrollment e " &
-            "JOIN student s ON e.student_id = s.student_id " &
-            "JOIN class c ON e.class_id = c.class_id " &
-            "WHERE e.class_id = @ClassId AND c.teacher_id = @TeacherId " &
-            "ORDER BY s.full_name"
-        Return DatabaseHelper.ExecuteQuery(sql, {New MySqlParameter("@ClassId", classId), New MySqlParameter("@TeacherId", teacherId)})
+        Dim students = DatabaseHelper.ExecuteQuery(
+            "SELECT e.enrollment_id, s.student_id, s.full_name, e.running_grade FROM enrollment e JOIN student s ON s.student_id=e.student_id JOIN class c ON c.class_id=e.class_id WHERE e.class_id=@Class AND c.teacher_id=@Teacher ORDER BY s.full_name",
+            New MySqlParameter("@Class", classId), New MySqlParameter("@Teacher", teacherId))
+        Dim scores = DatabaseHelper.ExecuteQuery(
+            "SELECT sg.enrollment_id,sg.score,a.total_score,a.weight FROM studentgrade sg JOIN assessment a ON a.assessment_id=sg.assessment_id JOIN enrollment e ON e.enrollment_id=sg.enrollment_id JOIN class c ON c.class_id=e.class_id WHERE e.class_id=@Class AND c.teacher_id=@Teacher",
+            New MySqlParameter("@Class", classId), New MySqlParameter("@Teacher", teacherId))
+        Dim grouped = scores.AsEnumerable().ToLookup(Function(row) CInt(row("enrollment_id")))
+        For Each student As DataRow In students.Rows
+            Dim items = grouped(CInt(student("enrollment_id"))).Select(Function(row) New ScoreItem(ToNullableDouble(row("score")), CDbl(row("total_score")), CDbl(row("weight"))))
+            Dim grade = GradeCalculator.CalculateRunningGrade(items)
+            student("running_grade") = If(grade.HasValue, CObj(grade.GetValueOrDefault()), DBNull.Value)
+        Next
+        Return students
     End Function
 
     ' Student's own classes (for the course dropdown on My Grades)
@@ -338,12 +350,13 @@ Public Class GradeService
     Public Function GetGradeHistoryForStudent(studentId As String) As DataTable
         Dim sql As String =
             "SELECT al.logged_at AS changed_at, a.title AS assessment, al.old_value, al.new_value, " &
-            "       COALESCE(t.full_name, al.teacher_id) AS changed_by, al.details AS reason " &
+            "       COALESCE(t.full_name, adm.full_name, 'System') AS changed_by, al.details AS reason " &
             "FROM auditlog al " &
             "JOIN studentgrade sg ON sg.grade_id = CAST(al.entity_id AS UNSIGNED) " &
             "JOIN enrollment e ON sg.enrollment_id = e.enrollment_id " &
             "JOIN assessment a ON sg.assessment_id = a.assessment_id " &
             "LEFT JOIN teacher t ON al.teacher_id = t.teacher_id " &
+            "LEFT JOIN admin adm ON al.admin_id = adm.admin_id " &
             "WHERE al.entity_type = 'StudentGrade' AND e.student_id = @StudentId " &
             "ORDER BY al.logged_at DESC, al.log_id DESC"
         Return DatabaseHelper.ExecuteQuery(sql, {New MySqlParameter("@StudentId", studentId)})
@@ -519,7 +532,7 @@ Public Class GradeService
     ' Fetch all assessments for a specific teacher's class
     Public Function GetAssessmentsByClass(classId As Integer, teacherId As String) As DataTable
         Dim sql As String =
-            "SELECT a.assessment_id, a.title, a.term, a.total_score, a.assessment_type " &
+            "SELECT a.assessment_id, a.title, a.term, a.total_score, a.assessment_type, a.weight " &
             "FROM assessment a JOIN class c ON a.class_id = c.class_id " &
             "WHERE a.class_id = @ClassId AND c.teacher_id = @TeacherId " &
             "ORDER BY a.term, a.created_at, a.assessment_id"
@@ -544,12 +557,12 @@ Public Class GradeService
     ' Analytics bars: average % per assessment type (Quiz, Activity, Exam, Project, Attendance)
     Public Function GetAveragesByType(classId As Integer, teacherId As String) As Dictionary(Of String, Double)
         Dim sql As String =
-            "SELECT a.assessment_type, SUM(sg.score) / SUM(a.total_score) * 100 AS avg_pct " &
+            "SELECT a.assessment_type, SUM(sg.score / a.total_score * a.weight) / SUM(a.weight) * 100 AS avg_pct " &
             "FROM studentgrade sg " &
             "JOIN assessment a ON sg.assessment_id = a.assessment_id " &
             "JOIN enrollment e ON sg.enrollment_id = e.enrollment_id " &
             "JOIN class c ON e.class_id = c.class_id " &
-            "WHERE e.class_id = @ClassId AND c.teacher_id = @TeacherId AND sg.score IS NOT NULL " &
+            "WHERE e.class_id = @ClassId AND c.teacher_id = @TeacherId AND sg.score IS NOT NULL AND a.total_score > 0 AND a.weight > 0 " &
             "GROUP BY a.assessment_type"
         Dim result As New Dictionary(Of String, Double)()
         For Each r As DataRow In DatabaseHelper.ExecuteQuery(sql,
@@ -582,6 +595,7 @@ Public Class GradeService
         Try
             Using conn = DatabaseHelper.GetConnection()
                 Using tx = conn.BeginTransaction()
+                    If Not AccountAccess.IsActive(conn, tx, "Teacher", createdBy) Then Return OperationResult.Fail("Your professor account is inactive.")
                     Using cmd As New MySqlCommand("SELECT teacher_id FROM class WHERE class_id = @Id FOR UPDATE", conn, tx)
                         cmd.Parameters.AddWithValue("@Id", classId)
                         If Convert.ToString(cmd.ExecuteScalar()) <> createdBy Then Return OperationResult.Fail("You can only create assessments for your own classes.")

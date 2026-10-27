@@ -23,17 +23,18 @@ Module Program
             Dim grid = DirectCast(GetType(frmGradebook).GetProperty("dgvGrades", flags).GetValue(form), DataGridView)
             Dim row = grid.Rows.Cast(Of DataGridViewRow)().First(Function(item) Convert.ToString(item.Cells("StudentName").Tag) = fixture("student_id").ToString())
             Dim cell = row.Cells("Assessment" & assessment & "Raw")
-            row.Cells("Part").Value = 2
             grid.CurrentCell = cell
             Check(grid.BeginEdit(True), "begin grade edit")
             DirectCast(grid.EditingControl, TextBox).Text = "15"
             ' Moving CurrentCell raises CellEndEdit inside SetCurrentCellAddressCore.
             ' The previous implementation threw when it cleared the rows here.
-            grid.CurrentCell = row.Cells("ExamRaw")
+            grid.CurrentCell = row.Cells("StudentName")
             Application.DoEvents()
             Check(Object.ReferenceEquals(grid.Rows(row.Index), row), "navigation does not rebuild student rows")
             Check(CDbl(cell.Value) = 15, "edited score stays displayed")
-            Check(CInt(row.Cells("Part").Value) = 2, "local worksheet input survives score save")
+            Dim sheet = New GradeService().GetClassGradeSheet(classId, teacher)
+            Dim expected = CDbl(sheet.Select("StudentId='" & fixture("student_id").ToString().Replace("'", "''") & "'")(0)("RunningGrade"))
+            Check(CDbl(row.Cells("Total").Value) = expected, "gradebook uses canonical weighted running grade")
             grid.CurrentCell = cell
             grid.BeginEdit(True)
             DirectCast(grid.EditingControl, TextBox).Text = "16"

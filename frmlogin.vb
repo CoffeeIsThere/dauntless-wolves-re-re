@@ -8,6 +8,7 @@ Public Class frmlogin
     Private ReadOnly authService As New AuthService()
 
     Private Sub frmLogin_Load(sender As Object, e As EventArgs) Handles MyBase.Load
+        Me.AcceptButton = Button1
         ' Mask password characters in TextBox1
         TextBox1.UseSystemPasswordChar = True
 
@@ -36,7 +37,7 @@ Public Class frmlogin
     ' LOG IN BUTTON CLICK (Button1)
     Private Sub Button1_Click(sender As Object, e As EventArgs) Handles Button1.Click
         Dim username As String = ValidationHelper.SanitizeInput(boxuser.Text)
-        Dim password As String = TextBox1.Text.Trim()
+        Dim password As String = TextBox1.Text
 
         If Not ValidationHelper.IsRequired(username) OrElse Not ValidationHelper.IsRequired(password) Then
             MessageBox.Show("Please enter both your Username/ID and Password.", "Validation Error", MessageBoxButtons.OK, MessageBoxIcon.Warning)
@@ -46,7 +47,7 @@ Public Class frmlogin
 
         Try
             ' 2. Authenticate user against database via UserService
-            Dim user As UserModel = authService.VerifyLogin(username, password)
+            Dim user As UserModel = authService.VerifyLogin(username, password, If(RadioButton1.Checked, "Student", "Teacher"))
 
             If user IsNot Nothing Then
                 Dim role As String = user.Role.Trim().ToLower()

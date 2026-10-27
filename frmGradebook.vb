@@ -23,6 +23,7 @@ Public Class frmGradebook
         Public Key As String
         Public Title As String
         Public Type As String     ' any name: Quiz, Homework, Laboratory, ...
+        Public Weight As Double
         Public Group As String    ' "Quiz" or "CW"
     End Class
     Private loadingClass As Boolean
@@ -95,7 +96,7 @@ Public Class frmGradebook
         CreateMeetingsBox()
         CreateSummaryLabel()
         HookUpRevisionButton()
-        lblSummary.Tag = "Assessment scores are saved. Attendance, project percentage, exam summary, and other worksheet inputs are local calculations only."
+        lblSummary.Tag = "Assessment scores and running grades use the same assessment weights as My Grades. Ungraded assessments are excluded."
         classTip.SetToolTip(dgvGrades, CStr(lblSummary.Tag))
 
         cboCourse.DropDownStyle = ComboBoxStyle.DropDownList
@@ -223,6 +224,12 @@ Public Class frmGradebook
                 .DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleLeft
             End With
 
+            For Each obsolete In {"Drp", "Part", "PartGrA", "Extra", "Project", "ProjectGrA", "ExamRaw", "ExamGrA", "MajorExam"}
+                .Columns(obsolete).Visible = False
+            Next
+            .Columns("CWComp").HeaderText = "Other assessments (%)"
+            .Columns("QuizComp").HeaderText = "Quizzes (%)"
+            .Columns("Total").HeaderText = "Running Grade (%)"
             ' Like Excel's "freeze panes"
             .Columns("StudentName").Frozen = True
         End With
@@ -429,7 +436,7 @@ Public Class frmGradebook
 
         Dim raw As DataGridViewColumn = AddCol(key & "Raw", RawHeader(title, maxScore), "input", at)
         raw.ToolTipText = "Double-click to change the max score"
-        AddCol(key & "GrA", title & vbLf & "GrA", "calc", at + 1)
+        AddCol(key & "GrA", title & vbLf & "Score (%)", "calc", at + 1)
 
         items.Add(New AssessItem With {.Key = key, .Title = title, .Type = type, .Group = grp})
         maxScores(key & "Raw") = maxScore
@@ -532,94 +539,27 @@ Public Class frmGradebook
         dgvGrades.ClearSelection()
     End Sub
 
-    ' ===== Computation (same logic as the Excel gradesheet) =====
-    ' Averages the GrA of every item in a group, times the group's weight.
-    ' A blank score counts as GrA 50 (like the sheet) and makes the student "inc".
-    Private Function ComputeGroup(row As DataGridViewRow, grp As String, weight As Double,
-                                  ByRef missing As Boolean) As Double
-        Dim v As Double
-        Dim graSum As Double = 0
-        Dim count As Integer = 0
-
-        For Each it As AssessItem In items
-            If it.Group <> grp Then Continue For
-            Dim gra As Double = 50
-            If TryNum(row.Cells(it.Key & "Raw").Value, v) Then
-                gra = v / maxScores(it.Key & "Raw") * 50 + 50
-            Else
-                missing = True
-            End If
-            row.Cells(it.Key & "GrA").Value = gra.ToString("0.00")
-            graSum += gra
-            count += 1
-        Next
-
-        If count = 0 Then
-            missing = True   ' nothing added yet for this component
-            row.Cells(grp & "Comp").Value = ""
-            Return 0
-        End If
-
-        Dim result As Double = graSum / count / 100 * weight
-        row.Cells(grp & "Comp").Value = result.ToString("0.00")
-        Return result
-    End Function
+    ' Shared weighted calculations over graded assessments only.
 
     Private Sub ComputeRow(row As DataGridViewRow)
         If Not IsStudentRow(row) Then Return
-
-        Dim v As Double
-        Dim missing As Boolean = False
-
-        ' Part: absences vs. number of meetings
-        Dim meets As Double = Meetings()
-        Dim absent As Double = 0
-        If TryNum(row.Cells("Part").Value, v) Then absent = Math.Min(Math.Max(v, 0), meets)
-        Dim partGrA As Double = W_PART * (meets - absent) / meets
-        row.Cells("PartGrA").Value = partGrA.ToString("0.00")
-
-        ' Extra (optional)
-        Dim extra As Double = 0
-        If TryNum(row.Cells("Extra").Value, v) Then extra = v / 100 * W_EXTRA
-
-        ' Class work and quizzes
-        Dim cw As Double = ComputeGroup(row, "CW", W_CW, missing)
-        Dim quiz As Double = ComputeGroup(row, "Quiz", W_QUIZ, missing)
-
-        ' Project (percent)
-        Dim proj As Double = 0
-        If TryNum(row.Cells("Project").Value, v) Then
-            proj = v / 100 * W_PROJECT
-        Else
-            missing = True
-        End If
-        row.Cells("ProjectGrA").Value = proj.ToString("0.00")
-
-        ' Major exam
-        Dim examGrA As Double = 50
-        If TryNum(row.Cells("ExamRaw").Value, v) Then
-            examGrA = v / maxScores("ExamRaw") * 50 + 50
-        Else
-            missing = True
-        End If
-        row.Cells("ExamGrA").Value = examGrA.ToString("0.00")
-        Dim major As Double = examGrA / 100 * W_EXAM
-        row.Cells("MajorExam").Value = major.ToString("0.00")
-
-        ' Grade + remarks (Grade stays blank while incomplete or dropped, like the sheet)
-        Dim total As Double = partGrA + extra + cw + quiz + proj + major
-        Dim dropped As Boolean = Convert.ToString(row.Cells("Drp").Value).Trim().ToLower() = "drp"
-
-        If dropped Then
-            row.Cells("Total").Value = ""
-            row.Cells("Remarks").Value = "drp"
-        ElseIf missing Then
-            row.Cells("Total").Value = ""
-            row.Cells("Remarks").Value = "inc"
-        Else
-            row.Cells("Total").Value = total.ToString("0.00")
-            row.Cells("Remarks").Value = If(total >= PASSING, "pass", "fail")
-        End If
+        Dim scores As New List(Of ScoreItem)
+        Dim groups As New Dictionary(Of String, List(Of ScoreItem)) From {{"Quiz", New List(Of ScoreItem)}, {"CW", New List(Of ScoreItem)}}
+        For Each item In items
+            Dim value As Double
+            Dim hasScore = TryNum(row.Cells(item.Key & "Raw").Value, value)
+            Dim score As New ScoreItem(If(hasScore, CType(value, Double?), Nothing), maxScores(item.Key & "Raw"), item.Weight)
+            scores.Add(score)
+            groups(item.Group).Add(score)
+            row.Cells(item.Key & "GrA").Value = If(hasScore, CObj(GradeCalculator.CalculateScorePercentage(value, score.TotalScore)), Nothing)
+        Next
+        For Each group In groups
+            Dim average = GradeCalculator.CalculateRunningGrade(group.Value)
+            row.Cells(group.Key & "Comp").Value = If(average.HasValue, CObj(average.GetValueOrDefault()), Nothing)
+        Next
+        Dim running = GradeCalculator.CalculateRunningGrade(scores)
+        row.Cells("Total").Value = If(running.HasValue, CObj(running.GetValueOrDefault()), Nothing)
+        row.Cells("Remarks").Value = GradeCalculator.GetStatus(running)
     End Sub
 
     Private Sub ComputeAll()
@@ -655,18 +595,17 @@ Public Class frmGradebook
             If Not IsStudentRow(r) Then Continue For
             Select Case Convert.ToString(r.Cells("Remarks").Value)
                 Case "drp" : drp += 1
-                Case "inc" : inc += 1
-                Case "pass" : pass += 1
-                Case "fail" : fail += 1
+                Case "Not Yet" : inc += 1
+                Case "Passed" : pass += 1
+                Case "At risk" : fail += 1
             End Select
         Next
 
         Dim total As Integer = drp + inc + pass + fail
         lblSummary.Text = "SUMMARY OF GRADES     " &
-                          "DRP " & drp & " (" & Pct(drp, total) & "%)   |   " &
-                          "INC " & inc & " (" & Pct(inc, total) & "%)   |   " &
-                          "PASS " & pass & " (" & Pct(pass, total) & "%)   |   " &
-                          "FAIL " & fail & " (" & Pct(fail, total) & "%)   |   " &
+                          "NOT YET " & inc & " (" & Pct(inc, total) & "%)   |   " &
+                          "PASSED " & pass & " (" & Pct(pass, total) & "%)   |   " &
+                          "AT RISK " & fail & " (" & Pct(fail, total) & "%)   |   " &
                           "TOTAL " & total
     End Sub
 
@@ -696,9 +635,9 @@ Public Class frmGradebook
         If col.Name = "Remarks" Then
             e.CellStyle.Font = BoldFont
             Select Case Convert.ToString(e.Value)
-                Case "pass" : e.CellStyle.ForeColor = Color.FromArgb(0, 128, 60)
-                Case "fail" : e.CellStyle.ForeColor = Color.FromArgb(170, 0, 0)
-                Case "inc" : e.CellStyle.ForeColor = Color.FromArgb(214, 120, 0)
+                Case "Passed" : e.CellStyle.ForeColor = Color.FromArgb(0, 128, 60)
+                Case "At risk" : e.CellStyle.ForeColor = Color.FromArgb(170, 0, 0)
+                Case "Not Yet" : e.CellStyle.ForeColor = Color.FromArgb(214, 120, 0)
                 Case "drp" : e.CellStyle.ForeColor = Color.DimGray
             End Select
         End If
@@ -838,106 +777,11 @@ Public Class frmGradebook
             If sfd.ShowDialog() = DialogResult.OK Then
                 If sfd.FilterIndex = 1 Then
                     ' --- PDF EXPORT (Landscape Layout with Clean Columns) ---
-                    Dim printDoc As New Printing.PrintDocument()
-                    printDoc.DefaultPageSettings.Landscape = True
-
-                    AddHandler printDoc.PrintPage, Sub(s, args)
-                                                       Dim g As Graphics = args.Graphics
-                                                       Dim titleFont As New Font("Segoe UI", 13, FontStyle.Bold)
-                                                       Dim subFont As New Font("Segoe UI", 8.5F, FontStyle.Regular)
-                                                       Dim headerFont As New Font("Segoe UI", 8.0F, FontStyle.Bold)
-                                                       Dim bodyFont As New Font("Segoe UI", 8.0F, FontStyle.Regular)
-
-                                                       Dim startX As Integer = 35
-                                                       Dim y As Integer = 35
-                                                       Dim selectedCourseText As String = If(cboCourse.SelectedItem IsNot Nothing, cboCourse.SelectedItem.ToString(), "Master Gradebook")
-
-                                                       ' Report Title Header
-                                                       g.DrawString($"DAUNTLESS WOLVES - DIGITAL GRADEBOOK ({selectedCourseText})", titleFont, Brushes.DarkGreen, startX, y)
-                                                       y += 24
-                                                       g.DrawString($"Meetings: {Meetings()} | Total Students: {studentRowCount} | Generated: {DateTime.Now:MMM d, yyyy HH:mm}", subFont, Brushes.Gray, startX, y)
-                                                       y += 28
-
-                                                       ' Short Clean Header Label Mapper
-                                                       Dim getCleanHeader As Func(Of DataGridViewColumn, String) =
-                                                           Function(col As DataGridViewColumn)
-                                                               Select Case col.Name.ToLower()
-                                                                   Case "no" : Return "No."
-                                                                   Case "studentname" : Return "Student Name"
-                                                                   Case "drp" : Return "Drp"
-                                                                   Case "part" : Return "Abs"
-                                                                   Case "partgra" : Return "Part%"
-                                                                   Case "extra" : Return "Ext%"
-                                                                   Case "cwcomp" : Return "CW%"
-                                                                   Case "quizcomp" : Return "Quiz%"
-                                                                   Case "project" : Return "Proj"
-                                                                   Case "projectgra" : Return "Proj%"
-                                                                   Case "examraw" : Return "Exam"
-                                                                   Case "examgra" : Return "ExGrA"
-                                                                   Case "majorexam" : Return "Major%"
-                                                                   Case "total" : Return "Grade"
-                                                                   Case "remarks" : Return "Status"
-                                                                   Case Else
-                                                                       Dim lines() As String = col.HeaderText.Split({vbLf, vbCr}, StringSplitOptions.RemoveEmptyEntries)
-                                                                       Return If(lines.Length > 0, lines(0), col.HeaderText)
-                                                               End Select
-                                                           End Function
-
-                                                       ' Column Width Allocator
-                                                       Dim getColWidth As Func(Of DataGridViewColumn, Integer) =
-                                                           Function(col As DataGridViewColumn)
-                                                               Select Case col.Name.ToLower()
-                                                                   Case "no" : Return 30
-                                                                   Case "studentname" : Return 160
-                                                                   Case "drp", "part" : Return 38
-                                                                   Case "partgra", "extra", "cwcomp", "quizcomp", "project", "projectgra", "examraw", "examgra", "majorexam" : Return 52
-                                                                   Case "total", "remarks" : Return 50
-                                                                   Case Else : Return 48
-                                                               End Select
-                                                           End Function
-
-                                                       ' 1. Print Header Row
-                                                       Dim x As Integer = startX
-                                                       For Each col As DataGridViewColumn In dgvGrades.Columns
-                                                           If col.Visible Then
-                                                               Dim colW As Integer = getColWidth(col)
-                                                               Dim headerText As String = getCleanHeader(col)
-                                                               g.DrawString(headerText, headerFont, Brushes.DarkGreen, x, y)
-                                                               x += colW
-                                                           End If
-                                                       Next
-
-                                                       y += 18
-                                                       g.DrawLine(Pens.DarkGreen, startX, y, x, y)
-                                                       y += 8
-
-                                                       ' 2. Print Student Rows
-                                                       For Each row As DataGridViewRow In dgvGrades.Rows
-                                                           If IsStudentRow(row) Then
-                                                               x = startX
-                                                               For Each col As DataGridViewColumn In dgvGrades.Columns
-                                                                   If col.Visible Then
-                                                                       Dim colW As Integer = getColWidth(col)
-                                                                       Dim cellVal As String = If(row.Cells(col.Index).Value IsNot Nothing, row.Cells(col.Index).Value.ToString(), "")
-
-                                                                       g.DrawString(cellVal, bodyFont, Brushes.Black, x, y)
-                                                                       x += colW
-                                                                   End If
-                                                               Next
-                                                               y += 22
-                                                           End If
-                                                       Next
-
-                                                       ' 3. Bottom Summary Bar
-                                                       y += 10
-                                                       g.DrawLine(Pens.Gray, startX, y, x, y)
-                                                       y += 8
-                                                       g.DrawString(lblSummary.Text, headerFont, Brushes.DarkGreen, startX, y)
-                                                   End Sub
-
-                    If _exportService.ExportToPDF(printDoc, sfd.FileName) Then
-                        MessageBox.Show("Digital gradebook exported to PDF successfully!", "Export Complete", MessageBoxButtons.OK, MessageBoxIcon.Information)
-                    End If
+                    Using printDoc = _exportService.CreateGridPrintDocument(dgvGrades, "DIGITAL GRADEBOOK", cboCourse.Text)
+                        If _exportService.ExportToPDF(printDoc, sfd.FileName) Then
+                            MessageBox.Show("Digital gradebook exported to PDF successfully!", "Export Complete", MessageBoxButtons.OK, MessageBoxIcon.Information)
+                        End If
+                    End Using
                 Else
                     ' --- CSV EXPORT ---
                     If _exportService.ExportToCSV(dgvGrades, sfd.FileName) Then
@@ -1012,8 +856,8 @@ Public Class frmGradebook
                 Dim grp = GroupFor(type)
                 Dim at = dgvGrades.Columns(grp & "Comp").Index
                 AddCol(key & "Raw", RawHeader(title, CDbl(a("total_score"))), "input", at)
-                AddCol(key & "GrA", title & vbLf & "GrA", "calc", at + 1)
-                items.Add(New AssessItem With {.Key = key, .Title = title, .Type = type, .Group = grp})
+                AddCol(key & "GrA", title & vbLf & "Score (%)", "calc", at + 1)
+                items.Add(New AssessItem With {.Key = key, .Title = title, .Type = type, .Group = grp, .Weight = CDbl(a("weight"))})
                 maxScores(key & "Raw") = CDbl(a("total_score"))
                 assessmentIds(key & "Raw") = CInt(a("assessment_id"))
             Next
@@ -1534,9 +1378,9 @@ Public Class frmGradebook
                 .Size = New Size(332, 2)
             }
 
-            ' Counts toward
+            ' Display category (not a separate grading weight).
             Dim lblGroup As New Label() With {
-                .Text = "Counts toward",
+                .Text = "Display category (automatic)",
                 .ForeColor = Color.Gray,
                 .Font = New Font("Segoe UI", 9.0F),
                 .AutoSize = True,
@@ -1550,8 +1394,9 @@ Public Class frmGradebook
                 .Location = New Point(24, 152),
                 .Width = 332
             }
-            cboGroup.Items.Add("Quiz (" & W_QUIZ & "%)")
-            cboGroup.Items.Add("Class Work (" & W_CW & "%)")
+            cboGroup.Enabled = False
+            cboGroup.Items.Add("Quiz category")
+            cboGroup.Items.Add("Other assessments")
             cboGroup.SelectedIndex = 0
             Dim lineGroup As New Panel() With {
                 .BackColor = green,
@@ -1766,10 +1611,6 @@ Public Class frmGradebook
     End Function
 
     ' ================= IMPORT / MYSQL / ADMIN =================
-    Private Function GetConnectionString() As String
-        ' TODO: replace with your real connection (or read it from dbconfig.json)
-        Return "Server=localhost;Port=3306;Database=gradebook;Uid=root;Pwd=;"
-    End Function
 
     ' "IT 112 - Information Assurance" -> "IT 112"
     Private Function SelectedClassCode() As String
@@ -1777,43 +1618,7 @@ Public Class frmGradebook
     End Function
 
     ' pairs = "@name", value, "@name", value ...
-    Private Function RunQuery(sql As String, ParamArray pairs() As Object) As DataTable
-        Try
-            Using con As New MySqlConnection(GetConnectionString())
-                Using cmd As New MySqlCommand(sql, con)
-                    For i As Integer = 0 To pairs.Length - 2 Step 2
-                        cmd.Parameters.AddWithValue(CStr(pairs(i)), pairs(i + 1))
-                    Next
-                    Dim dt As New DataTable()
-                    Using da As New MySqlDataAdapter(cmd)
-                        da.Fill(dt)
-                    End Using
-                    Return dt
-                End Using
-            End Using
-        Catch ex As Exception
-            MessageBox.Show("Could not read from MySQL: " & ex.Message, "Digital Gradebook")
-            Return Nothing
-        End Try
-    End Function
 
-    Private Function RunNonQuery(sql As String, ParamArray pairs() As Object) As Boolean
-        Try
-            Using con As New MySqlConnection(GetConnectionString())
-                Using cmd As New MySqlCommand(sql, con)
-                    For i As Integer = 0 To pairs.Length - 2 Step 2
-                        cmd.Parameters.AddWithValue(CStr(pairs(i)), pairs(i + 1))
-                    Next
-                    con.Open()
-                    cmd.ExecuteNonQuery()
-                End Using
-            End Using
-            Return True
-        Catch ex As Exception
-            MessageBox.Show("Could not update MySQL: " & ex.Message, "Digital Gradebook")
-            Return False
-        End Try
-    End Function
 
     ' ----- CSV from File Explorer -----
     Private Function PickCsv() As String
@@ -1909,80 +1714,24 @@ Public Class frmGradebook
 
     ' ----- Students -----
     ' Adds many names at once (skips duplicates), then sorts A-Z and renumbers
-    Private Function AddStudentNames(names As List(Of String)) As Integer
-        Dim existing As New HashSet(Of String)(StringComparer.OrdinalIgnoreCase)
-        For Each r As DataGridViewRow In dgvGrades.Rows
-            If IsStudentRow(r) Then existing.Add(Convert.ToString(r.Cells("StudentName").Value))
-        Next
-
-        Dim added As Integer = 0
-        For Each n As String In names
-            If existing.Add(n) Then
-                Dim vals(dgvGrades.Columns.Count - 1) As Object
-                vals(dgvGrades.Columns("StudentName").Index) = n
-                dgvGrades.Rows.Add(vals)
-                added += 1
-            End If
-        Next
-
-        If added > 0 Then SortAndRenumber()
-        Return added
-    End Function
 
     ' File columns: Surname, First Name, M.I., Student Number
     Private Function ImportStudents(choice As String) As Boolean
-        Dim names As New List(Of String)
-
-        If choice.StartsWith("From file") Then
-            Dim rows As List(Of String()) = LoadCsvRows("surname")
-            If rows Is Nothing Then Return False
-            For Each f As String() In rows
-                If f.Length < 2 OrElse f(0).Trim() = "" OrElse f(1).Trim() = "" Then Continue For
-                names.Add(BuildName(f(0), f(1), If(f.Length > 2, f(2), "")))
-            Next
-        Else
-            Dim code As String = SelectedClassCode()
-            If code = "" Then
-                MessageBox.Show("Please select a class first.", "Digital Gradebook")
-                Return False
-            End If
-            Dim dt As DataTable = RunQuery("SELECT surname, first_name, mi FROM students WHERE class_code = @c", "@c", code)
-            If dt Is Nothing Then Return False
-            For Each r As DataRow In dt.Rows
-                names.Add(BuildName(Convert.ToString(r("surname")), Convert.ToString(r("first_name")),
-                                    Convert.ToString(r("mi"))))
-            Next
+        If Not choice.StartsWith("From file") Then
+            LoadClassData()
+            MessageBox.Show("Enrolled students refreshed from the configured database.")
+            Return True
         End If
-
-        Dim added As Integer = AddStudentNames(names)
-        If added = 0 Then
-            MessageBox.Show("No new students were found (empty, incomplete or already in the list).", "Digital Gradebook")
-            Return False
-        End If
-        MessageBox.Show("Imported " & added & " of " & names.Count & " students.", "Digital Gradebook")
-        Return True
+        Dim rows = LoadCsvRows("student_id")
+        If rows Is Nothing Then Return False
+        Dim result = New RosterImportService().ImportStudents(loadedClassId, AppSession.CurrentUser.UserId, rows)
+        MessageBox.Show(result.Message, If(result.Success, "Students imported", "Import not saved"))
+        If result.Success Then LoadClassData()
+        Return result.Success
     End Function
 
     ' ----- Classes -----
     ' Each row = code, name, schedule, term, SY
-    Private Function AddClassRows(rows As List(Of String())) As Integer
-        Dim added As Integer = 0
-        For Each f As String() In rows
-            If f.Length < 5 Then Continue For
-            Dim code As String = System.Text.RegularExpressions.Regex.Replace(f(0).Trim(), "\s+", " ").ToUpper()
-            If code = "" OrElse code.Contains(" - ") OrElse CodeExists(code) OrElse f(1).Trim() = "" Then Continue For
-
-            Dim info As New ClassInfo With {
-                .Code = code, .Name = f(1).Trim(), .Schedule = f(2).Trim(),
-                .Term = f(3).Trim(), .SY = f(4).Trim()
-            }
-            classes(code) = info
-            cboCourse.Items.Add(code & " - " & info.Name)
-            added += 1
-        Next
-        If added > 0 Then cboCourse.SelectedIndex = cboCourse.Items.Count - 1
-        Return added
-    End Function
 
     ' File columns: Class Code, Class Name, Schedule, Term, SY
     Private Function ImportClasses(choice As String) As Boolean
@@ -2003,132 +1752,6 @@ Public Class frmGradebook
     End Function
 
     ' Pending classes sent by the admin: select one, then Approve or Decline
-    Private Function ImportFromAdmin() As Boolean
-        Dim dt As DataTable = RunQuery("SELECT class_code, class_name, schedule, term, sy FROM classes WHERE status = 'pending'")
-        If dt Is Nothing Then Return False
-        If dt.Rows.Count = 0 Then
-            MessageBox.Show("There are no pending class requests from the admin.", "Digital Gradebook")
-            Return False
-        End If
-
-        Dim approvedAny As Boolean = False
-
-        Using dlg As New Form()
-            dlg.FormBorderStyle = FormBorderStyle.None
-            dlg.StartPosition = FormStartPosition.CenterParent
-            dlg.Size = New Size(600, 420)
-            dlg.BackColor = Color.White
-            dlg.ShowInTaskbar = False
-
-            AddHandler dlg.Paint,
-                Sub(s, ev)
-                    Using pen As New Pen(DarkGreen, 2)
-                        ev.Graphics.DrawRectangle(pen, 1, 1, dlg.Width - 2, dlg.Height - 2)
-                    End Using
-                End Sub
-
-            Dim header As New Panel() With {.Dock = DockStyle.Top, .Height = 48, .BackColor = DarkGreen}
-            header.Controls.Add(New Label() With {
-                .Text = "Class Requests from Admin",
-                .ForeColor = Color.White,
-                .Font = New Font("Segoe UI Semibold", 12.0F),
-                .AutoSize = True,
-                .Location = New Point(18, 12)
-            })
-
-            Dim lv As New ListView() With {
-                .View = View.Details,
-                .FullRowSelect = True,
-                .MultiSelect = False,
-                .HideSelection = False,
-                .GridLines = True,
-                .Font = New Font("Segoe UI", 10.0F),
-                .Location = New Point(24, 64),
-                .Size = New Size(552, 262)
-            }
-            lv.Columns.Add("Code", 80)
-            lv.Columns.Add("Class Name", 190)
-            lv.Columns.Add("Schedule", 110)
-            lv.Columns.Add("Term", 90)
-            lv.Columns.Add("SY", 80)
-            For Each r As DataRow In dt.Rows
-                Dim row As New ListViewItem(Convert.ToString(r("class_code")))
-                row.SubItems.Add(Convert.ToString(r("class_name")))
-                row.SubItems.Add(Convert.ToString(r("schedule")))
-                row.SubItems.Add(Convert.ToString(r("term")))
-                row.SubItems.Add(Convert.ToString(r("sy")))
-                lv.Items.Add(row)
-            Next
-
-            Dim lblInfo As New Label() With {
-                .Text = "Select a class, then Approve or Decline.",
-                .ForeColor = Color.Gray,
-                .Font = New Font("Segoe UI", 9.0F),
-                .AutoSize = True,
-                .Location = New Point(24, 336)
-            }
-
-            Dim btnApprove As New Button() With {
-                .Text = "Approve", .FlatStyle = FlatStyle.Flat, .BackColor = DarkGreen, .ForeColor = Color.White,
-                .Font = New Font("Segoe UI Semibold", 10.0F), .Size = New Size(100, 36),
-                .Location = New Point(366, 368), .Cursor = Cursors.Hand
-            }
-            btnApprove.FlatAppearance.BorderSize = 0
-
-            Dim btnDecline As New Button() With {
-                .Text = "Decline", .FlatStyle = FlatStyle.Flat, .BackColor = Color.White, .ForeColor = Color.Firebrick,
-                .Font = New Font("Segoe UI Semibold", 10.0F), .Size = New Size(100, 36),
-                .Location = New Point(256, 368), .Cursor = Cursors.Hand
-            }
-            btnDecline.FlatAppearance.BorderColor = Color.Firebrick
-            btnDecline.FlatAppearance.BorderSize = 1
-
-            Dim btnClose As New Button() With {
-                .Text = "Close", .DialogResult = DialogResult.Cancel, .FlatStyle = FlatStyle.Flat,
-                .BackColor = Color.White, .ForeColor = DarkGreen,
-                .Font = New Font("Segoe UI Semibold", 10.0F), .Size = New Size(100, 36),
-                .Location = New Point(476, 368), .Cursor = Cursors.Hand
-            }
-            btnClose.FlatAppearance.BorderColor = DarkGreen
-            btnClose.FlatAppearance.BorderSize = 1
-
-            AddHandler btnApprove.Click,
-                Sub(s, ev)
-                    If lv.SelectedItems.Count = 0 Then
-                        lblInfo.Text = "Select a class first."
-                        Return
-                    End If
-                    Dim sel As ListViewItem = lv.SelectedItems(0)
-                    If RunNonQuery("UPDATE classes SET status = 'approved' WHERE class_code = @c", "@c", sel.Text) Then
-                        AddClassRows(New List(Of String()) From {
-                            New String() {sel.Text, sel.SubItems(1).Text, sel.SubItems(2).Text,
-                                          sel.SubItems(3).Text, sel.SubItems(4).Text}})
-                        approvedAny = True
-                        lblInfo.Text = "Approved " & sel.Text & "."
-                        lv.Items.Remove(sel)
-                    End If
-                End Sub
-
-            AddHandler btnDecline.Click,
-                Sub(s, ev)
-                    If lv.SelectedItems.Count = 0 Then
-                        lblInfo.Text = "Select a class first."
-                        Return
-                    End If
-                    Dim sel As ListViewItem = lv.SelectedItems(0)
-                    If RunNonQuery("UPDATE classes SET status = 'declined' WHERE class_code = @c", "@c", sel.Text) Then
-                        lblInfo.Text = "Declined " & sel.Text & "."
-                        lv.Items.Remove(sel)
-                    End If
-                End Sub
-
-            dlg.Controls.AddRange({lv, lblInfo, btnApprove, btnDecline, btnClose, header})
-            dlg.CancelButton = btnClose
-            dlg.ShowDialog(Form.ActiveForm)
-        End Using
-
-        Return approvedAny
-    End Function
 
     ' ----- Assessments -----
     ' File columns: Type, Counts toward (Quiz or Class Work), Max Score
@@ -2175,7 +1798,7 @@ Public Class frmGradebook
 
     Private Sub ConfigureToolbar()
         Dim toolbar As New FlowLayoutPanel With {.Dock = DockStyle.Fill, .WrapContents = True, .AutoScroll = True, .Padding = New Padding(8), .BackColor = Color.White}
-        Dim controls() As Control = {Label1, cboCourse, btnAddClass, btnAddStudent, btnAddAssessment, CustomButton2, lblMeetings, txtMeetings, CustomButton1}
+        Dim controls() As Control = {Label1, cboCourse, btnAddClass, btnAddStudent, btnAddAssessment, CustomButton2, CustomButton1}
         For Each control In controls
             control.Dock = DockStyle.None
             control.Anchor = AnchorStyles.Top Or AnchorStyles.Left
@@ -2190,15 +1813,8 @@ Public Class frmGradebook
         Label1.Font = New Font("Segoe UI", 12, FontStyle.Bold)
         Label1.Width = 180
         cboCourse.Width = 190
-        ' Keep the meetings label and value together when the toolbar wraps.
-        Dim meetingsGroup As New FlowLayoutPanel With {.AutoSize = True, .WrapContents = False, .Margin = New Padding(4, 3, 4, 3)}
-        lblMeetings.AutoSize = True
-        lblMeetings.Margin = New Padding(0, 4, 4, 0)
-        txtMeetings.Width = 42
-        txtMeetings.Margin = New Padding(0)
-        meetingsGroup.Controls.AddRange({lblMeetings, txtMeetings})
-        toolbar.Controls.Add(meetingsGroup)
-        toolbar.Controls.SetChildIndex(meetingsGroup, toolbar.Controls.IndexOf(CustomButton1))
+        lblMeetings.Visible = False
+        txtMeetings.Visible = False
         PictureBox1.Visible = False
         Panel2.Controls.Add(toolbar)
         toolbar.BringToFront()
