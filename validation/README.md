@@ -6,7 +6,7 @@ Run only against a disposable database populated with the supplied grading-syste
 2. Place `dbconfig.json` next to the generated `validation/bin/Debug/net8.0/professor-services.dll`, using DatabaseHelper's Host, Port, Database, User and Password fields. Do not commit credentials.
 3. Run: `dotnet validation/bin/Debug/net8.0/professor-services.dll`.
 
-109 checks exercise CSV import validation, request approval/status transitions, re-check score overrides, duplicate approval protection, and assessment ownership, term validation, assessment creation, score saving, range validation, rejected clearing, persisted values, grade-sheet columns and audit queries. The harness compiles the actual grading services for Linux without loading Windows Forms. Its session stub is used only by the test executable.
+116 checks exercise CSV import validation, request approval/status transitions, re-check score overrides, duplicate approval protection, and assessment ownership, term validation, assessment creation, score saving, range validation, rejected clearing, persisted values, grade-sheet columns and audit queries. The harness compiles the actual grading services for Linux without loading Windows Forms. Its session stub is used only by the test executable.
 
 Windows manual checks: switch between sections of the same course; confirm assessment titles and maximum scores match each section; edit and paste scores, reopen and verify persistence; enroll an existing student; create a weighted Midterm/Finals assessment; approve an Under Review request; inspect audit timestamps and exported class headers. Gradebook inputs now represent persisted assessment scores, and summaries use the shared weighted calculator. The old attendance/bonus/project/exam worksheet-only inputs are hidden to avoid conflicting grades. Removing a saved grade or changing an existing assessment maximum is explicitly blocked on this screen rather than silently changing only the display.
 
@@ -104,4 +104,9 @@ Final review fixes:
 - In another window/session, enroll a student or assign a class. Return to the student/professor window or select another tab and verify the catalog refreshes without logging out. Existing selections stay on the same IDs if they remain available. Reopen an already-open gradebook from the professor window and verify new assignments are available there too.
 - Professor class labels and Class Grades headings include section, semester and year. Check both short and long labels in the widened dropdown.
 
-The backend suite now contains 109 checks, including failed-paste score/audit rollback, precision rejection, duplicate-title protection, destination-aware enrollment and refreshed catalog query results. Both Windows interaction harnesses compile, but must be run on Windows.
+The backend suite now contains 116 checks, including failed-paste score/audit rollback, precision rejection, duplicate-title protection, destination-aware enrollment and refreshed catalog query results. Both Windows interaction harnesses compile, but must be run on Windows.
+
+
+Gradebook names and Add Student design: gradebook cells and the enrollment picker's display labels show surname first, for example `Puyat, Ron Jacob` and `Cruz, Juan A.`. Complete given names remain intact because the database has no separate middle-name field. Existing initial letters gain a period, already-formatted names are not reordered twice, and compound surnames/suffixes are preserved. Stored full_name and student ID remain unchanged.
+
+On Windows, compare Add Student with Add Class/Add Assessment: it should have no native title bar, a dark green header with Import, white body, gray labels with green underlines, and matching Cancel/Enroll buttons. Check long dropdown values, 125% scaling, inline missing-selection validation, Escape/cancellation, CSV import, and enrollment into a class different from the one behind the popup.

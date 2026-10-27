@@ -869,7 +869,7 @@ Public Class frmGradebook
             For Each student As DataRow In _gradeService.GetEnrollmentsByClass(classId, AppSession.CurrentUser.UserId).Rows
                 Dim idx = dgvGrades.Rows.Add()
                 Dim row = dgvGrades.Rows(idx)
-                row.Cells("StudentName").Value = student("full_name")
+                row.Cells("StudentName").Value = StudentNameOrder.FormatForGradebook(student("full_name").ToString())
                 row.Cells("StudentName").Tag = student("student_id").ToString()
                 For Each score As DataRow In scores.Rows
                     Dim col = "Assessment" & score("assessment_id").ToString() & "Raw"
@@ -953,44 +953,52 @@ Public Class frmGradebook
     Private Function ShowStudentDialog(ByRef fullName As String,
                                        ByRef studentNo As String,
                                        ByRef course As String) As Boolean
-        Using dialog As New Form With {.Text = "Enroll registered student", .ClientSize = New Size(500, 260), .FormBorderStyle = FormBorderStyle.FixedDialog, .MaximizeBox = False, .MinimizeBox = False, .StartPosition = FormStartPosition.CenterParent, .ShowInTaskbar = False, .BackColor = Color.White, .Font = New Font("Segoe UI", 10)}
-            Dim layout As New TableLayoutPanel With {.Dock = DockStyle.Fill, .Padding = New Padding(20), .ColumnCount = 1}
-            layout.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 100))
-            Dim header As New Panel With {.Height = 42, .Dock = DockStyle.Fill, .BackColor = Color.DarkGreen}
-            header.Controls.Add(New Label With {.Text = "Add Student", .AutoSize = True, .Location = New Point(8, 10), .ForeColor = Color.White})
-            header.Controls.Add(MakeImportButton(dialog, {"From file (CSV)...", "Refresh enrolled students from MySQL"}, Function(choice) ImportStudents(choice)))
-            For Each importButton As Button In header.Controls.OfType(Of Button)()
-                importButton.Location = New Point(dialog.ClientSize.Width - 40 - importButton.Width - 8, 7)
-            Next
+        Dim dark = Color.DarkGreen
+        Dim green = Color.FromArgb(0, 191, 99)
+        Using dialog As New Form With {.Text = "Add Student", .ClientSize = New Size(420, 350), .FormBorderStyle = FormBorderStyle.None, .StartPosition = FormStartPosition.CenterParent, .ShowInTaskbar = False, .BackColor = Color.White, .Font = New Font("Segoe UI", 10), .AutoScaleMode = AutoScaleMode.Font}
+            AddHandler dialog.Paint, Sub(sender, args)
+                                         Using pen As New Pen(dark, 2)
+                                             args.Graphics.DrawRectangle(pen, 1, 1, dialog.ClientSize.Width - 2, dialog.ClientSize.Height - 2)
+                                         End Using
+                                     End Sub
+            Dim header As New Panel With {.Dock = DockStyle.Top, .Height = 48, .BackColor = dark}
+            header.Controls.Add(New Label With {.Text = "Add Student", .AutoSize = True, .Location = New Point(18, 12), .ForeColor = Color.White, .Font = New Font("Segoe UI Semibold", 12)})
+            Dim importButton = MakeImportButton(dialog, {"From file (CSV)...", "Refresh enrolled students from MySQL"}, Function(choice) ImportStudents(choice))
+            importButton.Location = New Point(dialog.ClientSize.Width - importButton.Width - 18, 10)
+            header.Controls.Add(importButton)
             Dim students = StudentNameOrder.Sort(_userService.GetAllStudents(), "full_name", "student_id")
-            students.Columns.Add("Display", GetType(String), "student_id + ' - ' + full_name")
+            students.Columns.Add("Display", GetType(String))
+            For Each student As DataRow In students.Rows
+                student("Display") = student("student_id").ToString() & " - " & StudentNameOrder.FormatForGradebook(student("full_name").ToString())
+            Next
             students.DefaultView.RowFilter = "status = 'Active'"
-            Dim studentPicker As New ComboBox With {.Dock = DockStyle.Fill, .DropDownStyle = ComboBoxStyle.DropDownList, .DisplayMember = "Display", .ValueMember = "student_id", .DataSource = students.DefaultView}
-            Dim classPicker As New ComboBox With {.Dock = DockStyle.Fill, .DropDownStyle = ComboBoxStyle.DropDownList}
+            Dim studentLabel As New Label With {.Text = "Registered student", .AutoSize = True, .Location = New Point(24, 68), .ForeColor = Color.Gray, .Font = New Font("Segoe UI", 9)}
+            Dim studentPicker As New ComboBox With {.Location = New Point(24, 92), .Width = 372, .DropDownWidth = 520, .DropDownStyle = ComboBoxStyle.DropDownList, .FlatStyle = FlatStyle.Flat, .BackColor = Color.White, .Font = New Font("Segoe UI", 11), .DisplayMember = "Display", .ValueMember = "student_id", .DataSource = students.DefaultView}
+            Dim studentLine As New Panel With {.Location = New Point(24, 124), .Size = New Size(372, 2), .BackColor = green}
+            Dim classLabel As New Label With {.Text = "Enroll into class", .AutoSize = True, .Location = New Point(24, 148), .ForeColor = Color.Gray, .Font = New Font("Segoe UI", 9)}
+            Dim classPicker As New ComboBox With {.Location = New Point(24, 172), .Width = 372, .DropDownWidth = 700, .DropDownStyle = ComboBoxStyle.DropDownList, .FlatStyle = FlatStyle.Flat, .BackColor = Color.White, .Font = New Font("Segoe UI", 11)}
             For Each item In cboCourse.Items
                 classPicker.Items.Add(item)
             Next
             classPicker.SelectedIndex = cboCourse.SelectedIndex
-            Dim buttons As New FlowLayoutPanel With {.Dock = DockStyle.Fill, .FlowDirection = FlowDirection.RightToLeft}
-            Dim add As New Button With {.Text = "Enroll", .AutoSize = True, .BackColor = Color.DarkGreen, .ForeColor = Color.White}
-            Dim cancel As New Button With {.Text = "Cancel", .AutoSize = True, .DialogResult = DialogResult.Cancel}
+            Dim classLine As New Panel With {.Location = New Point(24, 204), .Size = New Size(372, 2), .BackColor = green}
+            Dim hint As New Label With {.Text = "Choose an existing student and the class to enroll them in.", .Location = New Point(24, 224), .Size = New Size(372, 36), .ForeColor = Color.Gray, .Font = New Font("Segoe UI", 9)}
+            Dim errorLabel As New Label With {.Text = "", .ForeColor = Color.Firebrick, .Location = New Point(24, 262), .Size = New Size(372, 25), .Font = New Font("Segoe UI", 9)}
+            Dim add As New Button With {.Text = "Enroll", .Location = New Point(296, 296), .Size = New Size(100, 36), .BackColor = dark, .ForeColor = Color.White, .FlatStyle = FlatStyle.Flat, .Font = New Font("Segoe UI Semibold", 10)}
+            Dim cancel As New Button With {.Text = "Cancel", .Location = New Point(186, 296), .Size = New Size(100, 36), .BackColor = Color.White, .ForeColor = dark, .FlatStyle = FlatStyle.Flat, .Font = New Font("Segoe UI Semibold", 10), .DialogResult = DialogResult.Cancel}
+            add.FlatAppearance.BorderSize = 0
+            cancel.FlatAppearance.BorderColor = dark
             AddHandler add.Click, Sub(sender, args)
                                       If studentPicker.SelectedItem Is Nothing OrElse classPicker.SelectedItem Is Nothing Then
-                                          MessageBox.Show(dialog, "Select a registered student and a class.")
+                                          errorLabel.Text = "Select a registered student and a class."
                                           Return
                                       End If
                                       dialog.DialogResult = DialogResult.OK
                                   End Sub
-            buttons.Controls.AddRange({add, cancel})
-            Dim controls As Control() = {header, New Label With {.Text = "Registered student", .AutoSize = True, .ForeColor = Color.DarkGreen}, studentPicker, New Label With {.Text = "Enroll into class", .AutoSize = True, .ForeColor = Color.DarkGreen}, classPicker, buttons}
-            Dim heights = {44, 25, 38, 25, 38, 44}
-            For i = 0 To controls.Length - 1
-                layout.RowStyles.Add(New RowStyle(SizeType.Absolute, heights(i)))
-                layout.Controls.Add(controls(i), 0, i)
-            Next
-            dialog.Controls.Add(layout)
+            dialog.Controls.AddRange({studentLabel, studentPicker, studentLine, classLabel, classPicker, classLine, hint, errorLabel, add, cancel, header})
             dialog.AcceptButton = add
             dialog.CancelButton = cancel
+            dialog.ActiveControl = studentPicker
             If dialog.ShowDialog(Me) <> DialogResult.OK Then Return False
             Dim selected = DirectCast(studentPicker.SelectedItem, DataRowView)
             fullName = selected("full_name").ToString()

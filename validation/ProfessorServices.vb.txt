@@ -23,6 +23,13 @@ Module Program
         Check(StudentNameOrder.Surname("Juan Cruz, Jr.") = "Cruz", "comma suffix does not become surname")
         Check(StudentNameOrder.CompareNames("Juan Álvarez", "John Brown") < 0, "accented surname sorts alphabetically")
         Check(StudentNameOrder.Surname("") = "", "empty name is safe")
+        Check(StudentNameOrder.FormatForGradebook("Ron Jacob Puyat") = "Puyat, Ron Jacob", "gradebook preserves complete given names")
+        Check(StudentNameOrder.FormatForGradebook("Juan A Cruz") = "Cruz, Juan A.", "gradebook displays recorded middle initial")
+        Check(StudentNameOrder.FormatForGradebook("Cruz, Juan A.") = "Cruz, Juan A.", "surname-first name is not reformatted twice")
+        Check(StudentNameOrder.FormatForGradebook("Juan de la Cruz") = "de la Cruz, Juan", "compound surname displays before given name")
+        Check(StudentNameOrder.FormatForGradebook("Juan Cruz Jr.") = "Cruz Jr., Juan", "name suffix is preserved in gradebook")
+        Check(StudentNameOrder.FormatForGradebook("") = "", "blank display name is safe")
+        Check(StudentNameOrder.CompareNames("Juan Cruz Jr.", "Cruz Jr., Juan") = 0, "display format preserves surname sorting with suffix")
         Dim service As New GradeService()
         Using conn = DatabaseHelper.GetConnection()
             Dim teacher As String
