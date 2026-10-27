@@ -71,7 +71,8 @@ Partial Public Class Admin
         If professor Then
             fields.Add(FilterField("Department", cboDeptProf, 100))
         Else
-            Label3.Visible = False : Label4.Visible = False
+            If Label3 IsNot Nothing Then Label3.Visible = False
+            If Label4 IsNot Nothing Then Label4.Visible = False
             fields.Add(FilterField("Year level", cboYearLevel, 85))
             fields.Add(FilterField("Section", cboSection, 85))
         End If
@@ -93,10 +94,20 @@ Partial Public Class Admin
         AddHandler refresh.Click, Async Sub() Await RefreshAccountsAsync(If(professor, "Teacher", "Student"))
         fields.Add(refresh)
         If Not professor Then
-            btnStudentFilter.Visible = False
-            btnStudentReset.Height = 26 : btnStudentReset.Margin = New Padding(3, 18, 3, 0)
-            fields.Add(btnStudentReset)
-            AddHandler btnStudentReset.Click, Sub() studentStatus.SelectedIndex = 0
+            ' Live filters replace the optional legacy Filter/Reset buttons.
+            If btnStudentFilter IsNot Nothing Then btnStudentFilter.Visible = False
+            If btnStudentReset IsNot Nothing Then btnStudentReset.Visible = False
+            Dim reset = UiKit.MakeSecondaryButton("Reset", 75)
+            reset.Name = "btnAdminStudentReset"
+            reset.Height = 26 : reset.Margin = New Padding(3, 18, 3, 0)
+            AddHandler reset.Click, Sub()
+                                        txtStudentSearch.Clear()
+                                        If cboYearLevel.Items.Count > 0 Then cboYearLevel.SelectedIndex = 0
+                                        If cboSection.Items.Count > 0 Then cboSection.SelectedIndex = 0
+                                        studentStatus.SelectedIndex = 0
+                                        ApplyStudentFilter()
+                                    End Sub
+            fields.Add(reset)
         End If
         Dim addButton As Control = If(professor, btnAddProf, btnaddstudent)
         addButton.Margin = New Padding(3, 18, 3, 0) : addButton.Height = 28

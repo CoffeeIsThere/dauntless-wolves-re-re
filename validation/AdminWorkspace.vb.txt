@@ -21,12 +21,20 @@ Module Program
                 Check(ordinary.BackColor = Drawing.Color.FromArgb(200, 215, 205), "tab styling uses initialized controls before the Load event")
                 tabs.Controls.Remove(ordinary)
             End Using
+            ' Older/local designer layouts may omit obsolete manual Filter/Reset controls.
+            For Each optionalName In {"btnStudentFilter", "btnStudentReset"}
+                Dim legacy = Control(form, optionalName)
+                legacy.Parent.Controls.Remove(legacy)
+                GetType(Admin).GetProperty(optionalName, flags).SetValue(form, Nothing)
+                legacy.Dispose()
+            Next
             form.Show() : Application.DoEvents()
             Pump(DirectCast(GetType(Admin).GetMethod("RefreshAccountsAsync", flags).Invoke(form, {"Student"}), Task))
             Pump(DirectCast(GetType(Admin).GetMethod("RefreshAccountsAsync", flags).Invoke(form, {"Teacher"}), Task))
             DirectCast(Control(form, "btnStudents"), Button).PerformClick()
             Dim grid = DirectCast(Control(form, "dgvstudents"), DataGridView)
             Check(grid.Rows.Count > 1, "student directory loads in the background")
+            Check(form.Controls.Find("btnAdminStudentReset", True).Length = 1, "admin header initializes without legacy Filter or Reset controls")
             Dim selected = Convert.ToString(grid.Rows(0).Cells("colStudentId").Value)
             grid.Rows(0).Cells("colCheck").Value = True
             Dim selections = DirectCast(GetType(Admin).GetField("studentSelection", flags).GetValue(form), HashSet(Of String))
@@ -48,7 +56,8 @@ Module Program
             Check(status.Text = "Active" AndAlso grid.Rows.Cast(Of DataGridViewRow).All(Function(row) Convert.ToString(row.Cells("colStatus").Value) = "Active"), "status filter survives refresh and filters the displayed rows")
             DirectCast(Control(form, "txtStudentSearch"), TextBox).Text = "no-match-" & Guid.NewGuid().ToString("N")
             Check(grid.Rows.Count = 0 AndAlso selections.Contains(selected), "live search preserves selected accounts hidden by its results")
-            DirectCast(Control(form, "txtStudentSearch"), TextBox).Clear()
+            DirectCast(Control(form, "btnAdminStudentReset"), Button).PerformClick()
+            Check(status.Text = "All" AndAlso DirectCast(Control(form, "txtStudentSearch"), TextBox).Text = "", "replacement Reset clears live search and status filters")
             Dim searchBox = Control(form, "txtStudentSearch")
             Check(searchBox.Top >= searchBox.Parent.Controls.OfType(Of Label).Single().Bottom, "search label is separate from its input")
             Dim header = Control(form, "Panel2")
