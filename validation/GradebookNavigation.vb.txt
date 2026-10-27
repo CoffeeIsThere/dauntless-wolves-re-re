@@ -1,0 +1,52 @@
+Imports System.Reflection
+Imports System.Windows.Forms
+Imports DAUNTLESS_WOLVES_PROF
+Imports DAUNTLESS_WOLVES_PROF.Models
+
+' Windows-only interaction regression. Use a disposable seeded database.
+Module Program
+    <STAThread>
+    Sub Main()
+        Application.EnableVisualStyles()
+        Dim fixture = DatabaseHelper.ExecuteQuery("SELECT c.class_id,c.teacher_id,e.student_id FROM class c JOIN enrollment e ON e.class_id=c.class_id ORDER BY c.class_id LIMIT 1").Rows(0)
+        Dim classId = CInt(fixture("class_id"))
+        Dim teacher = fixture("teacher_id").ToString()
+        AppSession.StartSession(New UserModel With {.UserId = teacher, .FullName = "Regression tester", .Role = "Teacher"})
+        Dim title = "Navigation " & Guid.NewGuid().ToString("N").Substring(0, 8)
+        Dim created = New GradeService().CreateAssessment(classId, title, "Quiz", 20, "Midterm", teacher)
+        Check(created.Success, "create isolated assessment fixture")
+        Dim assessment = CInt(DatabaseHelper.ExecuteScalar("SELECT MAX(assessment_id) FROM assessment WHERE class_id=" & classId))
+        Using form As New frmGradebook With {.InitialClassId = classId}
+            form.Show()
+            Application.DoEvents()
+            Dim flags = BindingFlags.Instance Or BindingFlags.NonPublic
+            Dim grid = DirectCast(GetType(frmGradebook).GetProperty("dgvGrades", flags).GetValue(form), DataGridView)
+            Dim row = grid.Rows.Cast(Of DataGridViewRow)().First(Function(item) Convert.ToString(item.Cells("StudentName").Tag) = fixture("student_id").ToString())
+            Dim cell = row.Cells("Assessment" & assessment & "Raw")
+            row.Cells("Part").Value = 2
+            grid.CurrentCell = cell
+            Check(grid.BeginEdit(True), "begin grade edit")
+            DirectCast(grid.EditingControl, TextBox).Text = "15"
+            ' Moving CurrentCell raises CellEndEdit inside SetCurrentCellAddressCore.
+            ' The previous implementation threw when it cleared the rows here.
+            grid.CurrentCell = row.Cells("ExamRaw")
+            Application.DoEvents()
+            Check(Object.ReferenceEquals(grid.Rows(row.Index), row), "navigation does not rebuild student rows")
+            Check(CDbl(cell.Value) = 15, "edited score stays displayed")
+            Check(CInt(row.Cells("Part").Value) = 2, "local worksheet input survives score save")
+            grid.CurrentCell = cell
+            grid.BeginEdit(True)
+            DirectCast(grid.EditingControl, TextBox).Text = "16"
+            GetType(frmGradebook).GetMethod("LoadClassData", flags).Invoke(form, Nothing)
+            Application.DoEvents()
+            Check(Not CBool(GetType(frmGradebook).GetField("reloadQueued", flags).GetValue(form)), "queued reload completes outside edit event")
+            Dim score = DatabaseHelper.ExecuteScalar("SELECT sg.score FROM studentgrade sg JOIN enrollment e ON e.enrollment_id=sg.enrollment_id WHERE sg.assessment_id=" & assessment & " AND e.student_id='" & fixture("student_id").ToString().Replace("'", "''") & "'")
+            Check(CDbl(score) = 16, "deferred reload commits active edit before rebuilding")
+            form.Close()
+        End Using
+    End Sub
+    Sub Check(condition As Boolean, name As String)
+        If Not condition Then Throw New Exception("FAIL: " & name)
+        Console.WriteLine("PASS: " & name)
+    End Sub
+End Module
