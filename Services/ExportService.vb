@@ -97,6 +97,39 @@ Public Class ExportService
         Return doc
     End Function
 
+    Public Function CreateTextReportDocument(title As String, description As String, data As DataTable) As PrintDocument
+        Dim document As New PrintDocument()
+        Dim generated = Date.Now.ToString("MMM d, yyyy HH:mm")
+        Dim content = String.Join(vbCrLf & vbCrLf & "────────────────────────" & vbCrLf & vbCrLf,
+            data.Rows.Cast(Of DataRow).Select(Function(row) String.Join(vbCrLf, data.Columns.Cast(Of DataColumn).Select(Function(column) column.ColumnName & ": " & ReportValue(row(column))))))
+        If content.Length = 0 Then content = "No matching records."
+        Dim offset, page As Integer
+        AddHandler document.BeginPrint, Sub()
+                                            offset = 0 : page = 0
+                                        End Sub
+        AddHandler document.PrintPage, Sub(sender, args)
+                                          page += 1
+                                          Using heading As New Font("Segoe UI", 13, FontStyle.Bold), body As New Font("Segoe UI", 10), small As New Font("Segoe UI", 8), format As New StringFormat(StringFormat.GenericTypographic)
+                                              format.FormatFlags = StringFormatFlags.LineLimit
+                                              Dim bounds = args.MarginBounds
+                                              args.Graphics.DrawString(title, heading, Brushes.DarkGreen, bounds.Left, bounds.Top)
+                                              Dim subtitle = "Generated " & generated & vbCrLf & description
+                                              Dim height = args.Graphics.MeasureString(subtitle, small, bounds.Width).Height + 12
+                                              args.Graphics.DrawString(subtitle, small, Brushes.Gray, New RectangleF(bounds.Left, bounds.Top + 30, bounds.Width, height))
+                                              Dim area As New RectangleF(bounds.Left, bounds.Top + 30 + height, bounds.Width, bounds.Height - 58 - height)
+                                              If area.Height < body.GetHeight(args.Graphics) Then Throw New InvalidOperationException("The printable area is too small.")
+                                              Dim characters, lines As Integer
+                                              args.Graphics.MeasureString(content.Substring(offset), body, area.Size, format, characters, lines)
+                                              If characters <= 0 Then Throw New InvalidOperationException("The printable area is too small.")
+                                              args.Graphics.DrawString(content.Substring(offset, characters), body, Brushes.Black, area, format)
+                                              offset += characters
+                                              args.Graphics.DrawString("Page " & page & " | " & data.Rows.Count & " request(s)", small, Brushes.Gray, bounds.Left, bounds.Bottom - 18)
+                                              args.HasMorePages = offset < content.Length
+                                          End Using
+                                      End Sub
+        Return document
+    End Function
+
     Private Class GridPrinter
         Private ReadOnly headers As New List(Of String)
         Private ReadOnly widths As New List(Of Single)
@@ -255,6 +288,27 @@ Public Class ExportService
             MessageBox.Show("Error saving CSV file: " & ex.Message, "CSV Export Error", MessageBoxButtons.OK, MessageBoxIcon.Error)
             Return False
         End Try
+    End Function
+
+    Public Function ExportTableToCSV(data As DataTable, filePath As String) As Boolean
+        Try
+            Using writer As New StreamWriter(filePath, False, System.Text.Encoding.UTF8)
+                writer.WriteLine(String.Join(",", data.Columns.Cast(Of DataColumn).Select(Function(column) CsvField(column.ColumnName))))
+                For Each row As DataRow In data.Rows
+                    writer.WriteLine(String.Join(",", data.Columns.Cast(Of DataColumn).Select(Function(column) CsvField(ReportValue(row(column))))))
+                Next
+            End Using
+            Return True
+        Catch ex As Exception
+            MessageBox.Show("Error saving CSV file: " & ex.Message, "CSV Export Error", MessageBoxButtons.OK, MessageBoxIcon.Error)
+            Return False
+        End Try
+    End Function
+
+    Private Shared Function ReportValue(value As Object) As String
+        If value Is Nothing OrElse IsDBNull(value) Then Return ""
+        If TypeOf value Is DateTime Then Return CDate(value).ToString("yyyy-MM-dd HH:mm:ss", Globalization.CultureInfo.InvariantCulture)
+        Return Convert.ToString(value, Globalization.CultureInfo.InvariantCulture)
     End Function
 
     ' Wraps a value in quotes and DOUBLES any quote inside it ("" is how CSV writes one quote)

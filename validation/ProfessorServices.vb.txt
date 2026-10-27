@@ -281,6 +281,48 @@ Module Program
                 Check(revision.GetRevisionRequestsByStudent(student, chosenEnrollment).Rows.Cast(Of DataRow).All(Function(row) CInt(row("enrollment_id")) = chosenEnrollment), "student requests filter by the selected enrollment")
                 Check(revision.GetRevisionRequestsByStudent(studentId, chosenEnrollment).Rows.Count = 0, "request enrollment filter cannot reveal another student's requests")
             End If
+            Dim adminRequests = workspace.RequestRows(adminId)
+            Check(adminRequests.Rows.Count > 0 AndAlso adminRequests.Columns("requested_at").DataType = GetType(DateTime), "admin requests include sortable request dates")
+            Check(adminRequests.Columns.Contains("reviewed_at") AndAlso adminRequests.Columns.Contains("reviewed_by") AndAlso adminRequests.Columns.Contains("response"), "admin requests include review history and response")
+            Check(adminRequests.Rows.Cast(Of DataRow).Any(Function(row) Not IsDBNull(row("response")) AndAlso row("response").ToString().Contains("Rechecked your submitted answer.")), "admin oversight shows the professor response stored with the decision")
+            Dim expectedRequestOrder = adminRequests.Rows.Cast(Of DataRow).OrderByDescending(Function(row) CDate(row("requested_at"))).ThenByDescending(Function(row) CInt(row("request_id"))).Select(Function(row) CInt(row("request_id")))
+            Check(adminRequests.Rows.Cast(Of DataRow).Select(Function(row) CInt(row("request_id"))).SequenceEqual(expectedRequestOrder), "admin requests default to newest first with stable ordering")
+            For Each requestStatus In {"Pending", "Under Review", "Approved", "Closed"}
+                Check(workspace.RequestRows(adminId, status:=requestStatus).Rows.Cast(Of DataRow).All(Function(row) CStr(row("status")) = requestStatus), "admin request status filter " & requestStatus)
+            Next
+            Check(workspace.RequestRows(adminId, status:="Open").Rows.Cast(Of DataRow).All(Function(row) {"Pending", "Under Review"}.Contains(CStr(row("status")))), "admin open filter includes pending and under-review requests only")
+            Dim firstRequest = adminRequests.Rows(0)
+            Dim requestStudent = CStr(firstRequest("student_id")), requestClass = CInt(firstRequest("class_id"))
+            Check(workspace.RequestRows(adminId, search:=requestStudent).Rows.Cast(Of DataRow).All(Function(row) CStr(row("student_id")) = requestStudent), "admin request student ID search is scoped correctly")
+            Check(workspace.RequestRows(adminId, search:=CStr(firstRequest("student_name")).ToUpperInvariant()).Rows.Count > 0, "admin request student name search ignores case")
+            Check(workspace.RequestRows(adminId, search:="%").Rows.Count = 0, "admin request search escapes literal wildcard characters")
+            Check(workspace.RequestRows(adminId, classId:=requestClass).Rows.Cast(Of DataRow).All(Function(row) CInt(row("class_id")) = requestClass), "admin request course filter uses exact class IDs")
+            Dim requestDay = CDate(firstRequest("requested_at")).Date
+            Dim dayRequests = workspace.RequestRows(adminId, fromDate:=requestDay, toDate:=requestDay)
+            Check(dayRequests.Rows.Cast(Of DataRow).Any(Function(row) CInt(row("request_id")) = CInt(firstRequest("request_id"))) AndAlso dayRequests.Rows.Cast(Of DataRow).All(Function(row) CDate(row("requested_at")).Date = requestDay), "admin request date range includes the entire end date")
+            Check(workspace.RequestRows(adminId, search:=requestStudent, classId:=requestClass, status:=CStr(firstRequest("status")), fromDate:=requestDay, toDate:=requestDay).Rows.Cast(Of DataRow).Any(Function(row) CInt(row("request_id")) = CInt(firstRequest("request_id"))), "admin request filters combine without losing matching rows")
+            Check(workspace.RequestCourses(adminId).Rows.Cast(Of DataRow).All(Function(row) row("class_label").ToString().Contains("Semester")), "admin request course choices identify semester and year")
+            Dim rejectedRequestRead = False
+            Try
+                workspace.RequestRows("invalid-admin")
+            Catch ex As UnauthorizedAccessException
+                rejectedRequestRead = True
+            End Try
+            Check(rejectedRequestRead, "admin request overview rejects unauthorized access")
+            Dim rejectedRequestDates = False
+            Try
+                workspace.RequestRows(adminId, fromDate:=Date.Today, toDate:=Date.Today.AddDays(-1))
+            Catch ex As ArgumentException
+                rejectedRequestDates = True
+            End Try
+            Check(rejectedRequestDates, "admin request overview rejects reversed date ranges")
+            Dim rejectedRequestStatus = False
+            Try
+                workspace.RequestRows(adminId, status:="Invalid")
+            Catch ex As ArgumentException
+                rejectedRequestStatus = True
+            End Try
+            Check(rejectedRequestStatus, "admin request overview rejects unknown status filters")
             Check(AssessmentNames.NextTitle("Quiz", {"Quiz 1", "Quiz 3"}) = "Quiz 2", "assessment numbering finds an unused gap")
             Check(AssessmentNames.NextTitle("Quiz", {"quiz 1", "QUIZ 2"}) = "Quiz 3", "assessment numbering ignores title case")
             Check(Not service.CreateAssessment(classId, "Review test", "Quiz", 20, "Midterm", teacher).Success, "duplicate assessment title is rejected")

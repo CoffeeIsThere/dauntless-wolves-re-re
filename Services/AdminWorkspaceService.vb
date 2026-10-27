@@ -82,6 +82,73 @@ Public Class AdminWorkspaceService
         Return DatabaseHelper.ExecuteQuery(sql & "ORDER BY c.academic_year DESC,c.course_code,c.section", New MySqlParameter("@Id", id))
     End Function
 
+    Public Function RequestCourses(adminId As String) As DataTable
+        RequireAdmin(adminId)
+        Return DatabaseHelper.ExecuteQuery("SELECT c.class_id,CONCAT(c.course_code,' - ',co.course_name,' (Section ',c.section,', ',c.semester,', ',c.academic_year,')') AS class_label FROM class c JOIN course co ON co.course_code=c.course_code ORDER BY c.course_code,c.section,c.academic_year DESC,c.semester")
+    End Function
+
+    ' Read-only admin oversight; all decisions remain in RevisionRequestService for the assigned professor.
+    Public Function RequestRows(adminId As String, Optional search As String = "", Optional status As String = "All", Optional classId As Integer = 0, Optional fromDate As Date? = Nothing, Optional toDate As Date? = Nothing) As DataTable
+        RequireAdmin(adminId)
+        If Not {"All", "Open", "Pending", "Under Review", "Approved", "Closed"}.Contains(status) Then Throw New ArgumentException("Choose a valid request status.")
+        If classId < 0 Then Throw New ArgumentException("Choose a valid course.")
+        If fromDate.HasValue AndAlso toDate.HasValue AndAlso fromDate.Value.Date > toDate.Value.Date Then Throw New ArgumentException("Start date must not follow end date.")
+        Dim sql = "SELECT r.request_id,s.student_id,s.full_name AS student_name,c.class_id," &
+            "CONCAT(c.course_code,' - ',co.course_name,' (Section ',c.section,', ',c.semester,', ',c.academic_year,')') AS course," &
+            "a.title AS assessment,sg.score AS current_score,a.total_score AS maximum_score,r.requested_points," &
+            "r.status,r.requested_at,r.reviewed_at,owner.full_name AS assigned_professor,reviewer.full_name AS reviewed_by,r.reason," &
+            "(SELECT al.details FROM auditlog al WHERE al.entity_type='RevisionRequest' AND CAST(al.entity_id AS BINARY)=CAST(CAST(r.request_id AS CHAR) AS BINARY) " &
+            "AND CAST(al.new_value AS BINARY)=CAST(r.status AS BINARY) AND CAST(al.teacher_id AS BINARY)=CAST(r.reviewed_by AS BINARY) " &
+            "AND al.action='Updated request status' ORDER BY al.log_id DESC LIMIT 1) AS response " &
+            "FROM revisionrequest r JOIN studentgrade sg ON sg.grade_id=r.grade_id JOIN enrollment e ON e.enrollment_id=sg.enrollment_id " &
+            "JOIN student s ON s.student_id=e.student_id JOIN assessment a ON a.assessment_id=sg.assessment_id " &
+            "JOIN class c ON c.class_id=e.class_id JOIN course co ON co.course_code=c.course_code " &
+            "LEFT JOIN teacher owner ON owner.teacher_id=c.teacher_id LEFT JOIN teacher reviewer ON reviewer.teacher_id=r.reviewed_by WHERE 1=1"
+        Dim parameters As New List(Of MySqlParameter)
+        If Not String.IsNullOrWhiteSpace(search) Then
+            sql &= " AND (CONVERT(s.full_name USING utf8mb4) COLLATE utf8mb4_general_ci LIKE @Search ESCAPE '!' OR CONVERT(s.student_id USING utf8mb4) COLLATE utf8mb4_general_ci LIKE @Search ESCAPE '!')"
+            parameters.Add(New MySqlParameter("@Search", LikeText(search)))
+        End If
+        If status = "Open" Then
+            sql &= " AND r.status IN ('Pending','Under Review')"
+        ElseIf status <> "All" Then
+            sql &= " AND r.status=@Status"
+            parameters.Add(New MySqlParameter("@Status", status))
+        End If
+        If classId > 0 Then
+            sql &= " AND c.class_id=@Class"
+            parameters.Add(New MySqlParameter("@Class", classId))
+        End If
+        If fromDate.HasValue Then
+            sql &= " AND r.requested_at>=@From"
+            parameters.Add(New MySqlParameter("@From", fromDate.Value.Date))
+        End If
+        If toDate.HasValue Then
+            sql &= " AND r.requested_at<@To"
+            parameters.Add(New MySqlParameter("@To", toDate.Value.Date.AddDays(1)))
+        End If
+        Dim raw = DatabaseHelper.ExecuteQuery(sql & " ORDER BY r.requested_at DESC,r.request_id DESC", parameters.ToArray())
+        ' AllowZeroDateTime is enabled globally; normalize provider date structs for grid sorting/formatting.
+        Dim result = raw.Clone()
+        Dim dates = {"requested_at", "reviewed_at"}
+        For Each column In dates
+            result.Columns(column).DataType = GetType(DateTime)
+            result.Columns(column).AllowDBNull = True
+        Next
+        For Each row As DataRow In raw.Rows
+            Dim values = row.ItemArray
+            For Each column In dates
+                Dim index = raw.Columns(column).Ordinal
+                If TypeOf values(index) Is MySql.Data.Types.MySqlDateTime Then
+                    Dim value = CType(values(index), MySql.Data.Types.MySqlDateTime)
+                    values(index) = If(value.IsValidDateTime, CObj(value.GetDateTime()), DBNull.Value)
+                End If
+            Next
+            result.Rows.Add(values)
+        Next
+        Return result
+    End Function
+
     Private Shared Function LikeText(value As String) As String
         Return "%" & value.Trim().Replace("!", "!!").Replace("%", "!%").Replace("_", "!_") & "%"
     End Function

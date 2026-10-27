@@ -1003,11 +1003,16 @@ Partial Public Class Admin
     End Sub
 
     Private Sub OpenQuickAction(mode As quickactions.FormMode, Optional onlyOpen As Boolean = False)
-        Using dialog As New quickactions()
-            dialog.OnlyOpenRequests = onlyOpen
-            dialog.ShowMode(mode)
-            dialog.ShowDialog(Me)
-        End Using
+        If mode = quickactions.FormMode.ViewRequests Then
+            Using dialog As New AdminRequestsForm(AppSession.CurrentUser.UserId, onlyOpen)
+                dialog.ShowDialog(Me)
+            End Using
+        Else
+            Using dialog As New quickactions()
+                dialog.ShowMode(mode)
+                dialog.ShowDialog(Me)
+            End Using
+        End If
         LoadDashboard()
     End Sub
 
