@@ -6,7 +6,7 @@ Run only against a disposable database populated with the supplied grading-syste
 2. Place `dbconfig.json` next to the generated `validation/bin/Debug/net8.0/professor-services.dll`, using DatabaseHelper's Host, Port, Database, User and Password fields. Do not commit credentials.
 3. Run: `dotnet validation/bin/Debug/net8.0/professor-services.dll`.
 
-187 checks exercise CSV import validation, request approval/status transitions, re-check score overrides, duplicate approval protection, and assessment ownership, term validation, assessment creation, score saving, range validation, rejected clearing, persisted values, grade-sheet columns and audit queries. The harness compiles the actual grading services for Linux without loading Windows Forms. Its session stub is used only by the test executable.
+211 checks exercise CSV import validation, request approval/status transitions, re-check score overrides, duplicate approval protection, and assessment ownership, term validation, assessment creation, score saving, range validation, rejected clearing, persisted values, grade-sheet columns and audit queries. The harness compiles the actual grading services for Linux without loading Windows Forms. Its session stub is used only by the test executable.
 
 Windows manual checks: switch between sections of the same course; confirm assessment titles and maximum scores match each section; edit and paste scores, reopen and verify persistence; enroll an existing student; create a weighted Midterm/Finals assessment; approve an Under Review request; inspect audit timestamps and exported class headers. Gradebook inputs now represent persisted assessment scores, and summaries use the shared weighted calculator. The old attendance/bonus/project/exam worksheet-only inputs are hidden to avoid conflicting grades. Removing a saved grade or changing an existing assessment maximum is explicitly blocked on this screen rather than silently changing only the display.
 
@@ -15,7 +15,7 @@ Additional Windows review:
 
 - At 1366×768 and 125% display scaling, verify Student/Assessment/Score labels are separated from their inputs, all score rows are accessible, and the gradebook toolbar wraps without clipping Revision or PDF buttons.
 - Open Add Assessment from the dashboard; confirm the correct section is selected. Create an assessment and return to the dashboard; verify it is refreshed.
-- Import CSV with header `type,group,max_score,term,weight` and example row `Quiz,Quiz,20,Midterm,10`. All rows are validated before confirmation. Each saved assessment is committed individually; a database failure reports the count saved before stopping. The group column is retained for file compatibility; worksheet grouping follows the assessment type.
+- Import CSV with header `type,group,max_score,term,weight` and example row `Quiz,Quiz,20,Midterm,10`. All rows are validated before confirmation. All assessments, their pending grade rows and audit entries are committed in one transaction; a database failure rolls back the entire file. The group column is retained for file compatibility; worksheet grouping follows the assessment type.
 - Check All/Midterm/Finals grade-sheet filters and column widths. RunningGrade remains the overall cached grade, while the term filter selects assessment columns.
 - Click Review for both Pending and Under Review rows; test approve, corrected re-check score, mark under review, close with reason, and cancellation. Confirm the score and audit timestamp persist after reopening.
 - Export audit logs and class grades with Microsoft Print to PDF enabled. Check headings, page numbers, long logs across pages, cancellation, and replacing an existing PDF. Export reports failure if no PDF is created within ten seconds and preserves the prior destination until a new PDF is available.
@@ -104,7 +104,7 @@ Final review fixes:
 - In another window/session, enroll a student or assign a class. Return to the student/professor window or select another tab and verify the catalog refreshes without logging out. Existing selections stay on the same IDs if they remain available. Reopen an already-open gradebook from the professor window and verify new assignments are available there too.
 - Professor class labels and Class Grades headings include section, semester and year. Check both short and long labels in the widened dropdown.
 
-The backend suite now contains 187 checks, including failed-paste score/audit rollback, precision rejection, duplicate-title protection, destination-aware enrollment and refreshed catalog query results. Both Windows interaction harnesses compile, but must be run on Windows.
+The backend suite now contains 211 checks, including failed-paste score/audit rollback, precision rejection, duplicate-title protection, destination-aware enrollment and refreshed catalog query results. Both Windows interaction harnesses compile, but must be run on Windows.
 
 
 Gradebook names and Add Student design: gradebook cells and the enrollment picker's display labels show surname first, for example `Puyat, Ron Jacob` and `Cruz, Juan A.`. Complete given names remain intact because the database has no separate middle-name field. Existing initial letters gain a period, already-formatted names are not reordered twice, and compound surnames/suffixes are preserved. Stored full_name and student ID remain unchanged.
@@ -113,7 +113,7 @@ On Windows, compare Add Student with Add Class/Add Assessment: it should have no
 
 ## Admin workspace improvements
 
-The service suite now passes 187 checks, including administrative bulk-status transactions and rollback, duplicate selections, authorization, linked-record counts, safe account detail reads, and audit filtering (dates, actor, action, literal wildcard text, entity and account activity). The audit viewer exports its displayed result set; PDF exports wrap complete values across pages.
+The service suite now passes 211 checks, including administrative bulk-status transactions and rollback, duplicate selections, authorization, linked-record counts, safe account detail reads, and audit filtering (dates, actor, action, literal wildcard text, entity and account activity). The audit viewer exports its displayed result set; PDF exports wrap complete values across pages.
 
 Windows interaction harness: `dotnet build validation/admin-workspace.vbproj -p:EnableWindowsTargeting=true`, then run the generated executable against a disposable seeded database with its own local `dbconfig.json`. It checks background refresh, selection across pages, page/current-row preservation, status and employment filters, account detail tabs, and audit search/export availability. This harness requires Windows Forms and cannot run on Linux.
 
@@ -130,7 +130,7 @@ Manual Windows review at 100% and 125% scaling:
 
 ## Final submission fixes
 
-The latest service run passes 187 checks. Added coverage includes strict consecutive academic years, distinct semester/year labels in Admin Quick Grade Entry, student request enrollment filtering and ownership, and horizontal PDF column groups with repeated student identity columns.
+The latest service run passes 211 checks. Added coverage includes strict consecutive academic years, distinct semester/year labels in Admin Quick Grade Entry, student request enrollment filtering and ownership, and horizontal PDF column groups with repeated student identity columns.
 
 `dotnet build validation/final-submission.vbproj -p:EnableWindowsTargeting=true` builds the new Windows interaction checks. Run its executable against a disposable database with a local dbconfig.json. It checks student decision/response, performance and history refresh; Admin Add Class saves selected dates; inline read-error recovery; and wide/long report pagination using bitmap graphics without sending a printer job. These Windows interaction checks are compiled on Linux but must be executed on Windows.
 
@@ -148,7 +148,7 @@ Before handing off the application, check these flows on Windows:
 
 Admin View Requests and the Pending Requests dashboard tile now open `AdminRequestsForm`. The standard button starts at All; the tile starts at Open (Pending + Under Review). This is read-only oversight; professors keep decision and score authority.
 
-The service suite passes 187 checks, including request date normalization, newest-first ordering, requested-date ranges, exact course filters, student ID/name search, literal wildcard escaping, combined filters, access validation and professor-response retrieval.
+The service suite passes 211 checks, including request date normalization, newest-first ordering, requested-date ranges, exact course filters, student ID/name search, literal wildcard escaping, combined filters, access validation and professor-response retrieval.
 
 Windows interaction checks: build `validation/admin-requests.vbproj -p:EnableWindowsTargeting=true` and run against a disposable seeded database with a local dbconfig.json. Checks cover dates, read-only cells, unchanged-refresh stability, selected request preservation, full reasons, filtered/sorted export snapshots, CSV timestamps, empty results, invalid-date recovery, Open-only navigation, and long text report pagination without sending a print job. The harness is compiled on Linux; execution requires Windows.
 
@@ -161,3 +161,19 @@ Manual Windows review:
 - Change a request through a separate professor session. Within five seconds, the admin table should update while retaining the selected request, current sort and scroll when the request still matches the filters. Unchanged refreshes should not rebuild the table or interrupt reading notes.
 - Disconnect the disposable database and Refresh. Existing results should remain readable, Retry should appear, and exports should remain disabled until a successful load. Reconnect and retry. Close the window while a load is pending; it should not reopen or show a disposed-control error.
 - Sort and filter, then export CSV/PDF. Both must contain only the displayed requests in the displayed order, plus full reasons/responses and request/review dates. PDF pages repeat the filter description and include page numbers; long records must continue without ellipses. Canceling Save must create no file. Editing filters without applying them must leave exports tied to the displayed result set.
+
+
+## Final four reliability fixes
+
+The portable suite now passes 211 checks. It deliberately rejects a later assessment insert and an audit insert using temporary triggers in the disposable database. The tests verify rollback of every assessment, pending grade and audit entry; retry produces exactly the intended batch; repeated types get distinct titles under the class lock. Password-change tests verify that an audit failure leaves the original password hash untouched, the old password still works, and a successful retry commits exactly one audit entry. Test triggers are removed in Finally blocks.
+
+The admin request interaction harness also checks that a failed manual filter remains blocked from automatic refresh until a successful manual load. Rebinding the grid suppresses intermediate detail clearing, and unchanged detail text keeps its native selection and scroll position.
+
+Windows handoff checks:
+
+- Import an assessment-only CSV containing multiple types and repeated quiz rows. Confirm the complete file saves, the intended titles appear, and each student has matching pending grade rows. Cancellation saves nothing.
+- Change a student's password, log out, and verify that only the new password works and one Changed password entry appears in Admin Audit Logs.
+- Admin Requests: apply a reversed date range, wait more than five seconds, and confirm the validation error/Retry remain visible and exports stay disabled. Correct the dates and apply/retry; normal refresh and exports should resume.
+- Scroll/select text in a selected request's reason and response. Update a different request in a separate professor session; when the admin table refreshes, the selected request and unchanged note positions should remain intact. Selecting a different request should start its details at the top.
+
+The database suite has executed on Linux. All five Windows interaction projects compile; their runtime, display scaling and final Microsoft Print to PDF checks require Windows.

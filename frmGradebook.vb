@@ -1650,19 +1650,10 @@ Public Class frmGradebook
         Next
         If definitions.Count = 0 Then Return False
         If MessageBox.Show("Save " & definitions.Count & " assessments to the selected class?", "Confirm import", MessageBoxButtons.YesNo) <> DialogResult.Yes Then Return False
-        Dim added = 0
-        For Each definition In definitions
-            Dim result = _gradeService.CreateAssessment(classId, NextTitle(definition.Type), definition.Type, definition.Max, definition.Term, AppSession.CurrentUser.UserId, definition.Weight)
-            If Not result.Success Then
-                MessageBox.Show("Imported " & added & " assessments before stopping: " & result.Message)
-                LoadClassData()
-                Return False
-            End If
-            added += 1
-            LoadClassData()
-        Next
-        MessageBox.Show("Imported " & added & " assessments.")
-        Return True
+        Dim result = _gradeService.ImportAssessments(classId, definitions, AppSession.CurrentUser.UserId)
+        MessageBox.Show(result.Message, If(result.Success, "Assessments imported", "Import not saved"))
+        If result.Success Then LoadClassData()
+        Return result.Success
     End Function
 
     Private Sub ConfigureToolbar()

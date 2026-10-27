@@ -6,6 +6,7 @@ Imports System.Reflection
 Imports System.Windows.Forms
 Imports DAUNTLESS_WOLVES_PROF
 Imports DAUNTLESS_WOLVES_PROF.Models
+Imports MySql.Data.MySqlClient
 
 ' Windows-only, disposable seeded database. PDF pagination uses bitmap graphics, no printer job.
 Module Program
@@ -32,6 +33,20 @@ Module Program
             Check(CInt(DirectCast(grid.CurrentRow.DataBoundItem, DataRowView)("request_id")) = selectedId, "refresh preserves selected request")
             Dim detail = Field(Of TextBox)(form, "reason")
             Check(detail.Text = CStr(DirectCast(grid.CurrentRow.DataBoundItem, DataRowView)("reason")), "details show the complete selected student's reason")
+            Dim otherId = CInt(DirectCast(grid.Rows.Cast(Of DataGridViewRow).First(Function(item) CInt(DirectCast(item.DataBoundItem, DataRowView)("request_id")) <> selectedId).DataBoundItem, DataRowView)("request_id"))
+            Dim originalOtherReason = CStr(DatabaseHelper.ExecuteScalar("SELECT reason FROM revisionrequest WHERE request_id=@Id", New MySqlParameter("@Id", otherId)))
+            Dim responseBox = Field(Of TextBox)(form, "response")
+            detail.Select(Math.Min(3, detail.TextLength), Math.Min(2, Math.Max(0, detail.TextLength - 3)))
+            responseBox.Select(Math.Min(4, responseBox.TextLength), 0)
+            Dim reasonStart = detail.SelectionStart, reasonLength = detail.SelectionLength, responseStart = responseBox.SelectionStart
+            Try
+                DatabaseHelper.ExecuteNonQuery("UPDATE revisionrequest SET reason='Background update for another request' WHERE request_id=@Id", New MySqlParameter("@Id", otherId))
+                Reload(form, True)
+                Check(CInt(DirectCast(grid.CurrentRow.DataBoundItem, DataRowView)("request_id")) = selectedId, "changed refresh keeps the selected request")
+                Check(detail.SelectionStart = reasonStart AndAlso detail.SelectionLength = reasonLength AndAlso responseBox.SelectionStart = responseStart, "another request update leaves reason and response reading positions intact")
+            Finally
+                DatabaseHelper.ExecuteNonQuery("UPDATE revisionrequest SET reason=@Reason WHERE request_id=@Id", New MySqlParameter("@Reason", originalOtherReason), New MySqlParameter("@Id", otherId))
+            End Try
             grid.Sort(grid.Columns("student_name"), ListSortDirection.Descending)
             Dim snapshot = DirectCast(GetType(AdminRequestsForm).GetMethod("ExportSnapshot", Flags).Invoke(form, Nothing), DataTable)
             Check(snapshot.Rows.Count = grid.RowCount AndAlso snapshot.Columns.Contains("Reviewed on") AndAlso snapshot.Columns.Contains("Professor response"), "exports include review dates and complete responses")
@@ -57,6 +72,9 @@ Module Program
             fromDate.Checked = True : through.Checked = True
             Reload(form)
             Check(grid.RowCount = beforeFailure AndAlso Field(Of Button)(form, "retry").Visible AndAlso Not Field(Of Button)(form, "csv").Enabled, "failed date filter preserves old data and offers Retry with exports disabled")
+            Dim validationMessage = Field(Of Label)(form, "state").Text
+            Reload(form, True)
+            Check(Field(Of Label)(form, "state").Text = validationMessage AndAlso Field(Of Button)(form, "retry").Visible AndAlso Not Field(Of Button)(form, "csv").Enabled, "automatic refresh cannot clear a failed manual filter or re-enable exports")
             fromDate.Checked = False : through.Checked = False
             Reload(form)
             Check(Not Field(Of Button)(form, "retry").Visible AndAlso Field(Of Button)(form, "csv").Enabled, "retry clears errors and re-enables export after successful load")

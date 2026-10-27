@@ -346,6 +346,53 @@ Module Program
             Check(service.GetEnrollmentsByStudent(student).Select("class_id=" & secondSection).Length = 1, "student catalog query discovers new enrollment")
             Check(service.GetClassesByTeacher(teacher).Select("class_id=" & secondSection).Length = 1, "professor catalog query discovers new offering")
             Check(Not rosterImporter.ImportStudents(secondSection, teacher, New List(Of String()) From {New String() {student, "Not the registered name"}}).Success, "manual enrollment cannot substitute a mismatched name")
+            Dim assessmentBatch As New List(Of (Type As String, Max As Double, Term As String, Weight As Double)) From {("Quiz", 20, "Midterm", 10), ("Activity", 50, "Finals", 10)}
+            Dim baselineAssessments = CInt(DatabaseHelper.ExecuteScalar("SELECT COUNT(*) FROM assessment WHERE class_id=" & secondSection))
+            Dim baselineGrades = CInt(DatabaseHelper.ExecuteScalar("SELECT COUNT(*) FROM studentgrade"))
+            Dim baselineAudit = CInt(DatabaseHelper.ExecuteScalar("SELECT COUNT(*) FROM auditlog"))
+            Check(Not service.ImportAssessments(secondSection, Nothing, teacher).Success, "assessment import requires a batch")
+            Check(Not service.ImportAssessments(secondSection, New List(Of (Type As String, Max As Double, Term As String, Weight As Double)), teacher).Success, "assessment import rejects an empty batch")
+            Check(Not service.ImportAssessments(secondSection, New List(Of (Type As String, Max As Double, Term As String, Weight As Double)) From {("Quiz", 20, "Midterm", 10), ("Activity", Double.NaN, "Finals", 10)}, teacher).Success, "assessment import validates every row before writing")
+            Dim otherTeacher = CStr(DatabaseHelper.ExecuteScalar("SELECT teacher_id FROM teacher WHERE status='Active' AND teacher_id<>@Teacher LIMIT 1", New MySqlParameter("@Teacher", teacher)))
+            Check(Not service.ImportAssessments(secondSection, assessmentBatch, otherTeacher).Success, "assessment batch rejects another class professor")
+            Check(CInt(DatabaseHelper.ExecuteScalar("SELECT COUNT(*) FROM assessment WHERE class_id=" & secondSection)) = baselineAssessments, "invalid or unauthorized batches add no assessments")
+            DatabaseHelper.ExecuteNonQuery("CREATE TRIGGER handoff_fail_assessment BEFORE INSERT ON assessment FOR EACH ROW BEGIN IF NEW.class_id=" & secondSection & " AND NEW.assessment_type='Activity' THEN SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='Simulated later import failure'; END IF; END")
+            Try
+                Check(Not service.ImportAssessments(secondSection, assessmentBatch, teacher).Success, "later database failure rejects the whole assessment batch")
+                Check(CInt(DatabaseHelper.ExecuteScalar("SELECT COUNT(*) FROM assessment WHERE class_id=" & secondSection)) = baselineAssessments, "failed batch rolls back earlier assessments")
+                Check(CInt(DatabaseHelper.ExecuteScalar("SELECT COUNT(*) FROM studentgrade")) = baselineGrades, "failed batch rolls back seeded student grades")
+                Check(CInt(DatabaseHelper.ExecuteScalar("SELECT COUNT(*) FROM auditlog")) = baselineAudit, "failed batch rolls back assessment audit entries")
+            Finally
+                DatabaseHelper.ExecuteNonQuery("DROP TRIGGER handoff_fail_assessment")
+            End Try
+            DatabaseHelper.ExecuteNonQuery("CREATE TRIGGER handoff_fail_assessment_audit BEFORE INSERT ON auditlog FOR EACH ROW BEGIN IF NEW.action='Created assessment' THEN SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='Simulated assessment audit failure'; END IF; END")
+            Try
+                Check(Not service.ImportAssessments(secondSection, assessmentBatch, teacher).Success, "assessment batch fails if its audit insert fails")
+                Check(CInt(DatabaseHelper.ExecuteScalar("SELECT COUNT(*) FROM assessment WHERE class_id=" & secondSection)) = baselineAssessments AndAlso CInt(DatabaseHelper.ExecuteScalar("SELECT COUNT(*) FROM studentgrade")) = baselineGrades AndAlso CInt(DatabaseHelper.ExecuteScalar("SELECT COUNT(*) FROM auditlog")) = baselineAudit, "audit failure rolls back the entire assessment import")
+            Finally
+                DatabaseHelper.ExecuteNonQuery("DROP TRIGGER handoff_fail_assessment_audit")
+            End Try
+            Check(service.ImportAssessments(secondSection, assessmentBatch, teacher).Success, "retry imports the complete two-row batch")
+            Check(CInt(DatabaseHelper.ExecuteScalar("SELECT COUNT(*) FROM assessment WHERE class_id=" & secondSection)) = baselineAssessments + 2, "retry leaves exactly two assessments rather than partial duplicates")
+            Check(CInt(DatabaseHelper.ExecuteScalar("SELECT COUNT(*) FROM studentgrade")) = baselineGrades + 2 AndAlso CInt(DatabaseHelper.ExecuteScalar("SELECT COUNT(*) FROM auditlog")) = baselineAudit + 2, "successful import commits seeded grades and audit entries together")
+            Check(service.GetAssessmentsByClass(secondSection, teacher).Rows.Cast(Of DataRow).Select(Function(row) CStr(row("title"))).OrderBy(Function(title) title).SequenceEqual({"Activity 1", "Quiz 1"}), "failed import does not consume generated assessment titles")
+            Check(service.ImportAssessments(secondSection, New List(Of (Type As String, Max As Double, Term As String, Weight As Double)) From {("Quiz", 30, "Midterm", 10), ("Quiz", 40, "Finals", 10)}, teacher).Success, "batch reserves distinct titles for repeated assessment types")
+            Check(service.GetAssessmentsByClass(secondSection, teacher).Rows.Cast(Of DataRow).Any(Function(row) CStr(row("title")) = "Quiz 2") AndAlso service.GetAssessmentsByClass(secondSection, teacher).Rows.Cast(Of DataRow).Any(Function(row) CStr(row("title")) = "Quiz 3"), "same-type batch titles advance within one transaction")
+            Dim originalHash = CStr(DatabaseHelper.ExecuteScalar("SELECT password_hash FROM student WHERE student_id=@Id", New MySqlParameter("@Id", studentId)))
+            Dim passwordAuditBefore = CInt(DatabaseHelper.ExecuteScalar("SELECT COUNT(*) FROM auditlog WHERE action='Changed password' AND student_id=@Id", New MySqlParameter("@Id", studentId)))
+            Dim changedPassword = "handoff changed password"
+            DatabaseHelper.ExecuteNonQuery("CREATE TRIGGER handoff_fail_password_audit BEFORE INSERT ON auditlog FOR EACH ROW BEGIN IF NEW.action='Changed password' THEN SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='Simulated password audit failure'; END IF; END")
+            Try
+                Check(Not auth.ChangePassword("Student", studentId, password, changedPassword).Success, "password change fails when its audit insert fails")
+                Check(CStr(DatabaseHelper.ExecuteScalar("SELECT password_hash FROM student WHERE student_id=@Id", New MySqlParameter("@Id", studentId))) = originalHash, "audit failure rolls back the password hash")
+                Check(auth.VerifyLogin(studentId, password, "Student") IsNot Nothing AndAlso auth.VerifyLogin(studentId, changedPassword, "Student") Is Nothing, "original password remains valid after audit failure")
+                Check(CInt(DatabaseHelper.ExecuteScalar("SELECT COUNT(*) FROM auditlog WHERE action='Changed password' AND student_id=@Id", New MySqlParameter("@Id", studentId))) = passwordAuditBefore, "failed password change creates no partial audit entry")
+            Finally
+                DatabaseHelper.ExecuteNonQuery("DROP TRIGGER handoff_fail_password_audit")
+            End Try
+            Check(auth.ChangePassword("Student", studentId, password, changedPassword).Success, "password change retries successfully when auditing recovers")
+            Check(auth.VerifyLogin(studentId, changedPassword, "Student") IsNot Nothing AndAlso auth.VerifyLogin(studentId, password, "Student") Is Nothing, "successful change replaces the original password")
+            Check(CInt(DatabaseHelper.ExecuteScalar("SELECT COUNT(*) FROM auditlog WHERE action='Changed password' AND student_id=@Id", New MySqlParameter("@Id", studentId))) = passwordAuditBefore + 1, "successful password change commits exactly one audit entry")
         End Using
     End Sub
     Sub Check(ok As Boolean, name As String)

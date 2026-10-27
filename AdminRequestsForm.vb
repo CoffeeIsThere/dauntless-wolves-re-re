@@ -25,6 +25,9 @@ Public Class AdminRequestsForm
     Private applied As RequestFilter
     Private revision As Integer
     Private loading As Boolean
+    Private manualLoadFailed As Boolean
+    Private rebindingRows As Boolean
+    Private displayedRequestId As Integer
     Private exportBusy As Boolean
     Private loadedSuccessfully As Boolean
     Private initializing As Boolean = True
@@ -87,7 +90,9 @@ Public Class AdminRequestsForm
         Controls.Add(body) : Controls.Add(feedback) : Controls.Add(footer) : Controls.Add(filters) : Controls.Add(UiKit.MakeHeader("Clarification Requests")) : body.BringToFront()
         AddHandler csv.Click, Sub() ExportRows(False)
         AddHandler pdf.Click, Sub() ExportRows(True)
-        AddHandler view.SelectionChanged, Sub() ShowDetails()
+        AddHandler view.SelectionChanged, Sub()
+                                              If Not rebindingRows Then ShowDetails()
+                                          End Sub
         AddHandler refreshTimer.Tick, Async Sub()
                                           If Visible AndAlso Not loading AndAlso Not exportBusy Then Await ReloadAsync(True)
                                       End Sub
@@ -182,18 +187,29 @@ Public Class AdminRequestsForm
     Private Sub ShowDetails()
         Dim record = If(view.CurrentRow Is Nothing, Nothing, TryCast(view.CurrentRow.DataBoundItem, DataRowView))
         If record Is Nothing Then
+            displayedRequestId = 0
             detailsTitle.Text = "Select a request" : metadata.Clear() : reason.Clear() : response.Clear()
             Return
         End If
         Dim row = record.Row
+        Dim selectedChanged = displayedRequestId <> CInt(row("request_id"))
+        displayedRequestId = CInt(row("request_id"))
         detailsTitle.Text = "Request #" & row("request_id").ToString() & " — " & row("status").ToString()
-        metadata.Text = row("student_name").ToString() & " (" & row("student_id").ToString() & ") • " & row("course").ToString() & vbCrLf &
+        Dim details = row("student_name").ToString() & " (" & row("student_id").ToString() & ") • " & row("course").ToString() & vbCrLf &
             row("assessment").ToString() & " • Current score: " & ScoreText(row) & " • Requested: " & Adjustment(row) & vbCrLf &
             "Requested: " & DateText(row("requested_at")) & " • Assigned professor: " & OrText(row("assigned_professor"), "Unassigned") & vbCrLf &
             "Reviewed: " & DateText(row("reviewed_at")) & " • Reviewed by: " & OrText(row("reviewed_by"), "Not recorded")
-        metadata.SelectionStart = 0
-        reason.Text = Convert.ToString(row("reason"))
-        response.Text = OrText(row("response"), If({"Approved", "Closed"}.Contains(CStr(row("status"))), "No reviewer response was recorded.", "No response yet; this request is still open."))
+        SetDetailText(metadata, details, selectedChanged)
+        SetDetailText(reason, Convert.ToString(row("reason")), selectedChanged)
+        SetDetailText(response, OrText(row("response"), If({"Approved", "Closed"}.Contains(CStr(row("status"))), "No reviewer response was recorded.", "No response yet; this request is still open.")), selectedChanged)
+    End Sub
+
+    Private Shared Sub SetDetailText(box As TextBox, text As String, reset As Boolean)
+        ' Leave unchanged native text alone so its selection and vertical scroll stay where the reader put them.
+        If box.Text = text AndAlso Not reset Then Return
+        box.Text = text
+        box.Select(0, 0)
+        box.ScrollToCaret()
     End Sub
 
     Private Shared Function ScoreText(row As DataRow) As String
@@ -231,12 +247,12 @@ Public Class AdminRequestsForm
     End Function
 
     Private Sub FiltersChanged(sender As Object, args As EventArgs)
-        If initializing OrElse applied Is Nothing Then Return
+        If initializing OrElse applied Is Nothing OrElse manualLoadFailed Then Return
         If CurrentFilter().Description() <> applied.Description() Then state.Text = "Filters changed — choose Apply filters. Exports use the displayed results."
     End Sub
 
     Private Async Function ReloadAsync(Optional automatic As Boolean = False) As Task
-        If exportBusy OrElse IsDisposed OrElse (automatic AndAlso (loading OrElse applied Is Nothing)) Then Return
+        If exportBusy OrElse IsDisposed OrElse (automatic AndAlso (loading OrElse applied Is Nothing OrElse manualLoadFailed)) Then Return
         Dim filter = If(automatic, applied, CurrentFilter())
         revision += 1
         Dim current = revision
@@ -248,29 +264,35 @@ Public Class AdminRequestsForm
             If IsDisposed OrElse Disposing OrElse current <> revision Then Return
             Dim changed = Not SameRows(TryCast(view.DataSource, DataTable), snapshot.Rows)
             If changed Then
-                Dim selectedId = If(view.CurrentRow Is Nothing, 0, CInt(DirectCast(view.CurrentRow.DataBoundItem, DataRowView)("request_id")))
-                Dim scroll = view.FirstDisplayedScrollingRowIndex
-                Dim sortColumn = If(view.SortedColumn Is Nothing, "", view.SortedColumn.Name)
-                Dim sortDirection = If(view.SortOrder = SortOrder.Descending, ListSortDirection.Descending, ListSortDirection.Ascending)
-                view.DataSource = snapshot.Rows
-                If sortColumn <> "" Then view.Sort(view.Columns(sortColumn), sortDirection)
-                Dim selected = view.Rows.Cast(Of DataGridViewRow).FirstOrDefault(Function(row) CInt(DirectCast(row.DataBoundItem, DataRowView)("request_id")) = selectedId)
-                If selected Is Nothing AndAlso view.Rows.Count > 0 Then selected = view.Rows(0)
-                If selected IsNot Nothing Then
-                    view.CurrentCell = selected.Cells(0) : selected.Selected = True
-                End If
-                If scroll >= 0 AndAlso view.RowCount > 0 Then view.FirstDisplayedScrollingRowIndex = Math.Min(scroll, view.RowCount - 1)
+                rebindingRows = True
+                Try
+                    Dim selectedId = If(view.CurrentRow Is Nothing, 0, CInt(DirectCast(view.CurrentRow.DataBoundItem, DataRowView)("request_id")))
+                    Dim scroll = view.FirstDisplayedScrollingRowIndex
+                    Dim sortColumn = If(view.SortedColumn Is Nothing, "", view.SortedColumn.Name)
+                    Dim sortDirection = If(view.SortOrder = SortOrder.Descending, ListSortDirection.Descending, ListSortDirection.Ascending)
+                    view.DataSource = snapshot.Rows
+                    If sortColumn <> "" Then view.Sort(view.Columns(sortColumn), sortDirection)
+                    Dim selected = view.Rows.Cast(Of DataGridViewRow).FirstOrDefault(Function(row) CInt(DirectCast(row.DataBoundItem, DataRowView)("request_id")) = selectedId)
+                    If selected Is Nothing AndAlso view.Rows.Count > 0 Then selected = view.Rows(0)
+                    If selected IsNot Nothing Then
+                        view.CurrentCell = selected.Cells(0) : selected.Selected = True
+                    End If
+                    If scroll >= 0 AndAlso view.RowCount > 0 Then view.FirstDisplayedScrollingRowIndex = Math.Min(scroll, view.RowCount - 1)
+                Finally
+                    rebindingRows = False
+                End Try
             End If
             initializing = True
             BindCourses(snapshot.Courses)
             initializing = False
-            applied = filter : loadedSuccessfully = True
+            applied = filter : loadedSuccessfully = True : manualLoadFailed = False
             state.Text = snapshot.Rows.Rows.Count & " request(s) • Updated " & Date.Now.ToString("HH:mm:ss") & " • Auto-refresh every 5 seconds."
             FiltersChanged(Me, EventArgs.Empty)
             If changed Then ShowDetails()
         Catch ex As Exception
             If Not IsDisposed AndAlso current = revision Then
                 loadedSuccessfully = False
+                If Not automatic Then manualLoadFailed = True
                 state.Text = "Could not load requests: " & ex.Message
                 state.ForeColor = Color.DarkRed : retry.Visible = True
             End If
