@@ -75,3 +75,14 @@ Admin account controls:
 - Login: focus the username field and press Enter; repeat from the password field. Both must use the same login path as the Log in button, including validation and role selection.
 
 Backend tests cover unauthorized status/employment/deletion calls, bidirectional badge mutations, persistent employment values, linked-account deletion protection, real deletion of unlinked student/professor records, repeat deletion, and retained admin audit entries. Windows interaction checks remain manual.
+
+Fast professor score entry (Windows only): build `dotnet build validation/professor-score-entry.vbproj`. Place a `dbconfig.json` pointing to a disposable seeded database beside `validation/bin/Debug/net8.0-windows/professor-score-entry.dll`, then run `dotnet validation/bin/Debug/net8.0-windows/professor-score-entry.dll`. The runner requires a class with at least two enrolled students, creates an isolated assessment, and checks Enter submission, correct student persistence, success-only advancement, retained class/assessment selection, cleared input focus, repeated Enter on an empty box, last-student completion without wrapping, and same-class refresh preservation. It must run on Windows; Linux cross-building does not execute these interaction checks.
+
+Manually check the Record Scores page:
+
+- Select a class, an assessment, and a student. Enter a valid score and press Enter. Verify the score is saved for that student, the next dropdown entry is selected, and the caret remains in the empty Score box. Repeat using Submit and Recalculate.
+- Verify normal successes show inline feedback without a popup. Hold/repeat Enter after a save with the Score box empty: no extra save, popup or advancement should occur.
+- Submit nonnumeric, negative, out-of-range and nonfinite values. Dismiss the warning; the same student/class/assessment and entered text must remain, with focus in Score for correction.
+- Temporarily disconnect the database or deactivate the professor account and submit. A failed save must not advance or clear the entry. Reconnect/reactivate before further testing.
+- Save for the last student. The dropdown must stay on that student and the feedback must read All students completed; the empty Score box remains focused. The professor may manually select another student or assessment afterward.
+- Switch away and back to the professor window, and dismiss a validation warning, while positioned midway through the roster. A same-class refresh must preserve the student and assessment rather than reset to the first entries.

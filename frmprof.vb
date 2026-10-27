@@ -8,6 +8,9 @@ Public Class frmprof
     Private ReadOnly _auditService As New AuditService()
 
     Private _currentTeacherId As String = "TCH001"
+    Private savingScore As Boolean
+    Private ReadOnly scoreFeedback As New Label With {.AutoSize = False, .ForeColor = Color.DarkGreen, .TextAlign = ContentAlignment.TopLeft}
+
 
     ' Maps each tab button to the panel it should show
     Private ReadOnly pages As New Dictionary(Of Button, Panel)
@@ -750,6 +753,12 @@ Public Class frmprof
             Return
         End If
 
+        ' Keep progress when returning from another window or refreshing the same class.
+        Dim previousStudent = TryCast(ComboBox2.SelectedItem, DataRowView)
+        Dim previousAssessment = TryCast(ComboBox4.SelectedItem, DataRowView)
+        Dim enrollmentId = If(previousStudent Is Nothing, 0, CInt(previousStudent("enrollment_id")))
+        Dim assessmentId = If(previousAssessment Is Nothing, 0, CInt(previousAssessment("assessment_id")))
+
         ' 1. Load enrolled students
         Dim students As DataTable = _gradeService.GetEnrollmentsByClass(classId, _currentTeacherId)
         If students IsNot Nothing Then
@@ -759,6 +768,7 @@ Public Class frmprof
             ComboBox2.DataSource = students
             ComboBox2.DisplayMember = "Display"
             ComboBox2.ValueMember = "enrollment_id"
+            If students.AsEnumerable().Any(Function(row) CInt(row("enrollment_id")) = enrollmentId) Then ComboBox2.SelectedValue = enrollmentId
         Else
             ComboBox2.DataSource = Nothing
         End If
@@ -769,6 +779,7 @@ Public Class frmprof
             ComboBox4.DataSource = assessments
             ComboBox4.DisplayMember = "title"
             ComboBox4.ValueMember = "assessment_id"
+            If assessments.AsEnumerable().Any(Function(row) CInt(row("assessment_id")) = assessmentId) Then ComboBox4.SelectedValue = assessmentId
         Else
             ComboBox4.DataSource = Nothing
         End If
@@ -817,6 +828,7 @@ Public Class frmprof
     End Sub
 
     Private Sub ComboBox2_SelectedIndexChanged(sender As Object, e As EventArgs) Handles ComboBox2.SelectedIndexChanged
+        If Not savingScore Then scoreFeedback.Text = ""
         UpdateSelectedStudentDisplay()
     End Sub
 
@@ -951,31 +963,78 @@ Public Class frmprof
     End Sub
 
     Private Sub CustomButton5_Click(sender As Object, e As EventArgs) Handles CustomButton5.Click
-        Dim stu As DataRowView = TryCast(ComboBox2.SelectedItem, DataRowView)
-        Dim asm As DataRowView = TryCast(ComboBox4.SelectedItem, DataRowView)
-        If stu Is Nothing OrElse asm Is Nothing Then
-            MessageBox.Show("Select a student and an assessment.", "Missing info", MessageBoxButtons.OK, MessageBoxIcon.Warning)
-            Return
-        End If
+        SubmitRecordedScore()
+    End Sub
 
-        Dim score As Double
-        If Not Double.TryParse(TextBox1.Text.Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, score) Then
-            MessageBox.Show("Enter a valid numeric score.", "Invalid score", MessageBoxButtons.OK, MessageBoxIcon.Warning)
-            TextBox1.Focus()
-            Return
-        End If
+    Private Sub ScoreBox_KeyDown(sender As Object, e As KeyEventArgs) Handles TextBox1.KeyDown
+        If e.KeyCode <> Keys.Enter OrElse e.Modifiers <> Keys.None Then Return
+        e.Handled = True
+        e.SuppressKeyPress = True
+        ' Ignore a repeated Enter after the previous score has cleared.
+        If Not String.IsNullOrWhiteSpace(TextBox1.Text) Then SubmitRecordedScore()
+    End Sub
 
-        Dim res As OperationResult = _gradeService.RecordScore(
-            Convert.ToInt32(stu("enrollment_id")), Convert.ToInt32(asm("assessment_id")),
-            score, _currentTeacherId, "Recorded via Record Scores page")
-
-        If res.Success Then
-            MessageBox.Show(res.Message, "Saved", MessageBoxButtons.OK, MessageBoxIcon.Information)
+    Private Sub SubmitRecordedScore()
+        If savingScore Then Return
+        savingScore = True
+        CustomButton5.Enabled = False
+        Dim scoreSaved As Boolean = False
+        Try
+            Dim student = TryCast(ComboBox2.SelectedItem, DataRowView)
+            Dim assessment = TryCast(ComboBox4.SelectedItem, DataRowView)
+            If student Is Nothing OrElse assessment Is Nothing Then
+                ShowScoreError("Select a student and an assessment.")
+                Return
+            End If
+            Dim score As Double
+            If Not Double.TryParse(TextBox1.Text.Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, score) OrElse Not Double.IsFinite(score) Then
+                ShowScoreError("Enter a valid numeric score.")
+                Return
+            End If
+            Dim index = ComboBox2.SelectedIndex
+            Dim studentName = student("full_name").ToString()
+            Dim result = _gradeService.RecordScore(CInt(student("enrollment_id")), CInt(assessment("assessment_id")), score, _currentTeacherId, "Recorded via Record Scores page")
+            If Not result.Success Then
+                ShowScoreError(result.Message)
+                Return
+            End If
+            scoreSaved = True
+            ' Advance only after the transaction succeeds; keep the class and assessment.
             TextBox1.Clear()
-            UpdateSelectedStudentDisplay()
-        Else
-            MessageBox.Show(res.Message, "Could not save", MessageBoxButtons.OK, MessageBoxIcon.Error)
-        End If
+            If index < ComboBox2.Items.Count - 1 Then
+                ComboBox2.SelectedIndex = index + 1
+                scoreFeedback.Text = "Saved for " & studentName & ". Ready for the next student."
+            Else
+                scoreFeedback.Text = "Saved for " & studentName & ". All students completed for this assessment."
+                UpdateSelectedStudentDisplay()
+            End If
+            scoreFeedback.ForeColor = Color.DarkGreen
+        Catch ex As Exception
+            If scoreSaved Then
+                scoreFeedback.Text = "Score saved, but the student display could not refresh: " & ex.Message
+                scoreFeedback.ForeColor = Color.DarkRed
+            Else
+                ShowScoreError("Could not save the score: " & ex.Message)
+            End If
+        Finally
+            CustomButton5.Enabled = True
+            If Not IsDisposed AndAlso Not Disposing Then
+                TextBox1.Focus()
+                TextBox1.SelectionStart = TextBox1.TextLength
+                TextBox1.SelectionLength = 0
+            End If
+            savingScore = False
+        End Try
+    End Sub
+
+    Private Sub ScoreAssessmentChanged(sender As Object, e As EventArgs) Handles ComboBox4.SelectedIndexChanged
+        If Not savingScore Then scoreFeedback.Text = ""
+    End Sub
+
+    Private Sub ShowScoreError(message As String)
+        scoreFeedback.Text = message
+        scoreFeedback.ForeColor = Color.DarkRed
+        MessageBox.Show(Me, message, "Score not saved", MessageBoxButtons.OK, MessageBoxIcon.Warning)
     End Sub
 
     Private Sub CustomButton6_Click(sender As Object, e As EventArgs) Handles CustomButton6.Click
@@ -1075,7 +1134,7 @@ Public Class frmprof
         dgvRequests.EditMode = DataGridViewEditMode.EditProgrammatically
         dgvRequests.Columns("Action").HeaderText = "Review / Approve"
         AddHandler Me.Activated, Sub(sender, args)
-                                    If Not isLoading Then
+                                    If Not isLoading AndAlso Not savingScore Then
                                         ComboBox1_SelectedIndexChanged(Nothing, EventArgs.Empty)
                                     End If
                                 End Sub
@@ -1087,6 +1146,9 @@ Public Class frmprof
             control.SetBounds(14, y, Math.Max(150, control.Parent.ClientSize.Width - 28), If(TypeOf control Is Label, 22, 30))
             y += control.Height + 5
         Next
+        scoreFeedback.SetBounds(14, y + 2, Math.Max(150, RoundedPanel11.ClientSize.Width - 28), 48)
+        scoreFeedback.Anchor = AnchorStyles.Top Or AnchorStyles.Left Or AnchorStyles.Right
+        RoundedPanel11.Controls.Add(scoreFeedback)
         pnlRecordScores.BackColor = Color.White
         pnlRecordScores.AutoScroll = True
         TableLayoutPanel1.Dock = DockStyle.Top
