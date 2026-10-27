@@ -261,7 +261,7 @@ Public Class UserService
     End Function
 
     ' =========================================================
-    '  DEACTIVATE / REACTIVATE (never delete)
+    '  DEACTIVATE / REACTIVATE
     ' =========================================================
 
     Public Function SetUserStatus(userRole As String, userId As String, newStatus As String, adminId As String) As Boolean
@@ -299,6 +299,83 @@ Public Class UserService
 
         Return WriteWithAudit(sql, params, adminId, If(status = "Active", "Reactivated account", "Deactivated account"), entity, userId,
                               entity & " " & userId & " is now " & status, entity)
+    End Function
+
+    Public Function ToggleAccountStatus(role As String, id As String, adminId As String) As OperationResult
+        Return ToggleAccountField(role, id, adminId, "status")
+    End Function
+
+    Public Function ToggleTeacherEmploymentType(id As String, adminId As String) As OperationResult
+        Return ToggleAccountField("Teacher", id, adminId, "employment_type")
+    End Function
+
+    Private Function ToggleAccountField(role As String, id As String, adminId As String, field As String) As OperationResult
+        If role <> "Teacher" AndAlso role <> "Student" Then Return OperationResult.Fail("Unknown account role.")
+        Dim table = If(role = "Teacher", "teacher", "student")
+        Dim key = If(role = "Teacher", "teacher_id", "student_id")
+        Try
+            Using conn = DatabaseHelper.GetConnection()
+                Using tx = conn.BeginTransaction()
+                    If Not AccountAccess.IsActive(conn, tx, "Admin", adminId) Then Return OperationResult.Fail("Administrator access is required.")
+                    Dim oldValue As String
+                    Using cmd As New MySqlCommand("SELECT " & field & " FROM " & table & " WHERE " & key & "=@Id FOR UPDATE", conn, tx)
+                        cmd.Parameters.AddWithValue("@Id", id)
+                        Dim value = cmd.ExecuteScalar()
+                        If value Is Nothing Then Return OperationResult.Fail("Account no longer exists.")
+                        oldValue = Convert.ToString(value)
+                    End Using
+                    Dim newValue = If(field = "status", If(oldValue = "Active", "Inactive", "Active"), If(oldValue = "Full-time", "Part-time", "Full-time"))
+                    Using cmd As New MySqlCommand("UPDATE " & table & " SET " & field & "=@Value WHERE " & key & "=@Id", conn, tx)
+                        cmd.Parameters.AddWithValue("@Id", id)
+                        cmd.Parameters.AddWithValue("@Value", newValue)
+                        cmd.ExecuteNonQuery()
+                    End Using
+                    AuditService.LogActionTx(conn, tx, "Admin", adminId, If(field = "status", "Changed account status", "Changed employment type"), role, id, oldValue, newValue)
+                    tx.Commit()
+                    Return OperationResult.Ok("Account updated to " & newValue & ".")
+                End Using
+            End Using
+        Catch ex As Exception
+            Return OperationResult.Fail("Account was not updated: " & ex.Message)
+        End Try
+    End Function
+
+    Public Function DeleteUser(role As String, id As String, adminId As String) As OperationResult
+        If role <> "Teacher" AndAlso role <> "Student" Then Return OperationResult.Fail("Only student and professor accounts can be deleted here.")
+        Dim table = If(role = "Teacher", "teacher", "student")
+        Dim key = If(role = "Teacher", "teacher_id", "student_id")
+        Try
+            Using conn = DatabaseHelper.GetConnection()
+                Using tx = conn.BeginTransaction()
+                    If Not AccountAccess.IsActive(conn, tx, "Admin", adminId) Then Return OperationResult.Fail("Administrator access is required.")
+                    Dim name As String
+                    Using cmd As New MySqlCommand("SELECT full_name FROM " & table & " WHERE " & key & "=@Id FOR UPDATE", conn, tx)
+                        cmd.Parameters.AddWithValue("@Id", id)
+                        Dim value = cmd.ExecuteScalar()
+                        If value Is Nothing Then Return OperationResult.Fail("Account no longer exists.")
+                        name = Convert.ToString(value)
+                    End Using
+                    Dim relatedSql = If(role = "Teacher",
+                        "SELECT (SELECT COUNT(*) FROM class WHERE teacher_id=@Id)+(SELECT COUNT(*) FROM auditlog WHERE teacher_id=@Id)+(SELECT COUNT(*) FROM revisionrequest WHERE reviewed_by=@Id)",
+                        "SELECT (SELECT COUNT(*) FROM enrollment WHERE student_id=@Id)+(SELECT COUNT(*) FROM auditlog WHERE student_id=@Id)")
+                    Using cmd As New MySqlCommand(relatedSql, conn, tx)
+                        cmd.Parameters.AddWithValue("@Id", id)
+                        If CLng(cmd.ExecuteScalar()) > 0 Then Return OperationResult.Fail("This account has linked classes, enrollments, reviews, or audit history and cannot be deleted. Use the status badge to mark it Inactive instead; existing records will be preserved.")
+                    End Using
+                    Using cmd As New MySqlCommand("DELETE FROM " & table & " WHERE " & key & "=@Id", conn, tx)
+                        cmd.Parameters.AddWithValue("@Id", id)
+                        If cmd.ExecuteNonQuery() <> 1 Then Return OperationResult.Fail("Account was not deleted.")
+                    End Using
+                    AuditService.LogActionTx(conn, tx, "Admin", adminId, "Deleted account", role, id, name, Nothing, "Permanently deleted " & role & " account " & id)
+                    tx.Commit()
+                    Return OperationResult.Ok("Account permanently deleted.")
+                End Using
+            End Using
+        Catch ex As MySqlException When ex.Number = 1451
+            Return OperationResult.Fail("This account is referenced by other records and cannot be deleted. Use the status badge to mark it Inactive instead.")
+        Catch ex As Exception
+            Return OperationResult.Fail("Account was not deleted: " & ex.Message)
+        End Try
     End Function
 
     ' =========================================================

@@ -228,6 +228,7 @@ Public Class Admin
             dgvProf.Rows.Add(False, p.Name, p.EmployeeID, p.Department, p.Classes & " classes", p.EmploymentType, p.Status, "")
         Next
         lblTotalProf.Text = "Total Professors: " & filteredProfs.Count
+        SetAccountTooltips(dgvProf)
         dgvProf.ClearSelection()
         BuildProfPager()
     End Sub
@@ -321,7 +322,7 @@ Public Class Admin
     End Function
 
     Private Sub dgvProf_CellPainting(sender As Object, e As DataGridViewCellPaintingEventArgs) Handles dgvProf.CellPainting
-        If e.RowIndex < 0 Then Return
+        If e.RowIndex < 0 OrElse e.ColumnIndex < 0 Then Return
         Dim col As String = dgvProf.Columns(e.ColumnIndex).Name
         If col <> "colStatus" AndAlso col <> "colActions" AndAlso col <> "colType" Then Return
 
@@ -359,129 +360,86 @@ Public Class Admin
         "Edit"
     )
 
-            Dim professorStatus As String =
-        Convert.ToString(dgvProf.Rows(e.RowIndex).Cells("colStatus").Value)
-
-            If String.Equals(professorStatus, "Active",
-                     StringComparison.OrdinalIgnoreCase) Then
-
-                DrawPill(
-            e.Graphics, rects(1),
-            Color.FromArgb(250, 190, 190),
-            Color.FromArgb(180, 0, 0),
-            "Disable"
-        )
-
-            Else
-
-                DrawPill(
-            e.Graphics, rects(1),
-            Color.FromArgb(198, 240, 214),
-            Color.FromArgb(0, 100, 0),
-            "Enable"
-        )
-
-            End If
+            DrawPill(e.Graphics, rects(1), Color.FromArgb(250, 190, 190), Color.FromArgb(180, 0, 0), "Delete")
         End If
 
         e.Handled = True
     End Sub
 
-    Private Sub dgvProf_CellMouseClick(sender As Object, e As DataGridViewCellMouseEventArgs) Handles dgvProf.CellMouseClick
-        If e.RowIndex < 0 Then Return
-        If dgvProf.Columns(e.ColumnIndex).Name <> "colActions" Then Return
-
-        Dim size = dgvProf.GetCellDisplayRectangle(e.ColumnIndex, e.RowIndex, False).Size
-        Dim rects = ActionRects(New Rectangle(0, 0, size.Width, size.Height))
-        Dim empId As String = dgvProf.Rows(e.RowIndex).Cells("colEmpId").Value.ToString()
-
-        If rects(0).Contains(e.Location) Then
-            If Not AppSession.IsAdmin Then
-                MessageBox.Show(
-                    "Administrator access is required.",
-                    "Access Denied",
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Warning
-                )
-                Return
-            End If
-
-            Using dlg As New frmUserEditor(frmUserEditor.UserKind.Teacher, empId)
-
-                If dlg.ShowDialog(Me) = DialogResult.OK Then
-
-                    ' Reload professor records from MySQL.
-                    LoadProfsFromDb()
-
-                    ' Reapply search and department filters.
-                    ApplyProfFilter()
-
-                    ' Refresh Dashboard statistics and updates.
-                    LoadDashboard()
-                End If
-            End Using
-
-        ElseIf rects(1).Contains(e.Location) Then
-
-            If Not AppSession.IsAdmin Then
-                MessageBox.Show("Administrator access is required.")
-                Return
-            End If
-
-            Dim professorStatus As String =
-                Convert.ToString(dgvProf.Rows(e.RowIndex).Cells("colStatus").Value)
-
-            Dim isActive As Boolean =
-                String.Equals(professorStatus, "Active",
-                              StringComparison.OrdinalIgnoreCase)
-
-            Dim newStatus As String = If(isActive, "Inactive", "Active")
-            Dim actionText As String = If(isActive, "Disable", "Enable")
-
-            Dim confirmation As DialogResult =
-                MessageBox.Show(
-                    actionText & " professor " & empId & "?" & vbCrLf &
-                    If(isActive,
-                       "They will no longer be able to log in.",
-                       "They will be able to log in again."),
-                    "Confirm Account Status",
-                    MessageBoxButtons.YesNo,
-                    MessageBoxIcon.Question
-                )
-
-            If confirmation <> DialogResult.Yes Then Return
-
-            Dim result As OperationResult =
-                _userService.SetUserStatusResult(
-                    "Teacher",
-                    empId,
-                    newStatus,
-                    AppSession.CurrentUser.UserId
-                )
-
-            If result.Success Then
-
-                MessageBox.Show(
-                    "Professor account is now " & newStatus & ".",
-                    "Account Updated",
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Information
-                )
-
-                LoadProfsFromDb()
-                LoadDashboard()
-
-            Else
-
-                MessageBox.Show(
-                    result.Message,
-                    "Account Update Failed",
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Warning
-                )
-
-            End If
+    Private Sub HandleAccountClick(grid As DataGridView, idColumn As String, role As String, e As DataGridViewCellMouseEventArgs)
+        If e.RowIndex < 0 OrElse e.ColumnIndex < 0 OrElse e.Button <> MouseButtons.Left Then Return
+        If Not AppSession.IsAdmin Then
+            MessageBox.Show("Administrator access is required.")
+            Return
         End If
+        Dim column = grid.Columns(e.ColumnIndex).Name
+        Dim id = Convert.ToString(grid.Rows(e.RowIndex).Cells(idColumn).Value)
+        Dim bounds = grid.GetCellDisplayRectangle(e.ColumnIndex, e.RowIndex, False)
+        Dim size = bounds.Size
+        Dim result As OperationResult = Nothing
+        If column = "colStatus" OrElse (column = "colType" AndAlso role = "Teacher") Then
+            Dim width = If(column = "colStatus", 80, 90)
+            Dim pill As New Rectangle((size.Width - width) \ 2, (size.Height - 24) \ 2, width, 24)
+            If Not pill.Contains(e.Location) Then Return
+            result = If(column = "colStatus", _userService.ToggleAccountStatus(role, id, AppSession.CurrentUser.UserId), _userService.ToggleTeacherEmploymentType(id, AppSession.CurrentUser.UserId))
+        ElseIf column = "colActions" Then
+            Dim rects = ActionRects(New Rectangle(Point.Empty, size))
+            If rects(0).Contains(e.Location) Then
+                Using editor As New frmUserEditor(If(role = "Teacher", frmUserEditor.UserKind.Teacher, frmUserEditor.UserKind.Student), id)
+                    If editor.ShowDialog(Me) <> DialogResult.OK Then Return
+                End Using
+            ElseIf rects(1).Contains(e.Location) Then
+                If MessageBox.Show(Me, "Permanently delete " & role.ToLowerInvariant() & " account " & id & "? This cannot be undone." & vbCrLf & "Accounts with linked records cannot be deleted.", "Confirm account deletion", MessageBoxButtons.YesNo, MessageBoxIcon.Warning, MessageBoxDefaultButton.Button2) <> DialogResult.Yes Then Return
+                result = _userService.DeleteUser(role, id, AppSession.CurrentUser.UserId)
+            Else
+                Return
+            End If
+        Else
+            Return
+        End If
+        If result IsNot Nothing AndAlso Not result.Success Then
+            MessageBox.Show(Me, result.Message, "Account not changed", MessageBoxButtons.OK, MessageBoxIcon.Warning)
+            Return
+        End If
+        Dim oldPage = If(role = "Teacher", profPage, studentPage)
+        If role = "Teacher" Then
+            LoadProfsFromDb()
+            profPage = Math.Min(oldPage, Math.Max(1, CInt(Math.Ceiling(filteredProfs.Count / CDbl(ProfPageSize)))))
+            ShowProfPage()
+        Else
+            LoadStudentsFromDb()
+            studentPage = Math.Min(oldPage, Math.Max(1, CInt(Math.Ceiling(filteredStudents.Count / CDbl(StudentPageSize)))))
+            ShowStudentPage()
+        End If
+        LoadDashboard()
+    End Sub
+
+    Private Sub SetAccountTooltips(grid As DataGridView)
+        For Each row As DataGridViewRow In grid.Rows
+            row.Cells("colStatus").ToolTipText = "Click to switch Active / Inactive."
+            row.Cells("colActions").ToolTipText = "Edit account details or permanently delete an unlinked account."
+            If grid.Columns.Contains("colType") Then row.Cells("colType").ToolTipText = "Click to switch Full-time / Part-time."
+        Next
+    End Sub
+
+    Private Sub AccountCellToolTip(sender As Object, e As DataGridViewCellToolTipTextNeededEventArgs) Handles dgvProf.CellToolTipTextNeeded, dgvstudents.CellToolTipTextNeeded
+        If e.RowIndex < 0 OrElse e.ColumnIndex < 0 Then Return
+        Dim grid = DirectCast(sender, DataGridView)
+        Select Case grid.Columns(e.ColumnIndex).Name
+            Case "colStatus" : e.ToolTipText = "Click the badge to switch Active / Inactive."
+            Case "colType" : e.ToolTipText = "Click the badge to switch Full-time / Part-time."
+            Case "colActions" : e.ToolTipText = "Edit account details or permanently delete an unlinked account."
+        End Select
+    End Sub
+
+    Private Sub AccountCellHover(sender As Object, e As DataGridViewCellMouseEventArgs) Handles dgvProf.CellMouseMove, dgvstudents.CellMouseMove
+        Dim grid = DirectCast(sender, DataGridView)
+        Dim interactive = e.RowIndex >= 0 AndAlso e.ColumnIndex >= 0 AndAlso {"colStatus", "colType", "colActions"}.Contains(grid.Columns(e.ColumnIndex).Name)
+        grid.Cursor = If(interactive, Cursors.Hand, Cursors.Default)
+    End Sub
+
+    Private Sub dgvProf_CellMouseClick(sender As Object, e As DataGridViewCellMouseEventArgs) Handles dgvProf.CellMouseClick
+        HandleAccountClick(dgvProf, "colEmpId", "Teacher", e)
     End Sub
     Private Sub btnAddProf_Click(
     sender As Object,
@@ -669,6 +627,7 @@ Public Class Admin
                                  s.Section, s.Program, s.Status, "")
         Next
         lbltotalstudents.Text = "Total Students: " & filteredStudents.Count
+        SetAccountTooltips(dgvstudents)
         dgvstudents.ClearSelection()
         BuildStudentPager()
     End Sub
@@ -768,7 +727,7 @@ Public Class Admin
 
 
     Private Sub dgvStudents_CellPainting(sender As Object, e As DataGridViewCellPaintingEventArgs) Handles dgvstudents.CellPainting
-        If e.RowIndex < 0 Then Return
+        If e.RowIndex < 0 OrElse e.ColumnIndex < 0 Then Return
         Dim col As String = dgvstudents.Columns(e.ColumnIndex).Name
         If col <> "colStatus" AndAlso col <> "colActions" Then Return
 
@@ -795,119 +754,14 @@ Public Class Admin
                 "Edit"
             )
 
-            Dim studentStatus As String =
-                Convert.ToString(dgvstudents.Rows(e.RowIndex).Cells("colStatus").Value)
-
-
-            If String.Equals(studentStatus, "Active", StringComparison.OrdinalIgnoreCase) Then
-
-                DrawPill(
-                    e.Graphics, rects(1),
-                    Color.FromArgb(250, 190, 190),
-                    Color.FromArgb(180, 0, 0),
-                    "Disable"
-                )
-
-            Else
-
-                DrawPill(
-                    e.Graphics, rects(1),
-                    Color.FromArgb(198, 240, 214),
-                    Color.FromArgb(0, 100, 0),
-                    "Enable"
-                )
-
-            End If
-
-
+            DrawPill(e.Graphics, rects(1), Color.FromArgb(250, 190, 190), Color.FromArgb(180, 0, 0), "Delete")
         End If
 
         e.Handled = True
     End Sub
 
     Private Sub dgvStudents_CellMouseClick(sender As Object, e As DataGridViewCellMouseEventArgs) Handles dgvstudents.CellMouseClick
-        If e.RowIndex < 0 Then Return
-        If dgvstudents.Columns(e.ColumnIndex).Name <> "colActions" Then Return
-
-        Dim size = dgvstudents.GetCellDisplayRectangle(e.ColumnIndex, e.RowIndex, False).Size
-        Dim rects = ActionRects(New Rectangle(0, 0, size.Width, size.Height))
-        Dim id As String = dgvstudents.Rows(e.RowIndex).Cells("colStudentId").Value.ToString()
-
-        If rects(0).Contains(e.Location) Then
-            Using dlg As New frmUserEditor(frmUserEditor.UserKind.Student, id)
-
-                If dlg.ShowDialog(Me) = DialogResult.OK Then
-
-                    ' Refresh student records after editing.
-                    LoadStudentsFromDb()
-                    ApplyStudentFilter()
-
-                    ' Refresh dashboard statistics and updates.
-                    LoadDashboard()
-
-                End If
-
-            End Using
-        ElseIf rects(1).Contains(e.Location) Then
-            If Not AppSession.IsAdmin Then
-                MessageBox.Show("Administrator access is required.")
-                Return
-            End If
-
-            Dim studentStatus As String =
-                Convert.ToString(dgvstudents.Rows(e.RowIndex).Cells("colStatus").Value)
-
-            Dim isActive As Boolean =
-                String.Equals(studentStatus, "Active", StringComparison.OrdinalIgnoreCase)
-
-            Dim newStatus As String = If(isActive, "Inactive", "Active")
-            Dim actionText As String = If(isActive, "Deactivate", "Activate")
-
-            Dim confirmation As DialogResult =
-                MessageBox.Show(
-                    actionText & " student " & id & "?" & vbCrLf &
-                    If(isActive,
-                       "They will no longer be able to log in.",
-                       "They will be able to log in again."),
-                    "Confirm Account Status",
-                    MessageBoxButtons.YesNo,
-                    MessageBoxIcon.Question
-                )
-
-            If confirmation <> DialogResult.Yes Then Return
-
-            Dim result As OperationResult =
-                _userService.SetUserStatusResult(
-                    "Student",
-                    id,
-                    newStatus,
-                    AppSession.CurrentUser.UserId
-                )
-
-            If result.Success Then
-
-                MessageBox.Show(
-                    "Student account is now " & newStatus & ".",
-                    "Account Updated",
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Information
-                )
-
-                LoadStudentsFromDb()
-                ApplyStudentFilter()
-                LoadDashboard()
-
-            Else
-
-                MessageBox.Show(
-                    result.Message,
-                    "Account Update Failed",
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Warning
-                )
-
-            End If
-        End If
+        HandleAccountClick(dgvstudents, "colStudentId", "Student", e)
     End Sub
 
     Private Sub Label5_Click(sender As Object, e As EventArgs) Handles lbltotalstudents.Click

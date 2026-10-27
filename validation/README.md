@@ -6,7 +6,7 @@ Run only against a disposable database populated with the supplied grading-syste
 2. Place `dbconfig.json` next to the generated `validation/bin/Debug/net8.0/professor-services.dll`, using DatabaseHelper's Host, Port, Database, User and Password fields. Do not commit credentials.
 3. Run: `dotnet validation/bin/Debug/net8.0/professor-services.dll`.
 
-Fifty-eight checks exercise CSV import validation, request approval/status transitions, re-check score overrides, duplicate approval protection, and assessment ownership, term validation, assessment creation, score saving, range validation, rejected clearing, persisted values, grade-sheet columns and audit queries. The harness compiles the actual grading services for Linux without loading Windows Forms. Its session stub is used only by the test executable.
+Eighty-two checks exercise CSV import validation, request approval/status transitions, re-check score overrides, duplicate approval protection, and assessment ownership, term validation, assessment creation, score saving, range validation, rejected clearing, persisted values, grade-sheet columns and audit queries. The harness compiles the actual grading services for Linux without loading Windows Forms. Its session stub is used only by the test executable.
 
 Windows manual checks: switch between sections of the same course; confirm assessment titles and maximum scores match each section; edit and paste scores, reopen and verify persistence; enroll an existing student; create a weighted Midterm/Finals assessment; approve an Under Review request; inspect audit timestamps and exported class headers. Gradebook inputs now represent persisted assessment scores, and summaries use the shared weighted calculator. The old attendance/bonus/project/exam worksheet-only inputs are hidden to avoid conflicting grades. Removing a saved grade or changing an existing assessment maximum is explicitly blocked on this screen rather than silently changing only the display.
 
@@ -63,3 +63,15 @@ Full audit fixes (Windows checks):
 - Test role-specific login with a shared email/password and leading/trailing password spaces. Deactivate an account while it is logged in and verify grade, request, enrollment and password writes are rejected.
 
 The backend suite exercises grade precision/weights, history entity isolation, deactivation, role collision, whitespace-preserving authentication, persistent/idempotent roster imports, and fresh dashboard counts. UI navigation, display scaling and Windows printer behavior still require the manual checks above.
+
+
+Admin account controls:
+
+- Manage Students/Professors: verify Edit remains available and Delete is always labeled Delete for both active and inactive accounts. Cancel the deletion confirmation and confirm no account changes; confirming deletion of a new unlinked account must remove its database row and add an admin audit entry.
+- Try deleting accounts with enrollments, assigned classes, reviewer links, or actor audit history. Deletion must be blocked with an explanation; linked grades/classes/audits must remain untouched. Use the status badge to deactivate these accounts instead.
+- Click the status badge to switch Active → Inactive → Active on both pages. Check the pill colors, database state and login behavior. No action should fire from a header, right click or empty cell padding.
+- Click Full-time/Part-time in Manage Professors twice and verify both changes persist and appear in the audit log.
+- Test these actions on a later pagination page and with filters active. The current page should remain selected when possible and clamp to the last remaining page after deletion.
+- Login: focus the username field and press Enter; repeat from the password field. Both must use the same login path as the Log in button, including validation and role selection.
+
+Backend tests cover unauthorized status/employment/deletion calls, bidirectional badge mutations, persistent employment values, linked-account deletion protection, real deletion of unlinked student/professor records, repeat deletion, and retained admin audit entries. Windows interaction checks remain manual.

@@ -8,6 +8,7 @@ Public Class frmlogin
     Private ReadOnly authService As New AuthService()
 
     Private Sub frmLogin_Load(sender As Object, e As EventArgs) Handles MyBase.Load
+        Me.AcceptButton = Button1
         ' Mask password characters in TextBox1
         TextBox1.UseSystemPasswordChar = True
 
