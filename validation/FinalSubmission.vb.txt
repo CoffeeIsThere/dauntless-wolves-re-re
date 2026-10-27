@@ -1,0 +1,113 @@
+Imports System.Data
+Imports System.Drawing
+Imports System.Drawing.Printing
+Imports System.Reflection
+Imports System.Windows.Forms
+Imports DAUNTLESS_WOLVES_PROF
+Imports DAUNTLESS_WOLVES_PROF.Models
+Imports MySql.Data.MySqlClient
+
+' Windows-only checks; use a disposable database. Does not send anything to a printer.
+Module Program
+    Private Const Flags As BindingFlags = BindingFlags.Instance Or BindingFlags.NonPublic
+    <STAThread>
+    Sub Main()
+        Application.EnableVisualStyles()
+        Dim fixture = DatabaseHelper.ExecuteQuery("SELECT c.class_id,c.teacher_id,e.enrollment_id,e.student_id FROM class c JOIN enrollment e ON e.class_id=c.class_id ORDER BY c.class_id LIMIT 1").Rows(0)
+        Dim teacher = CStr(fixture("teacher_id")), student = CStr(fixture("student_id"))
+        Dim classId = CInt(fixture("class_id")), enrollment = CInt(fixture("enrollment_id"))
+        Dim grades As New GradeService()
+        Dim revision As New RevisionRequestService()
+        Dim title = "Final UI " & Guid.NewGuid().ToString("N").Substring(0, 8)
+        Check(grades.CreateAssessment(classId, title, "Quiz", 20, "Midterm", teacher).Success, "create student refresh fixture")
+        Dim assessment = CInt(DatabaseHelper.ExecuteScalar("SELECT MAX(assessment_id) FROM assessment WHERE class_id=" & classId))
+        Check(grades.RecordScore(enrollment, assessment, 5, teacher).Success, "record initial fixture score")
+        Dim grade = CInt(DatabaseHelper.ExecuteScalar("SELECT grade_id FROM studentgrade WHERE enrollment_id=" & enrollment & " AND assessment_id=" & assessment))
+        Check(revision.SubmitRequestResult(New RevisionRequest With {.GradeId = grade, .Reason = "Please recheck"}, student).Success, "submit fixture revision")
+        Dim requestId = CInt(DatabaseHelper.ExecuteScalar("SELECT MAX(request_id) FROM revisionrequest WHERE grade_id=" & grade))
+        AppSession.StartSession(New UserModel(student, "Student tester", "", "Student"))
+        Using form As New frmStudent()
+            form.Show() : Application.DoEvents()
+            Find(Of Button)(form, "btnRequestRevision").PerformClick()
+            Find(Of ComboBox)(form, "cboclass").SelectedValue = enrollment
+            Dim grid = Find(Of DataGridView)(form, "dgvRequests")
+            Check(grid.Columns.Contains("Course"), "student requests identify the course")
+            Check(revision.ApproveAndApplyRevision(requestId, teacher, 10, "Final review response").Success, "another session approves the request")
+            GetType(frmStudent).GetMethod("RefreshStudentData", Flags).Invoke(form, Nothing)
+            Dim row = grid.Rows.Cast(Of DataGridViewRow).Single(Function(item) Convert.ToString(item.Cells("Assessment").Value) = title)
+            Check(Convert.ToString(row.Cells("Status").Value) = "Approved" AndAlso Convert.ToString(row.Tag).Contains("Final review response"), "returning to student window refreshes status and reviewer response")
+            Find(Of Button)(form, "btnMyPerformance").PerformClick()
+            Dim performanceIds = DirectCast(GetType(frmStudent).GetField("performanceClassIds", Flags).GetValue(form), List(Of Integer))
+            Find(Of ComboBox)(form, "cboperfcourse").SelectedIndex = performanceIds.IndexOf(classId)
+            Find(Of ComboBox)(form, "cboperfterm").SelectedItem = "Combined"
+            Check(grades.RecordScore(enrollment, assessment, 15, teacher).Success, "change score after performance page opens")
+            GetType(frmStudent).GetMethod("RefreshStudentData", Flags).Invoke(form, Nothing)
+            Dim expectedAverage = CDbl(grades.GetClassGradeSheet(classId, teacher).Rows.Cast(Of DataRow).Single(Function(item) CStr(item("StudentId")) = student)("RunningGrade"))
+            Dim averageControl = Find(Of Label)(form, "lblAverageValue")
+            Check(averageControl.Parent.Controls.OfType(Of Label).Any(Function(label) label.Text = expectedAverage.ToString("0.##")), "returning to performance refreshes the average from the changed score")
+            Find(Of Button)(form, "btnGradeHistory").PerformClick()
+            Dim oldHistoryCount = Find(Of DataGridView)(form, "dgvHistory").RowCount
+            Check(grades.RecordScore(enrollment, assessment, 16, teacher).Success, "change a score after history opens")
+            GetType(frmStudent).GetMethod("RefreshStudentData", Flags).Invoke(form, Nothing)
+            Check(Find(Of DataGridView)(form, "dgvHistory").RowCount = oldHistoryCount + 1, "returning to history refreshes the latest change")
+            Dim attempts = 0
+            Dim recover As Action = Sub()
+                                        attempts += 1
+                                        If attempts = 1 Then Throw New InvalidOperationException("Simulated disconnected database")
+                                    End Sub
+            Check(Not UiKit.TryLoadData(form, "test connection", recover), "read failure is contained in the form")
+            Check(Find(Of Panel)(form, "pnlDataLoadError").Visible, "read failure shows an inline error")
+            Find(Of Button)(form, "btnRetryDataLoad").PerformClick()
+            Check(attempts = 2 AndAlso Not Find(Of Panel)(form, "pnlDataLoadError").Visible, "Retry reloads successfully and clears the error")
+            form.Close()
+        End Using
+        Dim administrator = DatabaseHelper.ExecuteQuery("SELECT admin_id,full_name FROM admin LIMIT 1").Rows(0)
+        AppSession.StartSession(New UserModel(administrator("admin_id").ToString(), administrator("full_name").ToString(), "", "Admin"))
+        Using dialog As New frmAddClass()
+            dialog.Show() : Application.DoEvents()
+            Find(Of ComboBox)(dialog, "cboOfferingSemester").SelectedItem = "2nd Semester"
+            Find(Of TextBox)(dialog, "txtOfferingYear").Text = "2090-2091"
+            Dim code = "UI" & Guid.NewGuid().ToString("N").Substring(0, 8)
+            Find(Of TextBox)(dialog, "txtCode").Text = code
+            Find(Of TextBox)(dialog, "txtName").Text = "Offering UI test"
+            Find(Of TextBox)(dialog, "txtSection").Text = "TEST"
+            Find(Of ComboBox)(dialog, "cboProfessor").SelectedValue = teacher
+            Find(Of Button)(dialog, "btnsave").PerformClick()
+            Dim saved = DatabaseHelper.ExecuteQuery("SELECT semester,academic_year FROM class WHERE course_code=@Code", New MySqlParameter("@Code", code)).Rows(0)
+            Check(CStr(saved("semester")) = "2nd Semester" AndAlso CStr(saved("academic_year")) = "2090-2091", "Admin Add Class saves the chosen semester and year")
+        End Using
+        CheckReportPagination()
+        AppSession.ClearSession()
+    End Sub
+
+    Private Sub CheckReportPagination()
+        Using grid As New DataGridView With {.AllowUserToAddRows = False}
+            grid.Columns.Add("StudentName", "Student name (Surname, First name, M.I.)")
+            For index = 1 To 12
+                grid.Columns.Add("Assessment" & index, "A long assessment title " & index)
+                grid.Columns(index).Width = 150
+            Next
+            grid.Rows.Add(Enumerable.Repeat(CObj(String.Join(" ", Enumerable.Repeat("Long report text", 120))), 13).ToArray())
+            Using document = New ExportService().CreateGridPrintDocument(grid, "Wrapped report regression"), bitmap As New Bitmap(1200, 1000), canvas = Graphics.FromImage(bitmap)
+                GetType(PrintDocument).GetMethod("OnBeginPrint", Flags).Invoke(document, {New PrintEventArgs()})
+                Dim pages = 0
+                Dim more As Boolean
+                Do
+                    Dim args As New PrintPageEventArgs(canvas, New Rectangle(40, 40, 1000, 850), New Rectangle(0, 0, 1100, 950), document.DefaultPageSettings)
+                    GetType(PrintDocument).GetMethod("OnPrintPage", Flags).Invoke(document, {args})
+                    pages += 1 : more = args.HasMorePages
+                    If pages > 100 Then Throw New Exception("Report pagination did not finish.")
+                Loop While more
+                Check(pages > 2, "wide reports and long cells continue over multiple pages without a printer")
+            End Using
+        End Using
+    End Sub
+
+    Private Function Find(Of T As Control)(form As Form, name As String) As T
+        Return DirectCast(form.Controls.Find(name, True).Single(), T)
+    End Function
+    Private Sub Check(condition As Boolean, message As String)
+        If Not condition Then Throw New Exception("FAIL: " & message)
+        Console.WriteLine("PASS: " & message)
+    End Sub
+End Module

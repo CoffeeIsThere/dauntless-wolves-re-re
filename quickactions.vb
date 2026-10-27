@@ -1,9 +1,10 @@
-﻿Imports System.Data
+Imports System.Data
 Imports MySql.Data.MySqlClient
 Imports System.Drawing
 Imports System.Drawing.Printing
 
 Public Class quickactions
+    Public Property OnlyOpenRequests As Boolean
 
     Public Enum FormMode
         EnterGrades
@@ -104,6 +105,10 @@ Public Class quickactions
     ' 1. LIVE REVISION REQUESTS (MariaDB)
     ' ==========================================
     Private Sub LoadLiveRequests()
+        UiKit.TryLoadData(Me, "LiveRequests", AddressOf LoadLiveRequestsCore)
+    End Sub
+
+    Private Sub LoadLiveRequestsCore()
         Dim dgvRequests = FindControl(Of DataGridView)("dgvRequests")
         If dgvRequests Is Nothing Then Return
 
@@ -120,6 +125,7 @@ Public Class quickactions
                            "JOIN assessment a ON sg.assessment_id = a.assessment_id " &
                            "JOIN enrollment e ON sg.enrollment_id = e.enrollment_id " &
                            "JOIN student s ON e.student_id = s.student_id " &
+                           If(OnlyOpenRequests, "WHERE r.status IN ('Pending','Under Review') ", "") &
                            "ORDER BY r.requested_at DESC"
 
         Dim dt As DataTable = DatabaseHelper.ExecuteQuery(sql)
@@ -149,6 +155,10 @@ Public Class quickactions
     ' 2. LIVE AUDIT LOGS (MariaDB)
     ' ==========================================
     Private Sub LoadLiveAuditLogs()
+        UiKit.TryLoadData(Me, "LiveAuditLogs", AddressOf LoadLiveAuditLogsCore)
+    End Sub
+
+    Private Sub LoadLiveAuditLogsCore()
         Dim dgvAuditLogs = FindControl(Of DataGridView)("dgvAuditLogs")
         If dgvAuditLogs Is Nothing Then dgvAuditLogs = FindControl(Of DataGridView)("dgvLogs")
         If dgvAuditLogs Is Nothing Then dgvAuditLogs = FindControl(Of DataGridView)("dgvAudit")
@@ -189,15 +199,7 @@ Public Class quickactions
             cboSubject.Items.Clear()
             cboSubject.DropDownStyle = ComboBoxStyle.DropDownList
 
-            Dim sql As String =
-                "SELECT c.class_id, " &
-                "CONCAT(c.course_code, ' - ', co.course_name, " &
-                "' (Section ', c.section, ')') AS class_title " &
-                "FROM `class` c " &
-                "JOIN course co ON c.course_code = co.course_code " &
-                "ORDER BY c.course_code, c.section"
-
-            Dim dt As DataTable = DatabaseHelper.ExecuteQuery(sql)
+            Dim dt = New ClassService().GetGradeEntryClasses()
 
             cboSubject.DisplayMember = "class_title"
             cboSubject.ValueMember = "class_id"

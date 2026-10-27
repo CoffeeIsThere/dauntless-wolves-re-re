@@ -1,0 +1,114 @@
+Imports System.Data
+Imports System.Reflection
+Imports System.Windows.Forms
+Imports DAUNTLESS_WOLVES_PROF
+Imports DAUNTLESS_WOLVES_PROF.Models
+
+' Windows interaction checks. Run against a disposable, seeded database.
+Module Program
+    Private Const flags As BindingFlags = BindingFlags.Instance Or BindingFlags.NonPublic
+    <STAThread>
+    Sub Main()
+        Application.EnableVisualStyles()
+        Dim record = DatabaseHelper.ExecuteQuery("SELECT admin_id,full_name FROM admin LIMIT 1").Rows(0)
+        AppSession.StartSession(New UserModel(record("admin_id").ToString(), record("full_name").ToString(), "", "Admin"))
+        Using form As New Admin()
+            ' Navigation must work before Load; designer fields may not have populated an old cached array.
+            Dim tabs = Control(form, "pnlTabs")
+            Using ordinary As New Button With {.Text = "Regression tab"}
+                tabs.Controls.Add(ordinary)
+                GetType(Admin).GetMethod("ShowPanel", flags).Invoke(form, {Control(form, "pnlDashboard"), Control(form, "btnDashboard")})
+                Check(ordinary.BackColor = Drawing.Color.FromArgb(200, 215, 205), "tab styling uses initialized controls before the Load event")
+                tabs.Controls.Remove(ordinary)
+            End Using
+            ' Older/local designer layouts may omit obsolete manual Filter/Reset controls.
+            For Each optionalName In {"btnStudentFilter", "btnStudentReset"}
+                Dim legacy = Control(form, optionalName)
+                legacy.Parent.Controls.Remove(legacy)
+                GetType(Admin).GetProperty(optionalName, flags).SetValue(form, Nothing)
+                legacy.Dispose()
+            Next
+            form.Show() : Application.DoEvents()
+            Pump(DirectCast(GetType(Admin).GetMethod("RefreshAccountsAsync", flags).Invoke(form, {"Student"}), Task))
+            Pump(DirectCast(GetType(Admin).GetMethod("RefreshAccountsAsync", flags).Invoke(form, {"Teacher"}), Task))
+            DirectCast(Control(form, "btnStudents"), Button).PerformClick()
+            Dim grid = DirectCast(Control(form, "dgvstudents"), DataGridView)
+            Check(grid.Rows.Count > 1, "student directory loads in the background")
+            Check(form.Controls.Find("btnAdminStudentReset", True).Length = 1, "admin header initializes without legacy Filter or Reset controls")
+            Dim selected = Convert.ToString(grid.Rows(0).Cells("colStudentId").Value)
+            grid.Rows(0).Cells("colCheck").Value = True
+            Dim selections = DirectCast(GetType(Admin).GetField("studentSelection", flags).GetValue(form), HashSet(Of String))
+            Check(selections.Contains(selected), "checkbox adds the student ID to the bulk selection")
+            GetType(Admin).GetField("studentPage", flags).SetValue(form, 2)
+            GetType(Admin).GetMethod("ShowStudentPage", flags).Invoke(form, Nothing)
+            Check(selections.Contains(selected), "bulk selection survives navigation to another page")
+            grid.CurrentCell = grid.Rows(1).Cells("colFullName")
+            Dim focusedId = Convert.ToString(grid.CurrentRow.Cells("colStudentId").Value)
+            Pump(DirectCast(GetType(Admin).GetMethod("RefreshAccountsAsync", flags).Invoke(form, {"Student"}), Task))
+            Check(CInt(GetType(Admin).GetField("studentPage", flags).GetValue(form)) = 2, "background refresh preserves the current page")
+            Check(Convert.ToString(grid.CurrentRow.Cells("colStudentId").Value) = focusedId, "background refresh preserves the current student")
+            GetType(Admin).GetField("studentPage", flags).SetValue(form, 1)
+            GetType(Admin).GetMethod("ShowStudentPage", flags).Invoke(form, Nothing)
+            Check(CBool(grid.Rows.Cast(Of DataGridViewRow).First(Function(row) Convert.ToString(row.Cells("colStudentId").Value) = selected).Cells("colCheck").Value), "selected checkbox is restored when its page reopens")
+            Dim status = DirectCast(GetType(Admin).GetField("studentStatus", flags).GetValue(form), ComboBox)
+            status.SelectedItem = "Active"
+            Pump(DirectCast(GetType(Admin).GetMethod("RefreshAccountsAsync", flags).Invoke(form, {"Student"}), Task))
+            Check(status.Text = "Active" AndAlso grid.Rows.Cast(Of DataGridViewRow).All(Function(row) Convert.ToString(row.Cells("colStatus").Value) = "Active"), "status filter survives refresh and filters the displayed rows")
+            DirectCast(Control(form, "txtStudentSearch"), TextBox).Text = "no-match-" & Guid.NewGuid().ToString("N")
+            Check(grid.Rows.Count = 0 AndAlso selections.Contains(selected), "live search preserves selected accounts hidden by its results")
+            DirectCast(Control(form, "btnAdminStudentReset"), Button).PerformClick()
+            Check(status.Text = "All" AndAlso DirectCast(Control(form, "txtStudentSearch"), TextBox).Text = "", "replacement Reset clears live search and status filters")
+            Dim searchBox = Control(form, "txtStudentSearch")
+            Check(searchBox.Top >= searchBox.Parent.Controls.OfType(Of Label).Single().Bottom, "search label is separate from its input")
+            Dim header = Control(form, "Panel2")
+            Check(grid.Top >= header.Bottom, "student filters do not overlap the account table")
+            DirectCast(Control(form, "btnProfessors"), Button).PerformClick()
+            Dim employment = DirectCast(GetType(Admin).GetField("profEmployment", flags).GetValue(form), ComboBox)
+            employment.SelectedItem = "Full-time"
+            Pump(DirectCast(GetType(Admin).GetMethod("RefreshAccountsAsync", flags).Invoke(form, {"Teacher"}), Task))
+            Dim professors = DirectCast(Control(form, "dgvProf"), DataGridView)
+            Check(professors.Rows.Cast(Of DataGridViewRow).All(Function(row) Convert.ToString(row.Cells("colType").Value) = "Full-time"), "employment filter applies after professor refresh")
+            form.Hide()
+            Using details As New AdminAccountDetailsForm("Student", selected, AppSession.CurrentUser.UserId)
+                details.Show(form)
+                UntilReady(Function() details.Controls.OfType(Of TabControl).Single().TabPages.Count = 3 OrElse details.Controls.OfType(Of Label).Any(Function(label) label.Text.StartsWith("Could not")))
+                Check(details.Controls.OfType(Of TabControl).Single().TabPages.Count = 3, "account details load profile classes and recent activity")
+                details.Close()
+            End Using
+            Using audit As New AdminAuditForm(AppSession.CurrentUser.UserId)
+                audit.Show(form)
+                Pump(DirectCast(GetType(AdminAuditForm).GetMethod("ReloadAsync", flags).Invoke(audit, Nothing), Task))
+                Dim auditGrid = DirectCast(GetType(AdminAuditForm).GetField("view", flags).GetValue(audit), DataGridView)
+                Check(auditGrid.Rows.Count > 0 AndAlso auditGrid.Columns.Contains("Before") AndAlso auditGrid.Columns.Contains("After"), "audit viewer loads the full history fields")
+                Dim query = DirectCast(GetType(AdminAuditForm).GetField("query", flags).GetValue(audit), TextBox)
+                query.Text = "no-match-" & Guid.NewGuid().ToString("N")
+                Pump(DirectCast(GetType(AdminAuditForm).GetMethod("ReloadAsync", flags).Invoke(audit, Nothing), Task))
+                Check(auditGrid.Rows.Count = 0, "audit viewer applies search results")
+                Check(Not DirectCast(GetType(AdminAuditForm).GetField("csv", flags).GetValue(audit), Button).Enabled, "empty audit results disable export")
+                audit.Close()
+            End Using
+            form.Close()
+        End Using
+        AppSession.ClearSession()
+    End Sub
+    Private Function Control(form As Form, name As String) As Control
+        Return form.Controls.Find(name, True).Single()
+    End Function
+    Private Sub Pump(task As Task)
+        UntilReady(Function() task.IsCompleted)
+        task.GetAwaiter().GetResult()
+    End Sub
+    Private Sub UntilReady(ready As Func(Of Boolean))
+        Dim watch = Stopwatch.StartNew()
+        While Not ready()
+            If watch.Elapsed > TimeSpan.FromSeconds(30) Then Throw New TimeoutException("Background load did not finish.")
+            Application.DoEvents()
+            Threading.Thread.Sleep(10)
+        End While
+        Application.DoEvents()
+    End Sub
+    Private Sub Check(condition As Boolean, message As String)
+        If Not condition Then Throw New Exception("FAIL: " & message)
+        Console.WriteLine("PASS: " & message)
+    End Sub
+End Module

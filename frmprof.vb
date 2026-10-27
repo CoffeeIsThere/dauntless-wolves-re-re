@@ -1,4 +1,4 @@
-﻿Imports System.Globalization
+Imports System.Globalization
 Imports MySql.Data.MySqlClient
 
 Public Class frmprof
@@ -9,6 +9,11 @@ Public Class frmprof
 
     Private _currentTeacherId As String = "TCH001"
     Private savingScore As Boolean
+    Private refreshingClassList As Boolean
+    Private refreshingScoreSelectors As Boolean
+    Private entryClassId As Integer
+    Private entryEnrollmentId As Integer
+    Private entryAssessmentId As Integer
     Private ReadOnly scoreFeedback As New Label With {.AutoSize = False, .ForeColor = Color.DarkGreen, .TextAlign = ContentAlignment.TopLeft}
 
 
@@ -89,6 +94,7 @@ Public Class frmprof
     End Sub
 
     Private Sub Tab_Click(sender As Object, e As EventArgs)
+        If Not isLoading Then LoadTeacherInfo()
         Dim clickedButton As Button = DirectCast(sender, Button)
         ShowPage(clickedButton)
     End Sub
@@ -148,8 +154,12 @@ Public Class frmprof
     End Sub
 
     Private Sub LoadClassGrades()
+        UiKit.TryLoadData(Me, "class grades", AddressOf LoadClassGradesCore)
+    End Sub
+
+    Private Sub LoadClassGradesCore()
         Dim selectedClass = TryCast(ComboBox1.SelectedItem, DataRowView)
-        Label13.Text = If(selectedClass Is Nothing, "No class selected", selectedClass("course_code").ToString() & " - " & selectedClass("section").ToString())
+        Label13.Text = If(selectedClass Is Nothing, "No class selected", selectedClass("course_code").ToString() & " - " & selectedClass("section").ToString() & " (" & selectedClass("semester").ToString() & " " & selectedClass("academic_year").ToString() & ")")
         Dim classId As Integer = SelectedClassId()
         If classId = 0 Then
             Dim emptyDt As New DataTable()
@@ -318,6 +328,10 @@ Public Class frmprof
     End Sub
 
     Private Sub LoadRequests()
+        UiKit.TryLoadData(Me, "clarification requests", AddressOf LoadRequestsCore)
+    End Sub
+
+    Private Sub LoadRequestsCore()
         Dim dtDb As DataTable = _revisionService.GetPendingRequestsByTeacher(_currentTeacherId)
 
         Dim dt As New DataTable()
@@ -453,6 +467,10 @@ Public Class frmprof
     End Sub
 
     Private Sub LoadAuditLogs()
+        UiKit.TryLoadData(Me, "audit logs", AddressOf LoadAuditLogsCore)
+    End Sub
+
+    Private Sub LoadAuditLogsCore()
         Dim dtDb As DataTable = _gradeService.GetAuditLogsForTeacher(_currentTeacherId)
 
         Dim dt As New DataTable()
@@ -561,6 +579,10 @@ Public Class frmprof
     End Sub
 
     Private Sub LoadAnalytics()
+        UiKit.TryLoadData(Me, "analytics", AddressOf LoadAnalyticsCore)
+    End Sub
+
+    Private Sub LoadAnalyticsCore()
         Dim classId As Integer = SelectedClassId()
         If classId = 0 Then
             ResetAnalyticsUI()
@@ -736,23 +758,24 @@ Public Class frmprof
     End Sub
 
     Private Sub LoadTeacherInfo()
-        lblProfName.Text = AppSession.CurrentUser.FullName
+        UiKit.TryLoadData(Me, "class choices", AddressOf LoadTeacherInfoCore)
+    End Sub
 
-        Dim classes As DataTable = _gradeService.GetClassesByTeacher(_currentTeacherId)
-        If classes IsNot Nothing Then
-            If Not classes.Columns.Contains("Display") Then
-                classes.Columns.Add("Display", GetType(String), "course_code + ' - ' + section")
-            End If
-            ComboBox1.DataSource = classes
+    Private Sub LoadTeacherInfoCore()
+        lblProfName.Text = AppSession.CurrentUser.FullName
+        Dim previous = SelectedClassId()
+        Dim classes = _gradeService.GetClassesByTeacher(_currentTeacherId)
+        classes.Columns.Add("Display", GetType(String), "course_code + ' - ' + section + ' (' + semester + ' ' + academic_year + ')'")
+        refreshingClassList = True
+        Try
             ComboBox1.DisplayMember = "Display"
             ComboBox1.ValueMember = "class_id"
-
-            ' Force initial load of students & assessments for the first class
-            If ComboBox1.Items.Count > 0 Then
-                ComboBox1.SelectedIndex = 0
-                ComboBox1_SelectedIndexChanged(Nothing, EventArgs.Empty)
-            End If
-        End If
+            ComboBox1.DataSource = classes
+            If classes.AsEnumerable().Any(Function(row) CInt(row("class_id")) = previous) Then ComboBox1.SelectedValue = previous
+        Finally
+            refreshingClassList = False
+        End Try
+        ComboBox1_SelectedIndexChanged(Nothing, EventArgs.Empty)
     End Sub
 
     Private Function SelectedClassId() As Integer
@@ -762,47 +785,58 @@ Public Class frmprof
     End Function
 
     Private Sub ComboBox1_SelectedIndexChanged(sender As Object, e As EventArgs) Handles ComboBox1.SelectedIndexChanged
-        Dim classId As Integer = SelectedClassId()
-        If classId = 0 Then
-            If Not isLoading Then LoadClassGrades()
-            Return
-        End If
+        UiKit.TryLoadData(Me, "class selections", Sub() ComboBox1_SelectedIndexChangedCore(sender, e))
+    End Sub
 
-        ' Keep progress when returning from another window or refreshing the same class.
+    Private Sub ComboBox1_SelectedIndexChangedCore(sender As Object, e As EventArgs)
+        If refreshingClassList OrElse refreshingScoreSelectors Then Return
         Dim previousStudent = TryCast(ComboBox2.SelectedItem, DataRowView)
         Dim previousAssessment = TryCast(ComboBox4.SelectedItem, DataRowView)
         Dim enrollmentId = If(previousStudent Is Nothing, 0, CInt(previousStudent("enrollment_id")))
         Dim assessmentId = If(previousAssessment Is Nothing, 0, CInt(previousAssessment("assessment_id")))
-
-        ' 1. Load enrolled students
-        Dim students As DataTable = _gradeService.GetEnrollmentsByClass(classId, _currentTeacherId)
-        If students IsNot Nothing Then
-            If Not students.Columns.Contains("Display") Then
+        Dim classId = SelectedClassId()
+        refreshingScoreSelectors = True
+        Try
+            If classId = 0 Then
+                ComboBox2.DataSource = Nothing
+                ComboBox4.DataSource = Nothing
+            Else
+                Dim students = _gradeService.GetEnrollmentsByClass(classId, _currentTeacherId)
                 students.Columns.Add("Display", GetType(String), "student_id + ' - ' + full_name")
+                ComboBox2.DisplayMember = "Display"
+                ComboBox2.ValueMember = "enrollment_id"
+                ComboBox2.DataSource = students
+                If students.AsEnumerable().Any(Function(row) CInt(row("enrollment_id")) = enrollmentId) Then ComboBox2.SelectedValue = enrollmentId
+                Dim assessments = _gradeService.GetAssessmentsByClass(classId, _currentTeacherId)
+                ComboBox4.DisplayMember = "title"
+                ComboBox4.ValueMember = "assessment_id"
+                ComboBox4.DataSource = assessments
+                If assessments.AsEnumerable().Any(Function(row) CInt(row("assessment_id")) = assessmentId) Then ComboBox4.SelectedValue = assessmentId
             End If
-            ComboBox2.DataSource = students
-            ComboBox2.DisplayMember = "Display"
-            ComboBox2.ValueMember = "enrollment_id"
-            If students.AsEnumerable().Any(Function(row) CInt(row("enrollment_id")) = enrollmentId) Then ComboBox2.SelectedValue = enrollmentId
-        Else
-            ComboBox2.DataSource = Nothing
-        End If
-
-        ' 2. Load assessments
-        Dim assessments As DataTable = _gradeService.GetAssessmentsByClass(classId)
-        If assessments IsNot Nothing AndAlso assessments.Rows.Count > 0 Then
-            ComboBox4.DataSource = assessments
-            ComboBox4.DisplayMember = "title"
-            ComboBox4.ValueMember = "assessment_id"
-            If assessments.AsEnumerable().Any(Function(row) CInt(row("assessment_id")) = assessmentId) Then ComboBox4.SelectedValue = assessmentId
-        Else
-            ComboBox4.DataSource = Nothing
-        End If
-
-        ' 3. Refresh right-side student profile card & class analytics
+        Finally
+            refreshingScoreSelectors = False
+            ResetScoreDraftForContext()
+        End Try
         UpdateSelectedStudentDisplay()
         LoadAnalytics()
         If Not isLoading Then LoadClassGrades()
+    End Sub
+
+    Private Sub ResetScoreDraftForContext()
+        If refreshingClassList OrElse refreshingScoreSelectors Then Return
+        Dim student = TryCast(ComboBox2.SelectedItem, DataRowView)
+        Dim assessment = TryCast(ComboBox4.SelectedItem, DataRowView)
+        Dim enrollment = If(student Is Nothing, 0, CInt(student("enrollment_id")))
+        Dim selectedAssessment = If(assessment Is Nothing, 0, CInt(assessment("assessment_id")))
+        Dim classId = SelectedClassId()
+        If Not savingScore AndAlso (classId <> entryClassId OrElse enrollment <> entryEnrollmentId OrElse selectedAssessment <> entryAssessmentId) Then
+            Dim hadDraft = TextBox1.TextLength > 0
+            TextBox1.Clear()
+            scoreFeedback.Text = If(hadDraft, "Unsaved score cleared because the student, class, or assessment changed.", "")
+        End If
+        entryClassId = classId
+        entryEnrollmentId = enrollment
+        entryAssessmentId = selectedAssessment
     End Sub
 
     ' =====================================================
@@ -843,11 +877,16 @@ Public Class frmprof
     End Sub
 
     Private Sub ComboBox2_SelectedIndexChanged(sender As Object, e As EventArgs) Handles ComboBox2.SelectedIndexChanged
-        If Not savingScore Then scoreFeedback.Text = ""
+        If refreshingScoreSelectors Then Return
+        ResetScoreDraftForContext()
         UpdateSelectedStudentDisplay()
     End Sub
 
     Private Sub UpdateSelectedStudentDisplay()
+        UiKit.TryLoadData(Me, "student scores", AddressOf UpdateSelectedStudentDisplayCore)
+    End Sub
+
+    Private Sub UpdateSelectedStudentDisplayCore()
         If ComboBox2.SelectedItem Is Nothing Then
             If _lblRightStudentName IsNot Nothing Then _lblRightStudentName.Text = "No student selected"
             If _lblRightStudentId IsNot Nothing Then _lblRightStudentId.Text = ""
@@ -1043,7 +1082,7 @@ Public Class frmprof
     End Sub
 
     Private Sub ScoreAssessmentChanged(sender As Object, e As EventArgs) Handles ComboBox4.SelectedIndexChanged
-        If Not savingScore Then scoreFeedback.Text = ""
+        ResetScoreDraftForContext()
     End Sub
 
     Private Sub ShowScoreError(message As String)
@@ -1072,6 +1111,7 @@ Public Class frmprof
         book.InitialClassId = SelectedClassId()
         book.ShowInTaskbar = False
         book.Show(Me)
+        book.RefreshAssignedClasses()
         book.SelectClass(SelectedClassId())
         book.BringToFront()
     End Sub
@@ -1149,10 +1189,16 @@ Public Class frmprof
         dgvRequests.EditMode = DataGridViewEditMode.EditProgrammatically
         dgvRequests.Columns("Action").HeaderText = "Review / Approve"
         AddHandler Me.Activated, Sub(sender, args)
-                                    If Not isLoading AndAlso Not savingScore Then
-                                        ComboBox1_SelectedIndexChanged(Nothing, EventArgs.Empty)
+                                    If Not isLoading AndAlso Not savingScore AndAlso AppSession.IsTeacher Then
+                                        Try
+                                            LoadTeacherInfo()
+                                        Catch ex As Exception
+                                            Console.WriteLine("[CLASS REFRESH] " & ex.Message)
+                                        End Try
                                     End If
                                 End Sub
+        ComboBox1.Width = 360
+        ComboBox1.DropDownWidth = 500
         Label2.Text = "Student (surname A–Z)"
         Label3.Text = "Assessment"
         Dim inputs() As Control = {Label2, ComboBox2, Label3, ComboBox4, Label4, TextBox1, CustomButton5}

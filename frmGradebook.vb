@@ -1,4 +1,4 @@
-﻿Imports System.Data
+Imports System.Data
 Imports MySql.Data.MySqlClient
 
 Public Class frmGradebook
@@ -27,6 +27,7 @@ Public Class frmGradebook
         Public Group As String    ' "Quiz" or "CW"
     End Class
     Private loadingClass As Boolean
+    Private refreshingClassChoices As Boolean
     Private finishingEdit As Boolean
     Private reloadQueued As Boolean
     Private reloadAfterEdit As Boolean
@@ -110,34 +111,33 @@ Public Class frmGradebook
     End Sub
 
     Private Sub LoadClassesFromDatabase()
-        cboCourse.Items.Clear()
-        classes.Clear()
-
-        ' Fetch classes from MySQL for current logged-in teacher
-        Dim dt As DataTable = _classService.GetClassesByTeacher(AppSession.CurrentUser.UserId)
-
-        If dt IsNot Nothing AndAlso dt.Rows.Count > 0 Then
-            For Each row As DataRow In dt.Rows
-                Dim code As String = Convert.ToString(row("class_label"))
-                Dim name As String = Convert.ToString(row("course_name"))
-                Dim term As String = Convert.ToString(row("term"))
-                Dim sy As String = Convert.ToString(row("academic_year"))
-                Dim sched As String = Convert.ToString(row("schedule"))
-
-                Dim info As New ClassInfo With {
-                    .Code = code, .Name = name, .Term = term, .SY = sy, .Schedule = sched, .Id = Convert.ToInt32(row("class_id"))
-                }
-                classes(code) = info
-
-                Dim displayText As String = code
-                cboCourse.Items.Add(displayText)
-            Next
-
-            If cboCourse.Items.Count > 0 Then
-                cboCourse.SelectedIndex = 0
-            End If
-        End If
+        UiKit.TryLoadData(Me, "assigned classes", AddressOf LoadClassesFromDatabaseCore)
     End Sub
+
+    Private Sub LoadClassesFromDatabaseCore()
+        Dim previous = GetClassIdFromCode(SelectedClassCode())
+        Dim dt = _classService.GetClassesByTeacher(AppSession.CurrentUser.UserId)
+        refreshingClassChoices = True
+        Try
+            cboCourse.Items.Clear()
+            classes.Clear()
+            For Each row As DataRow In dt.Rows
+                Dim label = row("class_label").ToString()
+                classes(label) = New ClassInfo With {.Code = row("course_code").ToString(), .Name = row("course_name").ToString(), .Schedule = row("schedule").ToString(), .Term = row("term").ToString(), .SY = row("academic_year").ToString(), .Id = CInt(row("class_id"))}
+                cboCourse.Items.Add(label)
+            Next
+            If cboCourse.Items.Count > 0 Then cboCourse.SelectedIndex = 0
+            SelectClass(previous)
+        Finally
+            refreshingClassChoices = False
+        End Try
+        LoadClassData()
+    End Sub
+
+    Public Sub RefreshAssignedClasses()
+        LoadClassesFromDatabase()
+    End Sub
+
     Private Sub frmGradebook_Shown(sender As Object, e As EventArgs) Handles Me.Shown
         FillEmptyRows()
         dgvGrades.ClearSelection()
@@ -344,7 +344,7 @@ Public Class frmGradebook
     Private Function InputHint(colName As String) As String
         If colName = "Drp" Then Return "Type Drp to mark a dropped student, or leave it blank."
         Dim m As Double = MaxFor(colName)
-        If m > 0 Then Return "Please enter a number from 0 to " & m & "."
+        If m > 0 Then Return "Enter a number from 0 to " & m & " with at most two decimal places."
         Return "Please enter a valid number."
     End Function
 
@@ -369,7 +369,7 @@ Public Class frmGradebook
 
         Dim v As Double
         Dim maxVal As Double = MaxFor(colName)
-        If Not TryNum(text, v) OrElse Not Double.IsFinite(v) OrElse v < 0 OrElse (maxVal > 0 AndAlso v > maxVal) Then
+        If Not TryNum(text, v) OrElse Not ValidationHelper.HasTwoDecimalPlaces(v) OrElse v < 0 OrElse (maxVal > 0 AndAlso v > maxVal) Then
             cell.Value = Nothing
             Return False
         End If
@@ -405,11 +405,7 @@ Public Class frmGradebook
 
     ' "Laboratory" -> "Laboratory 1" for the first one, "Laboratory 2" for the next, and so on
     Private Function NextTitle(type As String) As String
-        Dim n As Integer = 1
-        For Each it As AssessItem In items
-            If String.Equals(it.Type, type, StringComparison.OrdinalIgnoreCase) Then n += 1
-        Next
-        Return type & " " & n
+        Return AssessmentNames.NextTitle(type, items.Select(Function(item) item.Title))
     End Function
 
     Private Function TitleOf(rawCol As String) As String
@@ -737,25 +733,42 @@ Public Class frmGradebook
     Private Sub PasteFromClipboard()
         If Not Clipboard.ContainsText() OrElse dgvGrades.CurrentCell Is Nothing Then Return
         If dgvGrades.IsCurrentCellInEditMode AndAlso Not dgvGrades.EndEdit() Then Return
-
-        Dim lines() As String = Clipboard.GetText().Replace(vbCrLf, vbLf).TrimEnd(ControlChars.Lf).Split(ControlChars.Lf)
-        Dim r0 As Integer = dgvGrades.CurrentCell.RowIndex
-        Dim c0 As Integer = dgvGrades.CurrentCell.ColumnIndex
-
-        For i As Integer = 0 To lines.Length - 1
-            If r0 + i >= dgvGrades.Rows.Count Then Exit For
-            Dim parts() As String = lines(i).Split(ControlChars.Tab)
-            For j As Integer = 0 To parts.Length - 1
-                If c0 + j >= dgvGrades.Columns.Count Then Exit For
-                Dim cell As DataGridViewCell = dgvGrades.Rows(r0 + i).Cells(c0 + j)
-                If CanEditCell(cell) Then
-                    Dim previous = cell.Value
-                    If Not SaveEditedCell(cell, parts(j), previous) Then Return
+        Dim lines = Clipboard.GetText().Replace(vbCrLf, vbLf).TrimEnd(ControlChars.Lf).Split(ControlChars.Lf)
+        Dim firstRow = dgvGrades.CurrentCell.RowIndex
+        Dim firstColumn = dgvGrades.CurrentCell.ColumnIndex
+        Dim updates As New List(Of (Cell As DataGridViewCell, Value As Double))
+        Dim batch As New List(Of (StudentId As String, AssessmentId As Integer, Score As Double))
+        For i = 0 To lines.Length - 1
+            If firstRow + i >= dgvGrades.Rows.Count Then
+                MessageBox.Show("Paste exceeds the student list. No pasted scores were saved.")
+                Return
+            End If
+            Dim fields = lines(i).Split(ControlChars.Tab)
+            For j = 0 To fields.Length - 1
+                If firstColumn + j >= dgvGrades.Columns.Count Then
+                    MessageBox.Show("Paste exceeds the available columns. No pasted scores were saved.")
+                    Return
                 End If
+                Dim cell = dgvGrades.Rows(firstRow + i).Cells(firstColumn + j)
+                Dim column = dgvGrades.Columns(cell.ColumnIndex).Name
+                If Not CanEditCell(cell) OrElse Not assessmentIds.ContainsKey(column) Then Continue For
+                Dim value As Double
+                If Not TryNum(fields(j), value) OrElse Not ValidationHelper.IsValidScore(value, MaxFor(column)) Then
+                    MessageBox.Show("Invalid pasted score for " & TitleOf(column) & ". Use a value within its maximum and at most two decimals. No pasted scores were saved.")
+                    Return
+                End If
+                updates.Add((cell, value))
+                batch.Add((Convert.ToString(dgvGrades.Rows(cell.RowIndex).Cells("StudentName").Tag), assessmentIds(column), value))
             Next
         Next
-
-        ComputeAll()
+        Dim result = _gradeService.SaveScoreBatch(loadedClassId, batch, AppSession.CurrentUser.UserId)
+        If result.Success Then
+            For Each change In updates
+                change.Cell.Value = change.Value
+            Next
+            ComputeAll()
+        End If
+        MessageBox.Show(result.Message, If(result.Success, "Paste saved", "Paste not saved"))
     End Sub
 
     Private Sub CustomButton1_Click(sender As Object, e As EventArgs) Handles CustomButton1.Click
@@ -794,13 +807,6 @@ Public Class frmGradebook
     End Sub
 
     ' ===== Add Class =====
-    Private Function CodeExists(code As String) As Boolean
-        For Each it As Object In cboCourse.Items
-            If CStr(it).StartsWith(code & " - ", StringComparison.OrdinalIgnoreCase) Then Return True
-        Next
-        Return False
-    End Function
-
     Private Sub btnAddClass_Click(sender As Object, e As EventArgs) Handles btnAddClass.Click
 
         pendingClassImport = Nothing
@@ -823,10 +829,15 @@ Public Class frmGradebook
 
     ' Hover over the class box to see its schedule, term and school year
     Private Sub cboCourse_SelectedIndexChanged(sender As Object, e As EventArgs) Handles cboCourse.SelectedIndexChanged
+        If refreshingClassChoices Then Return
         LoadClassData()
     End Sub
 
     Private Sub LoadClassData()
+        UiKit.TryLoadData(Me, "gradebook", AddressOf LoadClassDataCore)
+    End Sub
+
+    Private Sub LoadClassDataCore()
         If loadingClass OrElse IsDisposed OrElse Disposing Then Return
         If finishingEdit Then
             reloadAfterEdit = True
@@ -866,7 +877,7 @@ Public Class frmGradebook
             For Each student As DataRow In _gradeService.GetEnrollmentsByClass(classId, AppSession.CurrentUser.UserId).Rows
                 Dim idx = dgvGrades.Rows.Add()
                 Dim row = dgvGrades.Rows(idx)
-                row.Cells("StudentName").Value = student("full_name")
+                row.Cells("StudentName").Value = StudentNameOrder.FormatForGradebook(student("full_name").ToString())
                 row.Cells("StudentName").Tag = student("student_id").ToString()
                 For Each score As DataRow In scores.Rows
                     Dim col = "Assessment" & score("assessment_id").ToString() & "Raw"
@@ -888,14 +899,23 @@ Public Class frmGradebook
 
     ' ===== Add Student: name goes into the grid, list re-sorts A-Z and renumbers =====
     Private Sub btnAddStudent_Click(sender As Object, e As EventArgs) Handles btnAddStudent.Click
+        UiKit.TryLoadData(Me, "registered students", AddressOf EnrollStudentDialog)
+    End Sub
+
+    Private Sub EnrollStudentDialog()
         Dim fullName As String = ""
         Dim studentNo As String = ""
         Dim course As String = ""
 
         If Not ShowStudentDialog(fullName, studentNo, course) Then Return
 
-        Dim result = _classService.EnrollStudent(studentNo, GetClassIdFromCode(SelectedClassCode()), "Teacher", AppSession.CurrentUser.UserId)
-        If Not result.Success Then MessageBox.Show(result.Message, "Enrollment failed")
+        Dim targetClass = GetClassIdFromCode(course)
+        Dim result = New RosterImportService().ImportStudents(targetClass, AppSession.CurrentUser.UserId, New List(Of String()) From {New String() {studentNo, fullName}})
+        If Not result.Success Then
+            MessageBox.Show(result.Message, "Enrollment failed")
+            Return
+        End If
+        SelectClass(targetClass)
         LoadClassData()
     End Sub
 
@@ -945,216 +965,59 @@ Public Class frmGradebook
     Private Function ShowStudentDialog(ByRef fullName As String,
                                        ByRef studentNo As String,
                                        ByRef course As String) As Boolean
-        Dim dark As Color = Color.FromArgb(0, 100, 0)
-        Dim green As Color = Color.FromArgb(0, 191, 99)
-        Dim accepted As Boolean = False
-
-        Using dlg As New Form()
-            dlg.FormBorderStyle = FormBorderStyle.None
-            dlg.StartPosition = FormStartPosition.CenterParent
-            dlg.Size = New Size(380, 440)
-            dlg.BackColor = Color.White
-            dlg.ShowInTaskbar = False
-
-            AddHandler dlg.Paint,
-                Sub(s, ev)
-                    Using pen As New Pen(dark, 2)
-                        ev.Graphics.DrawRectangle(pen, 1, 1, dlg.Width - 2, dlg.Height - 2)
-                    End Using
-                End Sub
-
-            Dim header As New Panel() With {.Dock = DockStyle.Top, .Height = 48, .BackColor = dark}
-            Dim lblTitle As New Label() With {
-                .Text = "Add Student",
-                .ForeColor = Color.White,
-                .Font = New Font("Segoe UI Semibold", 12.0F),
-                .AutoSize = True,
-                .Location = New Point(18, 12)
-            }
-            header.Controls.Add(lblTitle)
-            header.Controls.Add(MakeImportButton(dlg,
-                {"From file (CSV)...", "From MySQL (this class)..."},
-                Function(choice) ImportStudents(choice)))
-
-            ' Surname
-            Dim lblSurname As New Label() With {
-                .Text = "Surname",
-                .ForeColor = Color.Gray,
-                .Font = New Font("Segoe UI", 9.0F),
-                .AutoSize = True,
-                .Location = New Point(24, 62)
-            }
-            Dim txtSurname As New TextBox() With {
-                .BorderStyle = BorderStyle.None,
-                .Font = New Font("Segoe UI", 12.0F),
-                .Location = New Point(24, 84),
-                .Width = 332
-            }
-            Dim lineSurname As New Panel() With {
-                .BackColor = green,
-                .Location = New Point(24, 112),
-                .Size = New Size(332, 2)
-            }
-
-            ' First name + M.I. on the same row
-            Dim lblFirst As New Label() With {
-                .Text = "First Name",
-                .ForeColor = Color.Gray,
-                .Font = New Font("Segoe UI", 9.0F),
-                .AutoSize = True,
-                .Location = New Point(24, 128)
-            }
-            Dim txtFirst As New TextBox() With {
-                .BorderStyle = BorderStyle.None,
-                .Font = New Font("Segoe UI", 12.0F),
-                .Location = New Point(24, 150),
-                .Width = 250
-            }
-            Dim lineFirst As New Panel() With {
-                .BackColor = green,
-                .Location = New Point(24, 178),
-                .Size = New Size(250, 2)
-            }
-
-            Dim lblMI As New Label() With {
-                .Text = "M.I.",
-                .ForeColor = Color.Gray,
-                .Font = New Font("Segoe UI", 9.0F),
-                .AutoSize = True,
-                .Location = New Point(292, 128)
-            }
-            Dim txtMI As New TextBox() With {
-                .BorderStyle = BorderStyle.None,
-                .Font = New Font("Segoe UI", 12.0F),
-                .Location = New Point(292, 150),
-                .Width = 64,
-                .MaxLength = 3
-            }
-            Dim lineMI As New Panel() With {
-                .BackColor = green,
-                .Location = New Point(292, 178),
-                .Size = New Size(64, 2)
-            }
-
-            ' Student Number
-            Dim lblNo As New Label() With {
-                .Text = "Student Number",
-                .ForeColor = Color.Gray,
-                .Font = New Font("Segoe UI", 9.0F),
-                .AutoSize = True,
-                .Location = New Point(24, 194)
-            }
-            Dim txtNo As New TextBox() With {
-                .BorderStyle = BorderStyle.None,
-                .Font = New Font("Segoe UI", 12.0F),
-                .Location = New Point(24, 216),
-                .Width = 332
-            }
-            Dim lineNo As New Panel() With {
-                .BackColor = green,
-                .Location = New Point(24, 244),
-                .Size = New Size(332, 2)
-            }
-
-            ' Course
-            Dim lblCourse As New Label() With {
-                .Text = "Course",
-                .ForeColor = Color.Gray,
-                .Font = New Font("Segoe UI", 9.0F),
-                .AutoSize = True,
-                .Location = New Point(24, 260)
-            }
-            Dim cboDlgCourse As New ComboBox() With {
-                .DropDownStyle = ComboBoxStyle.DropDownList,
-                .FlatStyle = FlatStyle.Flat,
-                .BackColor = Color.White,
-                .Font = New Font("Segoe UI", 11.0F),
-                .Location = New Point(24, 282),
-                .Width = 332
-            }
-            For Each item In cboCourse.Items
-                cboDlgCourse.Items.Add(item)
+        Dim dark = Color.DarkGreen
+        Dim green = Color.FromArgb(0, 191, 99)
+        Using dialog As New Form With {.Text = "Add Student", .ClientSize = New Size(420, 350), .FormBorderStyle = FormBorderStyle.None, .StartPosition = FormStartPosition.CenterParent, .ShowInTaskbar = False, .BackColor = Color.White, .Font = New Font("Segoe UI", 10), .AutoScaleMode = AutoScaleMode.Font}
+            AddHandler dialog.Paint, Sub(sender, args)
+                                         Using pen As New Pen(dark, 2)
+                                             args.Graphics.DrawRectangle(pen, 1, 1, dialog.ClientSize.Width - 2, dialog.ClientSize.Height - 2)
+                                         End Using
+                                     End Sub
+            Dim header As New Panel With {.Dock = DockStyle.Top, .Height = 48, .BackColor = dark}
+            header.Controls.Add(New Label With {.Text = "Add Student", .AutoSize = True, .Location = New Point(18, 12), .ForeColor = Color.White, .Font = New Font("Segoe UI Semibold", 12)})
+            Dim classPicker As New ComboBox With {.Location = New Point(24, 172), .Width = 372, .DropDownWidth = 700, .DropDownStyle = ComboBoxStyle.DropDownList, .FlatStyle = FlatStyle.Flat, .BackColor = Color.White, .Font = New Font("Segoe UI", 11)}
+            Dim importButton = MakeImportButton(dialog, {"From file (CSV)...", "Refresh enrolled students from MySQL"}, Function(choice) ImportStudents(choice, GetClassIdFromCode(Convert.ToString(classPicker.SelectedItem))))
+            importButton.Location = New Point(dialog.ClientSize.Width - importButton.Width - 18, 10)
+            header.Controls.Add(importButton)
+            Dim students = StudentNameOrder.Sort(_userService.GetAllStudents(), "full_name", "student_id")
+            students.Columns.Add("Display", GetType(String))
+            For Each student As DataRow In students.Rows
+                student("Display") = student("student_id").ToString() & " - " & StudentNameOrder.FormatForGradebook(student("full_name").ToString())
             Next
-            cboDlgCourse.SelectedIndex = cboCourse.SelectedIndex
-            Dim lineCourse As New Panel() With {
-                .BackColor = green,
-                .Location = New Point(24, 312),
-                .Size = New Size(332, 2)
-            }
-
-            Dim lblError As New Label() With {
-                .Text = "",
-                .ForeColor = Color.Firebrick,
-                .Font = New Font("Segoe UI", 9.0F),
-                .AutoSize = True,
-                .Location = New Point(24, 326)
-            }
-
-            Dim btnOk As New Button() With {
-                .Text = "Add",
-                .FlatStyle = FlatStyle.Flat,
-                .BackColor = dark,
-                .ForeColor = Color.White,
-                .Font = New Font("Segoe UI Semibold", 10.0F),
-                .Size = New Size(100, 36),
-                .Location = New Point(256, 380),
-                .Cursor = Cursors.Hand
-            }
-            btnOk.FlatAppearance.BorderSize = 0
-
-            Dim btnCancel As New Button() With {
-                .Text = "Cancel",
-                .DialogResult = DialogResult.Cancel,
-                .FlatStyle = FlatStyle.Flat,
-                .BackColor = Color.White,
-                .ForeColor = dark,
-                .Font = New Font("Segoe UI Semibold", 10.0F),
-                .Size = New Size(100, 36),
-                .Location = New Point(146, 380),
-                .Cursor = Cursors.Hand
-            }
-            btnCancel.FlatAppearance.BorderColor = dark
-            btnCancel.FlatAppearance.BorderSize = 1
-
-            AddHandler btnOk.Click,
-                Sub(s, ev)
-                    If txtSurname.Text.Replace(",", "").Trim() = "" Then
-                        lblError.Text = "Please enter the surname."
-                        txtSurname.Focus()
-                    ElseIf txtFirst.Text.Replace(",", "").Trim() = "" Then
-                        lblError.Text = "Please enter the first name."
-                        txtFirst.Focus()
-                    ElseIf txtNo.Text.Trim() = "" Then
-                        lblError.Text = "Please enter the student number."
-                        txtNo.Focus()
-                    ElseIf cboDlgCourse.SelectedIndex = -1 Then
-                        lblError.Text = "Please select a course."
-                    Else
-                        accepted = True
-                        dlg.DialogResult = DialogResult.OK
-                    End If
-                End Sub
-
-            dlg.Controls.AddRange({lblSurname, txtSurname, lineSurname,
-                                   lblFirst, txtFirst, lineFirst,
-                                   lblMI, txtMI, lineMI,
-                                   lblNo, txtNo, lineNo,
-                                   lblCourse, cboDlgCourse, lineCourse,
-                                   lblError, btnOk, btnCancel, header})
-            dlg.AcceptButton = btnOk
-            dlg.CancelButton = btnCancel
-            dlg.ActiveControl = txtSurname
-
-            dlg.ShowDialog(If(assessmentOwner, Me))
-
-            If accepted Then
-                fullName = BuildName(txtSurname.Text, txtFirst.Text, txtMI.Text)
-                studentNo = txtNo.Text.Trim()
-                course = CStr(cboDlgCourse.SelectedItem)
-            End If
+            students.DefaultView.RowFilter = "status = 'Active'"
+            Dim studentLabel As New Label With {.Text = "Registered student", .AutoSize = True, .Location = New Point(24, 68), .ForeColor = Color.Gray, .Font = New Font("Segoe UI", 9)}
+            Dim studentPicker As New ComboBox With {.Location = New Point(24, 92), .Width = 372, .DropDownWidth = 520, .DropDownStyle = ComboBoxStyle.DropDownList, .FlatStyle = FlatStyle.Flat, .BackColor = Color.White, .Font = New Font("Segoe UI", 11), .DisplayMember = "Display", .ValueMember = "student_id", .DataSource = students.DefaultView}
+            Dim studentLine As New Panel With {.Location = New Point(24, 124), .Size = New Size(372, 2), .BackColor = green}
+            Dim classLabel As New Label With {.Text = "Enroll into class", .AutoSize = True, .Location = New Point(24, 148), .ForeColor = Color.Gray, .Font = New Font("Segoe UI", 9)}
+            For Each item In cboCourse.Items
+                classPicker.Items.Add(item)
+            Next
+            classPicker.SelectedIndex = cboCourse.SelectedIndex
+            Dim classLine As New Panel With {.Location = New Point(24, 204), .Size = New Size(372, 2), .BackColor = green}
+            Dim hint As New Label With {.Text = "Choose an existing student and the class to enroll them in.", .Location = New Point(24, 224), .Size = New Size(372, 36), .ForeColor = Color.Gray, .Font = New Font("Segoe UI", 9)}
+            Dim errorLabel As New Label With {.Text = "", .ForeColor = Color.Firebrick, .Location = New Point(24, 262), .Size = New Size(372, 25), .Font = New Font("Segoe UI", 9)}
+            Dim add As New Button With {.Text = "Enroll", .Location = New Point(296, 296), .Size = New Size(100, 36), .BackColor = dark, .ForeColor = Color.White, .FlatStyle = FlatStyle.Flat, .Font = New Font("Segoe UI Semibold", 10)}
+            Dim cancel As New Button With {.Text = "Cancel", .Location = New Point(186, 296), .Size = New Size(100, 36), .BackColor = Color.White, .ForeColor = dark, .FlatStyle = FlatStyle.Flat, .Font = New Font("Segoe UI Semibold", 10), .DialogResult = DialogResult.Cancel}
+            add.FlatAppearance.BorderSize = 0
+            cancel.FlatAppearance.BorderColor = dark
+            AddHandler add.Click, Sub(sender, args)
+                                      If studentPicker.SelectedItem Is Nothing OrElse classPicker.SelectedItem Is Nothing Then
+                                          errorLabel.Text = "Select a registered student and a class."
+                                          Return
+                                      End If
+                                      dialog.DialogResult = DialogResult.OK
+                                  End Sub
+            dialog.Controls.AddRange({studentLabel, studentPicker, studentLine, classLabel, classPicker, classLine, hint, errorLabel, add, cancel, header})
+            dialog.AcceptButton = add
+            dialog.CancelButton = cancel
+            dialog.ActiveControl = studentPicker
+            If dialog.ShowDialog(Me) <> DialogResult.OK Then Return False
+            Dim selected = DirectCast(studentPicker.SelectedItem, DataRowView)
+            fullName = selected("full_name").ToString()
+            studentNo = selected("student_id").ToString()
+            course = classPicker.SelectedItem.ToString()
+            Return True
         End Using
-
-        Return accepted
     End Function
 
     Private pendingClassImport As List(Of String())
@@ -1273,14 +1136,11 @@ Public Class frmGradebook
                     ElseIf code.Contains(" - ") Then
                         lblError.Text = "Class code can't contain "" - ""."
                         txtCode.Focus()
-                    ElseIf CodeExists(code) Then
-                        lblError.Text = "That class code already exists."
-                        txtCode.Focus()
                     ElseIf txtName.Text.Trim() = "" Then
                         lblError.Text = "Please enter the class name."
                         txtName.Focus()
                     ElseIf txtSched.Text.Trim() = "" Then
-                        lblError.Text = "Please enter the schedule."
+                        lblError.Text = "Please enter the section."
                         txtSched.Focus()
                     ElseIf cboTerm.Text.Trim() = "" Then
                         lblError.Text = "Please enter the term."
@@ -1716,18 +1576,26 @@ Public Class frmGradebook
     ' ----- Students -----
     ' Adds many names at once (skips duplicates), then sorts A-Z and renumbers
 
-    ' File columns: Surname, First Name, M.I., Student Number
-    Private Function ImportStudents(choice As String) As Boolean
+    ' CSV columns: student_id,full_name. Import uses the destination selected in the popup.
+    Private Function ImportStudents(choice As String, targetClassId As Integer) As Boolean
+        If targetClassId = 0 Then
+            MessageBox.Show("Select the class to enroll into before importing.")
+            Return False
+        End If
         If Not choice.StartsWith("From file") Then
+            SelectClass(targetClassId)
             LoadClassData()
             MessageBox.Show("Enrolled students refreshed from the configured database.")
             Return True
         End If
         Dim rows = LoadCsvRows("student_id")
         If rows Is Nothing Then Return False
-        Dim result = New RosterImportService().ImportStudents(loadedClassId, AppSession.CurrentUser.UserId, rows)
+        Dim result = New RosterImportService().ImportStudents(targetClassId, AppSession.CurrentUser.UserId, rows)
         MessageBox.Show(result.Message, If(result.Success, "Students imported", "Import not saved"))
-        If result.Success Then LoadClassData()
+        If result.Success Then
+            SelectClass(targetClassId)
+            LoadClassData()
+        End If
         Return result.Success
     End Function
 
@@ -1782,19 +1650,10 @@ Public Class frmGradebook
         Next
         If definitions.Count = 0 Then Return False
         If MessageBox.Show("Save " & definitions.Count & " assessments to the selected class?", "Confirm import", MessageBoxButtons.YesNo) <> DialogResult.Yes Then Return False
-        Dim added = 0
-        For Each definition In definitions
-            Dim result = _gradeService.CreateAssessment(classId, NextTitle(definition.Type), definition.Type, definition.Max, definition.Term, AppSession.CurrentUser.UserId, definition.Weight)
-            If Not result.Success Then
-                MessageBox.Show("Imported " & added & " assessments before stopping: " & result.Message)
-                LoadClassData()
-                Return False
-            End If
-            added += 1
-            LoadClassData()
-        Next
-        MessageBox.Show("Imported " & added & " assessments.")
-        Return True
+        Dim result = _gradeService.ImportAssessments(classId, definitions, AppSession.CurrentUser.UserId)
+        MessageBox.Show(result.Message, If(result.Success, "Assessments imported", "Import not saved"))
+        If result.Success Then LoadClassData()
+        Return result.Success
     End Function
 
     Private Sub ConfigureToolbar()

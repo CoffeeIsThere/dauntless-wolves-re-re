@@ -1,0 +1,125 @@
+Imports System.ComponentModel
+Imports System.Data
+Imports System.Drawing
+Imports System.Drawing.Printing
+Imports System.Reflection
+Imports System.Windows.Forms
+Imports DAUNTLESS_WOLVES_PROF
+Imports DAUNTLESS_WOLVES_PROF.Models
+Imports MySql.Data.MySqlClient
+
+' Windows-only, disposable seeded database. PDF pagination uses bitmap graphics, no printer job.
+Module Program
+    Private Const Flags As BindingFlags = BindingFlags.Instance Or BindingFlags.NonPublic
+    <STAThread>
+    Sub Main()
+        Application.EnableVisualStyles()
+        Dim administrator = DatabaseHelper.ExecuteQuery("SELECT admin_id,full_name FROM admin LIMIT 1").Rows(0)
+        Dim adminId = CStr(administrator("admin_id"))
+        AppSession.StartSession(New UserModel(adminId, CStr(administrator("full_name")), "", "Admin"))
+        Using form As New AdminRequestsForm(adminId)
+            form.Show() : Application.DoEvents()
+            Reload(form)
+            DirectCast(GetType(AdminRequestsForm).GetField("refreshTimer", Flags).GetValue(form), System.Windows.Forms.Timer).Stop()
+            Dim grid = Field(Of DataGridView)(form, "view")
+            Check(grid.RowCount > 1 AndAlso grid.Columns.Contains("requested_at"), "admin request grid loads request dates")
+            Check(grid.ReadOnly AndAlso Not grid.AllowUserToDeleteRows, "admin oversight has no grade or decision editing")
+            Dim selected = grid.Rows(grid.RowCount - 1)
+            grid.CurrentCell = selected.Cells(0)
+            Dim selectedId = CInt(DirectCast(selected.DataBoundItem, DataRowView)("request_id"))
+            Dim oldSource = grid.DataSource
+            Reload(form, True)
+            Check(Object.ReferenceEquals(oldSource, grid.DataSource), "unchanged auto-refresh does not rebuild the grid")
+            Check(CInt(DirectCast(grid.CurrentRow.DataBoundItem, DataRowView)("request_id")) = selectedId, "refresh preserves selected request")
+            Dim detail = Field(Of TextBox)(form, "reason")
+            Check(detail.Text = CStr(DirectCast(grid.CurrentRow.DataBoundItem, DataRowView)("reason")), "details show the complete selected student's reason")
+            Dim otherId = CInt(DirectCast(grid.Rows.Cast(Of DataGridViewRow).First(Function(item) CInt(DirectCast(item.DataBoundItem, DataRowView)("request_id")) <> selectedId).DataBoundItem, DataRowView)("request_id"))
+            Dim originalOtherReason = CStr(DatabaseHelper.ExecuteScalar("SELECT reason FROM revisionrequest WHERE request_id=@Id", New MySqlParameter("@Id", otherId)))
+            Dim responseBox = Field(Of TextBox)(form, "response")
+            detail.Select(Math.Min(3, detail.TextLength), Math.Min(2, Math.Max(0, detail.TextLength - 3)))
+            responseBox.Select(Math.Min(4, responseBox.TextLength), 0)
+            Dim reasonStart = detail.SelectionStart, reasonLength = detail.SelectionLength, responseStart = responseBox.SelectionStart
+            Try
+                DatabaseHelper.ExecuteNonQuery("UPDATE revisionrequest SET reason='Background update for another request' WHERE request_id=@Id", New MySqlParameter("@Id", otherId))
+                Reload(form, True)
+                Check(CInt(DirectCast(grid.CurrentRow.DataBoundItem, DataRowView)("request_id")) = selectedId, "changed refresh keeps the selected request")
+                Check(detail.SelectionStart = reasonStart AndAlso detail.SelectionLength = reasonLength AndAlso responseBox.SelectionStart = responseStart, "another request update leaves reason and response reading positions intact")
+            Finally
+                DatabaseHelper.ExecuteNonQuery("UPDATE revisionrequest SET reason=@Reason WHERE request_id=@Id", New MySqlParameter("@Reason", originalOtherReason), New MySqlParameter("@Id", otherId))
+            End Try
+            grid.Sort(grid.Columns("student_name"), ListSortDirection.Descending)
+            Dim snapshot = DirectCast(GetType(AdminRequestsForm).GetMethod("ExportSnapshot", Flags).Invoke(form, Nothing), DataTable)
+            Check(snapshot.Rows.Count = grid.RowCount AndAlso snapshot.Columns.Contains("Reviewed on") AndAlso snapshot.Columns.Contains("Professor response"), "exports include review dates and complete responses")
+            Check(CInt(snapshot.Rows(0)("Request ID")) = CInt(DirectCast(grid.Rows(0).DataBoundItem, DataRowView)("request_id")), "export snapshot follows displayed sort order")
+            Dim csvPath = IO.Path.Combine(IO.Path.GetTempPath(), Guid.NewGuid().ToString("N") & ".csv")
+            Try
+                Check(New ExportService().ExportTableToCSV(snapshot, csvPath), "request CSV writes directly from its data snapshot")
+                Dim csv = IO.File.ReadAllText(csvPath)
+                Check(csv.Contains("Professor response") AndAlso csv.Contains(CDate(snapshot.Rows(0)("Requested on")).ToString("yyyy-MM-dd HH:mm:ss")), "CSV preserves full fields and request timestamps")
+            Finally
+                If IO.File.Exists(csvPath) Then IO.File.Delete(csvPath)
+            End Try
+            Dim search = Field(Of TextBox)(form, "search")
+            search.Text = "no-match-" & Guid.NewGuid().ToString("N")
+            Reload(form)
+            Check(grid.RowCount = 0 AndAlso detail.Text = "" AndAlso Not Field(Of Button)(form, "csv").Enabled, "empty filters clear details and disable export")
+            search.Clear()
+            Field(Of ComboBox)(form, "statuses").SelectedItem = "All"
+            Reload(form)
+            Dim beforeFailure = grid.RowCount
+            Dim fromDate = Field(Of DateTimePicker)(form, "fromDate"), through = Field(Of DateTimePicker)(form, "toDate")
+            fromDate.Value = Date.Today : through.Value = Date.Today.AddDays(-1)
+            fromDate.Checked = True : through.Checked = True
+            Reload(form)
+            Check(grid.RowCount = beforeFailure AndAlso Field(Of Button)(form, "retry").Visible AndAlso Not Field(Of Button)(form, "csv").Enabled, "failed date filter preserves old data and offers Retry with exports disabled")
+            Dim validationMessage = Field(Of Label)(form, "state").Text
+            Reload(form, True)
+            Check(Field(Of Label)(form, "state").Text = validationMessage AndAlso Field(Of Button)(form, "retry").Visible AndAlso Not Field(Of Button)(form, "csv").Enabled, "automatic refresh cannot clear a failed manual filter or re-enable exports")
+            fromDate.Checked = False : through.Checked = False
+            Reload(form)
+            Check(Not Field(Of Button)(form, "retry").Visible AndAlso Field(Of Button)(form, "csv").Enabled, "retry clears errors and re-enables export after successful load")
+            CheckTextReport(snapshot)
+            form.Close()
+        End Using
+        Using openForm As New AdminRequestsForm(adminId, True)
+            openForm.Show() : Application.DoEvents() : Reload(openForm)
+            Check(Field(Of ComboBox)(openForm, "statuses").Text = "Open", "pending dashboard tile starts with Open filter")
+            Dim data = DirectCast(Field(Of DataGridView)(openForm, "view").DataSource, DataTable)
+            Check(data.Rows.Cast(Of DataRow).All(Function(row) {"Pending", "Under Review"}.Contains(CStr(row("status")))), "pending tile excludes approved and closed requests")
+            openForm.Close()
+        End Using
+        AppSession.ClearSession()
+    End Sub
+    Private Sub Reload(form As AdminRequestsForm, Optional automatic As Boolean = False)
+        Dim task = DirectCast(GetType(AdminRequestsForm).GetMethod("ReloadAsync", Flags).Invoke(form, {automatic}), Task)
+        Dim watch = Stopwatch.StartNew()
+        While Not task.IsCompleted
+            If watch.Elapsed > TimeSpan.FromSeconds(30) Then Throw New TimeoutException("Request load did not finish.")
+            Application.DoEvents() : Threading.Thread.Sleep(10)
+        End While
+        task.GetAwaiter().GetResult() : Application.DoEvents()
+    End Sub
+    Private Function Field(Of T)(form As Form, name As String) As T
+        Return DirectCast(GetType(AdminRequestsForm).GetField(name, Flags).GetValue(form), T)
+    End Function
+    Private Sub CheckTextReport(data As DataTable)
+        Dim report = data.Copy()
+        report.Rows(0)("Student reason") = String.Join(" ", Enumerable.Repeat("Full student reason", 400))
+        report.Rows(0)("Professor response") = String.Join(" ", Enumerable.Repeat("Full professor response", 400))
+        Using document = New ExportService().CreateTextReportDocument("Requests", "Filtered results", report), bitmap As New Bitmap(1000, 1100), canvas = Graphics.FromImage(bitmap)
+            GetType(PrintDocument).GetMethod("OnBeginPrint", Flags).Invoke(document, {New PrintEventArgs()})
+            Dim pages = 0, more = True
+            While more
+                Dim args As New PrintPageEventArgs(canvas, New Rectangle(40, 40, 800, 950), New Rectangle(0, 0, 900, 1050), document.DefaultPageSettings)
+                GetType(PrintDocument).GetMethod("OnPrintPage", Flags).Invoke(document, {args})
+                pages += 1 : more = args.HasMorePages
+                If pages > 100 Then Throw New Exception("Request report pagination did not finish.")
+            End While
+            Check(pages > 1, "long request reasons and responses continue over multiple report pages")
+        End Using
+    End Sub
+    Private Sub Check(condition As Boolean, message As String)
+        If Not condition Then Throw New Exception("FAIL: " & message)
+        Console.WriteLine("PASS: " & message)
+    End Sub
+End Module

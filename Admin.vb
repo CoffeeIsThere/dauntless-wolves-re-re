@@ -1,7 +1,7 @@
-﻿Imports System.Drawing.Drawing2D
+Imports System.Drawing.Drawing2D
 Imports System.Drawing.Printing
 
-Public Class Admin
+Partial Public Class Admin
 
     ' Instantiate backend service
     Private ReadOnly _userService As New UserService()
@@ -11,7 +11,6 @@ Public Class Admin
     ' Dropdown menu for the Updates filter
     Private ReadOnly _updatesFilterMenu As New ContextMenuStrip()
 
-    Private tabButtons As Button()
     Private WithEvents updatesTimer As New Global.System.Windows.Forms.Timer With {.Interval = 2000}
     Private dashboardReady As Boolean
     Private updatesLoading As Boolean
@@ -24,7 +23,14 @@ Public Class Admin
     End Sub
 
     Private Async Sub Admin_Activated(sender As Object, e As EventArgs) Handles MyBase.Activated
-        If dashboardReady AndAlso pnlDashboard.Visible AndAlso Not updatesLoading Then Await RefreshDashboardUpdatesAsync(False)
+        If Not dashboardReady OrElse accountBusy Then Return
+        If pnlDashboard.Visible AndAlso Not updatesLoading Then
+            Await RefreshDashboardUpdatesAsync(False)
+        ElseIf pnlStudents.Visible Then
+            Await RefreshAccountsAsync("Student")
+        ElseIf pnlProfessors.Visible Then
+            Await RefreshAccountsAsync("Teacher")
+        End If
     End Sub
 
     Private Sub Admin_FormClosed(sender As Object, e As FormClosedEventArgs) Handles MyBase.FormClosed
@@ -48,10 +54,10 @@ Public Class Admin
         ' Displays actual full name from session
         lblAdminName.Text = AppSession.CurrentUser.FullName
 
-        tabButtons = {btnDashboard, btnStudents, btnProfessors}
         ShowPanel(pnlDashboard, btnDashboard)
         InitProfessorPage()
         InitStudentPage()
+        InitAdminEnhancements()
         InitDashboardPage()
         dashboardReady = True
         updatesTimer.Start()
@@ -65,7 +71,8 @@ Public Class Admin
         p.Visible = True
         p.BringToFront()
 
-        For Each b As Button In tabButtons
+        ' Read the constructed controls instead of caching designer fields before they exist.
+        For Each b As Button In pnlTabs.Controls.OfType(Of Button)()
             Dim isActive As Boolean = (b Is activeBtn)
             ' Fix: Update NormalColor on CustomButtons so hover doesn't wipe out active color
             If TypeOf b Is CustomButton Then
@@ -84,10 +91,12 @@ Public Class Admin
 
     Private Sub btnStudents_Click(sender As Object, e As EventArgs) Handles btnStudents.Click
         ShowPanel(pnlStudents, btnStudents)
+        If dashboardReady Then LoadStudentsFromDb()
     End Sub
 
     Private Sub btnProfessors_Click(sender As Object, e As EventArgs) Handles btnProfessors.Click
         ShowPanel(pnlProfessors, btnProfessors)
+        If dashboardReady Then LoadProfsFromDb()
     End Sub
 
     ' ===== PROFESSOR PAGE =====
@@ -187,50 +196,38 @@ Public Class Admin
         End With
     End Sub
 
-    Private Sub LoadProfsFromDb()
-        allProfs.Clear()
-        Dim dt As DataTable = _userService.GetAllTeachers()
-
-        For Each row As DataRow In dt.Rows
-            Dim classCount As Integer = 0
-            If dt.Columns.Contains("class_count") AndAlso Not IsDBNull(row("class_count")) Then
-                classCount = Convert.ToInt32(row("class_count"))
-            End If
-
-            allProfs.Add(New ProfessorInfo With {
-                .Name = row("full_name").ToString(),
-                .EmployeeID = row("teacher_id").ToString(),
-                .Department = row("department").ToString(),
-                .Classes = classCount,
-                .EmploymentType = If(dt.Columns.Contains("employment_type"), row("employment_type").ToString(), "Full-time"),
-                .Status = row("status").ToString()
-            })
-        Next
-
-        ApplyProfFilter()
+    Private Async Sub LoadProfsFromDb()
+        Await RefreshAccountsAsync("Teacher")
     End Sub
 
-    Private Sub ApplyProfFilter()
+    Private Sub ApplyProfFilter(Optional resetPage As Boolean = True)
         Dim q As String = txtSearchProf.Text.Trim().ToLower()
         Dim dept As String = If(cboDeptProf.SelectedItem Is Nothing, "All", cboDeptProf.SelectedItem.ToString())
 
         filteredProfs = allProfs.Where(Function(p) _
-            (q = "" OrElse p.Name.ToLower().Contains(q) OrElse p.EmployeeID.ToLower().Contains(q)) AndAlso
+            (q = "" OrElse p.Name.ToLower().Contains(q) OrElse p.EmployeeID.ToLower().Contains(q) OrElse p.Email.ToLower().Contains(q) OrElse p.Department.ToLower().Contains(q)) AndAlso
+            MatchesFilter(profStatus, p.Status) AndAlso MatchesFilter(profEmployment, p.EmploymentType) AndAlso
             (dept = "All" OrElse p.Department = dept)).ToList()
 
-        profPage = 1
+        If resetPage Then profPage = 1
+        profPage = Math.Min(profPage, Math.Max(1, CInt(Math.Ceiling(filteredProfs.Count / CDbl(ProfPageSize)))))
         ShowProfPage()
     End Sub
 
     Private Sub ShowProfPage()
+        Dim saved = CapturePosition(dgvProf, "colEmpId")
+        renderingAccounts = True
         dgvProf.Rows.Clear()
         For Each p In filteredProfs.Skip((profPage - 1) * ProfPageSize).Take(ProfPageSize)
-            dgvProf.Rows.Add(False, p.Name, p.EmployeeID, p.Department, p.Classes & " classes", p.EmploymentType, p.Status, "")
+            dgvProf.Rows.Add(SelectedAccounts("Teacher").Contains(p.EmployeeID), p.Name, p.EmployeeID, p.Department, p.Classes & " classes", p.EmploymentType, p.Status, "")
         Next
         lblTotalProf.Text = "Total Professors: " & filteredProfs.Count
         SetAccountTooltips(dgvProf)
         dgvProf.ClearSelection()
         BuildProfPager()
+        renderingAccounts = False
+        RestorePosition(dgvProf, "colEmpId", saved)
+        UpdateBulkBar("Teacher")
     End Sub
 
     Private Sub BuildProfPager()
@@ -291,7 +288,7 @@ Public Class Admin
     End Sub
 
     Private Sub cboDeptProf_SelectedIndexChanged(sender As Object, e As EventArgs) Handles cboDeptProf.SelectedIndexChanged
-        If allProfs.Count > 0 Then ApplyProfFilter()
+        If Not restoringFilters AndAlso allProfs.Count > 0 Then ApplyProfFilter()
     End Sub
 
     ' ---------- drawing helpers ----------
@@ -366,52 +363,58 @@ Public Class Admin
         e.Handled = True
     End Sub
 
-    Private Sub HandleAccountClick(grid As DataGridView, idColumn As String, role As String, e As DataGridViewCellMouseEventArgs)
-        If e.RowIndex < 0 OrElse e.ColumnIndex < 0 OrElse e.Button <> MouseButtons.Left Then Return
-        If Not AppSession.IsAdmin Then
-            MessageBox.Show("Administrator access is required.")
-            Return
-        End If
+    Private Async Sub HandleAccountClick(grid As DataGridView, idColumn As String, role As String, e As DataGridViewCellMouseEventArgs)
+        If accountBusy OrElse e.RowIndex < 0 OrElse e.ColumnIndex < 0 OrElse e.Button <> MouseButtons.Left OrElse Not AppSession.IsAdmin Then Return
         Dim column = grid.Columns(e.ColumnIndex).Name
         Dim id = Convert.ToString(grid.Rows(e.RowIndex).Cells(idColumn).Value)
-        Dim bounds = grid.GetCellDisplayRectangle(e.ColumnIndex, e.RowIndex, False)
-        Dim size = bounds.Size
-        Dim result As OperationResult = Nothing
-        If column = "colStatus" OrElse (column = "colType" AndAlso role = "Teacher") Then
-            Dim width = If(column = "colStatus", 80, 90)
-            Dim pill As New Rectangle((size.Width - width) \ 2, (size.Height - 24) \ 2, width, 24)
-            If Not pill.Contains(e.Location) Then Return
-            result = If(column = "colStatus", _userService.ToggleAccountStatus(role, id, AppSession.CurrentUser.UserId), _userService.ToggleTeacherEmploymentType(id, AppSession.CurrentUser.UserId))
-        ElseIf column = "colActions" Then
-            Dim rects = ActionRects(New Rectangle(Point.Empty, size))
-            If rects(0).Contains(e.Location) Then
-                Using editor As New frmUserEditor(If(role = "Teacher", frmUserEditor.UserKind.Teacher, frmUserEditor.UserKind.Student), id)
-                    If editor.ShowDialog(Me) <> DialogResult.OK Then Return
-                End Using
-            ElseIf rects(1).Contains(e.Location) Then
-                If MessageBox.Show(Me, "Permanently delete " & role.ToLowerInvariant() & " account " & id & "? This cannot be undone." & vbCrLf & "Accounts with linked records cannot be deleted.", "Confirm account deletion", MessageBoxButtons.YesNo, MessageBoxIcon.Warning, MessageBoxDefaultButton.Button2) <> DialogResult.Yes Then Return
-                result = _userService.DeleteUser(role, id, AppSession.CurrentUser.UserId)
+        Dim size = grid.GetCellDisplayRectangle(e.ColumnIndex, e.RowIndex, False).Size
+        Dim administrator = AppSession.CurrentUser.UserId
+        accountBusy = True
+        Try
+            Dim result As OperationResult = Nothing
+            If column = "colStatus" OrElse (column = "colType" AndAlso role = "Teacher") Then
+                Dim width = If(column = "colStatus", 80, 90)
+                If Not New Rectangle((size.Width - width) \ 2, (size.Height - 24) \ 2, width, 24).Contains(e.Location) Then Return
+                SetAdminState("Saving account…")
+                result = Await Task.Run(Function() If(column = "colStatus", _userService.ToggleAccountStatus(role, id, administrator), _userService.ToggleTeacherEmploymentType(id, administrator)))
+            ElseIf column = "colActions" Then
+                Dim rects = ActionRects(New Rectangle(Point.Empty, size))
+                If rects(0).Contains(e.Location) Then
+                    Using editor As New frmUserEditor(If(role = "Teacher", frmUserEditor.UserKind.Teacher, frmUserEditor.UserKind.Student), id)
+                        If editor.ShowDialog(Me) <> DialogResult.OK Then Return
+                    End Using
+                ElseIf rects(1).Contains(e.Location) Then
+                    SetAdminState("Checking linked records…")
+                    Dim blockers = Await Task.Run(Function() adminWorkspace.DeletionBlockers(role, id, administrator))
+                    If IsDisposed Then Return
+                    Dim linked = blockers.Rows.Cast(Of DataRow).Where(Function(row) Convert.ToInt64(row("Records")) > 0).ToList()
+                    If linked.Count > 0 Then
+                        Dim message = String.Join(vbCrLf, linked.Select(Function(row) row("Category").ToString() & ": " & row("Records").ToString()))
+                        If MessageBox.Show(Me, message & vbCrLf & vbCrLf & "This account cannot be deleted. Mark it inactive instead?", "Linked records — " & id, MessageBoxButtons.YesNo, MessageBoxIcon.Information, MessageBoxDefaultButton.Button2) <> DialogResult.Yes Then Return
+                        result = Await Task.Run(Function() _userService.SetUserStatusResult(role, id, "Inactive", administrator))
+                    Else
+                        If MessageBox.Show(Me, "No linked records were found." & vbCrLf & "Permanently delete " & role.ToLowerInvariant() & " " & id & "? This cannot be undone.", "Delete account", MessageBoxButtons.YesNo, MessageBoxIcon.Warning, MessageBoxDefaultButton.Button2) <> DialogResult.Yes Then Return
+                        result = Await Task.Run(Function() _userService.DeleteUser(role, id, administrator))
+                    End If
+                Else
+                    Return
+                End If
             Else
                 Return
             End If
-        Else
-            Return
-        End If
-        If result IsNot Nothing AndAlso Not result.Success Then
-            MessageBox.Show(Me, result.Message, "Account not changed", MessageBoxButtons.OK, MessageBoxIcon.Warning)
-            Return
-        End If
-        Dim oldPage = If(role = "Teacher", profPage, studentPage)
-        If role = "Teacher" Then
-            LoadProfsFromDb()
-            profPage = Math.Min(oldPage, Math.Max(1, CInt(Math.Ceiling(filteredProfs.Count / CDbl(ProfPageSize)))))
-            ShowProfPage()
-        Else
-            LoadStudentsFromDb()
-            studentPage = Math.Min(oldPage, Math.Max(1, CInt(Math.Ceiling(filteredStudents.Count / CDbl(StudentPageSize)))))
-            ShowStudentPage()
-        End If
-        LoadDashboard()
+            If IsDisposed Then Return
+            If result IsNot Nothing AndAlso Not result.Success Then
+                MessageBox.Show(Me, result.Message, "Account not changed", MessageBoxButtons.OK, MessageBoxIcon.Warning)
+                SetAdminState(result.Message, True)
+                Return
+            End If
+            Await RefreshAccountsAsync(role)
+            LoadDashboard()
+        Catch ex As Exception
+            SetAdminState("Account operation failed: " & ex.Message, True)
+        Finally
+            accountBusy = False
+        End Try
     End Sub
 
     Private Sub SetAccountTooltips(grid As DataGridView)
@@ -445,6 +448,7 @@ Public Class Admin
     sender As Object,
     e As EventArgs
 ) Handles btnAddProf.Click
+        If accountBusy Then Return
 
         If Not AppSession.IsAdmin Then
             MessageBox.Show(
@@ -492,7 +496,7 @@ Public Class Admin
         cboSection.DropDownStyle = ComboBoxStyle.DropDownList
 
         cboYearLevel.Items.Clear()
-        cboYearLevel.Items.AddRange({"All", "1", "2", "3", "4"})
+        cboYearLevel.Items.AddRange({"All", "1", "2", "3", "4", "5", "6"})
         cboYearLevel.SelectedIndex = 0
 
         cboSection.Items.Clear()
@@ -586,25 +590,11 @@ Public Class Admin
         End With
     End Sub
 
-    Private Sub LoadStudentsFromDb()
-        allStudents.Clear()
-        Dim dt As DataTable = _userService.GetAllStudents()
-
-        For Each row As DataRow In dt.Rows
-            allStudents.Add(New StudentInfo With {
-                .StudentID = row("student_id").ToString(),
-                .FullName = row("full_name").ToString(),
-                .YearLevel = Convert.ToInt32(row("year_level")),
-                .Section = row("section").ToString(),
-                .Program = row("program").ToString(),
-                .Status = row("status").ToString()
-            })
-        Next
-
-        ApplyStudentFilter()
+    Private Async Sub LoadStudentsFromDb()
+        Await RefreshAccountsAsync("Student")
     End Sub
 
-    Private Sub ApplyStudentFilter()
+    Private Sub ApplyStudentFilter(Optional resetPage As Boolean = True)
         If cboYearLevel.SelectedItem Is Nothing OrElse cboSection.SelectedItem Is Nothing Then Return
 
         Dim q As String = txtStudentSearch.Text.Trim().ToLower()
@@ -612,24 +602,31 @@ Public Class Admin
         Dim sec As String = cboSection.SelectedItem.ToString()
 
         filteredStudents = allStudents.Where(Function(s) _
-            (q = "" OrElse s.FullName.ToLower().Contains(q) OrElse s.StudentID.ToLower().Contains(q)) AndAlso
+            (q = "" OrElse s.FullName.ToLower().Contains(q) OrElse s.StudentID.ToLower().Contains(q) OrElse s.Email.ToLower().Contains(q) OrElse s.Program.ToLower().Contains(q)) AndAlso
+            MatchesFilter(studentStatus, s.Status) AndAlso
             (yr = "All" OrElse s.YearLevel.ToString() = yr) AndAlso
             (sec = "All" OrElse s.Section = sec)).ToList()
 
-        studentPage = 1
+        If resetPage Then studentPage = 1
+        studentPage = Math.Min(studentPage, Math.Max(1, CInt(Math.Ceiling(filteredStudents.Count / CDbl(StudentPageSize)))))
         ShowStudentPage()
     End Sub
 
     Private Sub ShowStudentPage()
+        Dim saved = CapturePosition(dgvstudents, "colStudentId")
+        renderingAccounts = True
         dgvstudents.Rows.Clear()
         For Each s In filteredStudents.Skip((studentPage - 1) * StudentPageSize).Take(StudentPageSize)
-            dgvstudents.Rows.Add(False, s.StudentID, s.FullName, s.YearLevel,
+            dgvstudents.Rows.Add(SelectedAccounts("Student").Contains(s.StudentID), s.StudentID, s.FullName, s.YearLevel,
                                  s.Section, s.Program, s.Status, "")
         Next
         lbltotalstudents.Text = "Total Students: " & filteredStudents.Count
         SetAccountTooltips(dgvstudents)
         dgvstudents.ClearSelection()
         BuildStudentPager()
+        renderingAccounts = False
+        RestorePosition(dgvstudents, "colStudentId", saved)
+        UpdateBulkBar("Student")
     End Sub
 
     Private Sub BuildStudentPager()
@@ -682,11 +679,11 @@ Public Class Admin
     End Sub
 
     Private Sub cboYearLevel_SelectedIndexChanged(sender As Object, e As EventArgs) Handles cboYearLevel.SelectedIndexChanged
-        If allStudents.Count > 0 Then ApplyStudentFilter()
+        If Not restoringFilters AndAlso allStudents.Count > 0 Then ApplyStudentFilter()
     End Sub
 
     Private Sub cboSection_SelectedIndexChanged(sender As Object, e As EventArgs) Handles cboSection.SelectedIndexChanged
-        If allStudents.Count > 0 Then ApplyStudentFilter()
+        If Not restoringFilters AndAlso allStudents.Count > 0 Then ApplyStudentFilter()
     End Sub
 
     Private Sub btnStudentFilter_Click(sender As Object, e As EventArgs) Handles btnStudentFilter.Click
@@ -705,6 +702,7 @@ Public Class Admin
     sender As Object,
     e As EventArgs
 ) Handles btnaddstudent.Click
+        If accountBusy Then Return
 
         Using dlg As New frmUserEditor(frmUserEditor.UserKind.Student)
 
@@ -714,7 +712,7 @@ Public Class Admin
                 LoadStudentsFromDb()
 
                 ' Refresh the displayed student list.
-                ApplyStudentFilter()
+                ApplyStudentFilter(False)
 
                 ' Update dashboard statistics.
                 LoadDashboard()
@@ -829,7 +827,6 @@ Public Class Admin
     End Sub
 
     Private Sub LoadDashboard()
-        ApplyDashboardStatistics(DashboardService.GetStatistics())
         LoadDashboardUpdates()
     End Sub
 
@@ -852,7 +849,7 @@ Public Class Admin
         updatesLoading = True
 
         Dim sql As String =
-        "SELECT action, details, logged_at " &
+        "SELECT log_id, action, details, logged_at " &
         "FROM auditlog WHERE 1=1"
 
         ' Apply the selected filter
@@ -891,6 +888,7 @@ Public Class Admin
             Dim dt = snapshot.Updates
             If IsDisposed OrElse Disposing OrElse revision <> updatesRevision OrElse selectedFilter <> _selectedUpdatesFilter Then Return
             ApplyDashboardStatistics(snapshot.Totals)
+            If showErrors OrElse adminState.Text.StartsWith("Updates could not refresh") Then SetAdminState("Dashboard updated " & Date.Now.ToString("HH:mm:ss") & ". Click an update for details.")
             Dim rows As New List(Of String())
             For Each record As DataRow In dt.Rows
                 Dim text = record("action").ToString()
@@ -902,7 +900,7 @@ Public Class Admin
             Dim changed = dgvupdates.Rows.Count <> rows.Count
             If Not changed Then
                 For i = 0 To rows.Count - 1
-                    If Convert.ToString(dgvupdates.Rows(i).Cells(0).Value) <> rows(i)(0) OrElse Convert.ToString(dgvupdates.Rows(i).Cells(1).Value) <> rows(i)(1) Then
+                    If (i < dt.Rows.Count AndAlso Not Object.Equals(dgvupdates.Rows(i).Tag, CInt(dt.Rows(i)("log_id")))) OrElse Convert.ToString(dgvupdates.Rows(i).Cells(0).Value) <> rows(i)(0) OrElse Convert.ToString(dgvupdates.Rows(i).Cells(1).Value) <> rows(i)(1) Then
                         changed = True
                         Exit For
                     End If
@@ -911,14 +909,15 @@ Public Class Admin
             If changed Then
                 dgvupdates.Rows.Clear()
                 For Each values In rows
-                    dgvupdates.Rows.Add(values(0), values(1))
+                    Dim index = dgvupdates.Rows.Add(values(0), values(1))
+                    If index < dt.Rows.Count Then dgvupdates.Rows(index).Tag = CInt(dt.Rows(index)("log_id"))
                 Next
                 dgvupdates.ClearSelection()
             End If
         Catch ex As Exception
             ' Keep the current feed intact on a failed automatic refresh.
             If revision = updatesRevision AndAlso Not IsDisposed AndAlso Not Disposing Then
-                If showErrors Then MessageBox.Show("Unable to load updates: " & ex.Message, "Updates Error", MessageBoxButtons.OK, MessageBoxIcon.Error)
+                SetAdminState("Updates could not refresh. Use Refresh to retry: " & ex.Message, True)
             End If
         Finally
             If revision = updatesRevision Then updatesLoading = False
@@ -1003,11 +1002,17 @@ Public Class Admin
 
     End Sub
 
-    Private ReadOnly quickForm As New quickactions()
-
-    Private Sub OpenQuickAction(mode As quickactions.FormMode)
-        quickForm.ShowMode(mode)
-        quickForm.ShowDialog(Me)
+    Private Sub OpenQuickAction(mode As quickactions.FormMode, Optional onlyOpen As Boolean = False)
+        If mode = quickactions.FormMode.ViewRequests Then
+            Using dialog As New AdminRequestsForm(AppSession.CurrentUser.UserId, onlyOpen)
+                dialog.ShowDialog(Me)
+            End Using
+        Else
+            Using dialog As New quickactions()
+                dialog.ShowMode(mode)
+                dialog.ShowDialog(Me)
+            End Using
+        End If
         LoadDashboard()
     End Sub
 
@@ -1020,7 +1025,9 @@ Public Class Admin
     End Sub
 
     Private Sub btnViewLogs_Click(sender As Object, e As EventArgs) Handles btnViewLogs.Click
-        OpenQuickAction(quickactions.FormMode.ViewAuditLogs)
+        Using audit As New AdminAuditForm(AppSession.CurrentUser.UserId)
+            audit.ShowDialog(Me)
+        End Using
     End Sub
 
     Private Sub btnLogout_Click(sender As Object, e As EventArgs) Handles btnLogout.Click

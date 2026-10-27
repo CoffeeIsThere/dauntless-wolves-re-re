@@ -29,11 +29,27 @@ Public Class StudentNameOrder
         Return Parts(name).Surname
     End Function
 
+    Public Shared Function FormatForGradebook(name As String) As String
+        Dim parsed = Parts(name)
+        Dim surname = parsed.Surname
+        Dim given = parsed.Given
+        Dim words = Regex.Replace(If(name, ""), "[,\s]+", " ").Trim().Split(" "c, StringSplitOptions.RemoveEmptyEntries)
+        If words.Length > 1 AndAlso Suffixes.Contains(words.Last().TrimEnd("."c)) Then
+            Dim suffix = words.Last()
+            If given.EndsWith(suffix, StringComparison.OrdinalIgnoreCase) Then given = given.Substring(0, given.Length - suffix.Length).Trim()
+            If Not surname.EndsWith(suffix, StringComparison.OrdinalIgnoreCase) Then surname &= " " & suffix
+        End If
+        ' Preserve complete given names: the schema cannot distinguish a second given
+        ' name from a middle name. Only normalize initials explicitly stored as letters.
+        given = String.Join(" ", given.Split(" "c, StringSplitOptions.RemoveEmptyEntries).Select(Function(word) If(word.Length = 1 AndAlso Char.IsLetter(word(0)), word & ".", word)))
+        Return surname & If(given = "", "", ", " & given)
+    End Function
+
     Public Shared Function CompareNames(left As String, right As String) As Integer
         Dim first = Parts(left)
         Dim second = Parts(right)
         Dim options = CompareOptions.IgnoreCase Or CompareOptions.IgnoreNonSpace
-        Dim result = CultureInfo.InvariantCulture.CompareInfo.Compare(first.Surname, second.Surname, options)
+        Dim result = CultureInfo.InvariantCulture.CompareInfo.Compare(Regex.Replace(first.Surname, "\s+(Jr\.?|Sr\.?|II|III|IV|V)$", "", RegexOptions.IgnoreCase), Regex.Replace(second.Surname, "\s+(Jr\.?|Sr\.?|II|III|IV|V)$", "", RegexOptions.IgnoreCase), options)
         If result <> 0 Then Return result
         Return CultureInfo.InvariantCulture.CompareInfo.Compare(first.Given, second.Given, options)
     End Function

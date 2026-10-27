@@ -1,9 +1,16 @@
-﻿
+
 Imports System.Text.RegularExpressions
 
 Public Class ValidationHelper
     Public Shared Function IsRequired(input As String) As Boolean
         Return Not String.IsNullOrWhiteSpace(input)
+    End Function
+
+    Public Shared Function IsValidAcademicYear(value As String) As Boolean
+        If value Is Nothing OrElse Not Regex.IsMatch(value, "^[0-9]{4}-[0-9]{4}$") Then Return False
+        Dim startYear = Integer.Parse(value.Substring(0, 4))
+        Dim endYear = Integer.Parse(value.Substring(5, 4))
+        Return startYear >= 1000 AndAlso endYear = startYear + 1
     End Function
 
     Public Shared Function IsValidEmail(email As String) As Boolean
@@ -30,8 +37,12 @@ Public Class ValidationHelper
     Public Shared Function SanitizeInput(input As String) As String
         Return CleanInput(input)
     End Function
+    Public Shared Function HasTwoDecimalPlaces(value As Double) As Boolean
+        Return Double.IsFinite(value) AndAlso value = Math.Round(value, 2, MidpointRounding.AwayFromZero)
+    End Function
+
     Public Shared Function IsValidScore(score As Double, maxScore As Double) As Boolean
-        Return score >= 0.0 AndAlso score <= maxScore
+        Return HasTwoDecimalPlaces(score) AndAlso score >= 0.0 AndAlso score <= maxScore
     End Function
 
     Public Shared Function IsValidWeight(weight As Double) As Boolean
@@ -42,8 +53,8 @@ Public Class ValidationHelper
         If Not {"Quiz", "Activity", "Exam", "Project", "Attendance"}.Contains(fields(0).Trim()) Then Return False
         If Not {"Midterm", "Finals"}.Contains(fields(3).Trim()) Then Return False
         Return Double.TryParse(fields(2), Globalization.NumberStyles.Float, Globalization.CultureInfo.InvariantCulture, maximum) AndAlso
-            Double.IsFinite(maximum) AndAlso maximum > 0 AndAlso maximum <= 9999.99 AndAlso
+            HasTwoDecimalPlaces(maximum) AndAlso maximum > 0 AndAlso maximum <= 9999.99 AndAlso
             Double.TryParse(fields(4), Globalization.NumberStyles.Float, Globalization.CultureInfo.InvariantCulture, weight) AndAlso
-            Double.IsFinite(weight) AndAlso weight > 0 AndAlso weight <= 100
+            HasTwoDecimalPlaces(weight) AndAlso weight > 0 AndAlso weight <= 100
     End Function
 End Class

@@ -22,6 +22,8 @@ Module Program
             Dim flags = BindingFlags.Instance Or BindingFlags.NonPublic
             Dim grid = DirectCast(GetType(frmGradebook).GetProperty("dgvGrades", flags).GetValue(form), DataGridView)
             Dim row = grid.Rows.Cast(Of DataGridViewRow)().First(Function(item) Convert.ToString(item.Cells("StudentName").Tag) = fixture("student_id").ToString())
+            Dim originalName = Convert.ToString(DatabaseHelper.ExecuteScalar("SELECT full_name FROM student WHERE student_id=@Id", New MySql.Data.MySqlClient.MySqlParameter("@Id", fixture("student_id").ToString())))
+            Check(Convert.ToString(row.Cells("StudentName").Value) = StudentNameOrder.FormatForGradebook(originalName), "gradebook displays surname-first name without changing student identity")
             Dim cell = row.Cells("Assessment" & assessment & "Raw")
             grid.CurrentCell = cell
             Check(grid.BeginEdit(True), "begin grade edit")

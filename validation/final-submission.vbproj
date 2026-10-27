@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType><TargetFramework>net8.0-windows</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms><EnableWindowsTargeting>true</EnableWindowsTargeting>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems><RootNamespace>FinalSubmissionRegression</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="FinalSubmission.vb.txt" />
+    <ProjectReference Include="../DAUNTLESS WOLVES PROF.vbproj" />
+  </ItemGroup>
+</Project>

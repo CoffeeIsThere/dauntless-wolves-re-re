@@ -14,7 +14,7 @@ Public Class ClassImportService
         section = section.Trim().ToUpperInvariant()
         If code.Length = 0 OrElse code.Length > 20 OrElse name.Length = 0 OrElse name.Length > 100 OrElse section.Length = 0 OrElse section.Length > 20 Then Return OperationResult.Fail("Enter a course code, name, and section (up to 20 characters).")
         If Not {"1st Semester", "2nd Semester"}.Contains(semester) Then Return OperationResult.Fail("Choose 1st Semester or 2nd Semester.")
-        If Not Regex.IsMatch(year, "^\d{4}-\d{4}$") OrElse Integer.Parse(year.Substring(5)) <> Integer.Parse(year.Substring(0, 4)) + 1 Then Return OperationResult.Fail("Enter an academic year such as 2026-2027.")
+        If Not ValidationHelper.IsValidAcademicYear(year) Then Return OperationResult.Fail("Enter an academic year such as 2026-2027.")
         If Not {"Midterm", "Finals"}.Contains(term) Then Return OperationResult.Fail("Choose Midterm or Finals for imported assessments.")
         Dim titles As New List(Of String)
         Dim maxima As New List(Of Double)
@@ -23,7 +23,7 @@ Public Class ClassImportService
             For Each header In rows(0).Skip(2)
                 Dim match = Regex.Match(header.Trim(), "^(.+?)\s*/\s*(\d+(?:\.\d+)?)$")
                 Dim maximum As Double
-                If Not match.Success OrElse Not Double.TryParse(match.Groups(2).Value, NumberStyles.Float, CultureInfo.InvariantCulture, maximum) OrElse maximum <= 0 OrElse maximum > 9999.99 Then Return OperationResult.Fail("Each assessment header needs a maximum: Quiz 1 /20.")
+                If Not match.Success OrElse Not Double.TryParse(match.Groups(2).Value, NumberStyles.Float, CultureInfo.InvariantCulture, maximum) OrElse Not ValidationHelper.HasTwoDecimalPlaces(maximum) OrElse maximum <= 0 OrElse maximum > 9999.99 Then Return OperationResult.Fail("Each assessment header needs a maximum: Quiz 1 /20.")
                 Dim title = match.Groups(1).Value.Trim()
                 If title.Length > 100 OrElse titles.Any(Function(existing) existing.Equals(title, StringComparison.OrdinalIgnoreCase)) Then Return OperationResult.Fail("Assessment titles must be unique and at most 100 characters.")
                 titles.Add(title)
@@ -34,7 +34,7 @@ Public Class ClassImportService
                 If row.Length <> rows(0).Length OrElse String.IsNullOrWhiteSpace(row(1)) OrElse Not ids.Add(row(0).Trim()) Then Return OperationResult.Fail("Each CSV row needs a unique student ID, name, and the same number of columns as the header.")
                 For i = 2 To row.Length - 1
                     Dim score As Double
-                    If row(i).Trim() <> "" AndAlso (Not Double.TryParse(row(i), NumberStyles.Float, CultureInfo.InvariantCulture, score) OrElse Not Double.IsFinite(score) OrElse score < 0 OrElse score > maxima(i - 2)) Then Return OperationResult.Fail("Invalid score for student " & row(0) & ", " & titles(i - 2))
+                    If row(i).Trim() <> "" AndAlso (Not Double.TryParse(row(i), NumberStyles.Float, CultureInfo.InvariantCulture, score) OrElse Not ValidationHelper.HasTwoDecimalPlaces(score) OrElse score < 0 OrElse score > maxima(i - 2)) Then Return OperationResult.Fail("Invalid score for student " & row(0) & ", " & titles(i - 2))
                 Next
             Next
         End If

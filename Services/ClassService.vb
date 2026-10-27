@@ -1,4 +1,4 @@
-﻿Imports MySql.Data.MySqlClient
+Imports MySql.Data.MySqlClient
 Imports System.Data
 
 ' Everything about classes: courses, class offerings, teacher assignment and enrollment.
@@ -37,6 +37,10 @@ Public Class ClassService
     End Function
 
     ' Every class with its teacher (admin screens)
+    Public Function GetGradeEntryClasses() As DataTable
+        Return DatabaseHelper.ExecuteQuery("SELECT c.class_id, CONCAT(c.course_code, ' - ', co.course_name, ' (Section ', c.section, ', ', c.semester, ', ', c.academic_year, ')') AS class_title FROM class c JOIN course co ON co.course_code=c.course_code ORDER BY c.course_code,c.section,c.academic_year DESC,c.semester")
+    End Function
+
     Public Function GetAllClasses() As DataTable
         Dim sql As String =
             "SELECT c.class_id, c.course_code, co.course_name, c.section, c.semester, c.academic_year, c.teacher_id, " &
@@ -92,7 +96,7 @@ Public Class ClassService
         If courseCode.Length > 20 Then Return OperationResult.Fail("Subject code can have at most 20 characters.")
         If section.Length > 20 Then Return OperationResult.Fail("Section can have at most 20 characters.")
         If semester <> "1st Semester" AndAlso semester <> "2nd Semester" Then Return OperationResult.Fail("Semester must be 1st Semester or 2nd Semester.")
-        If academicYear.Length <> 9 OrElse academicYear(4) <> "-"c Then Return OperationResult.Fail("Academic year must look like 2026-2027.")
+        If Not ValidationHelper.IsValidAcademicYear(academicYear) Then Return OperationResult.Fail("Academic year must contain consecutive years, such as 2026-2027.")
         If String.IsNullOrEmpty(teacherId) Then Return OperationResult.Fail("Please choose a professor.")
 
         Try

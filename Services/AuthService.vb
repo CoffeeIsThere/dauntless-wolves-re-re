@@ -1,4 +1,4 @@
-﻿Imports MySql.Data.MySqlClient
+Imports MySql.Data.MySqlClient
 Imports System.Data
 Imports DAUNTLESS_WOLVES_PROF.Models
 
@@ -108,25 +108,26 @@ Public Class AuthService
 
         Try
             Using conn = DatabaseHelper.GetConnection()
-                If Not AccountAccess.IsActive(conn, Nothing, If(tableName = "admin", "Admin", If(tableName = "teacher", "Teacher", "Student")), userId) Then Return OperationResult.Fail("Your account is inactive or unavailable.")
+                Using tx = conn.BeginTransaction()
+                    Dim actorRole = If(tableName = "admin", "Admin", If(tableName = "teacher", "Teacher", "Student"))
+                    If Not AccountAccess.IsActive(conn, tx, actorRole, userId) Then Return OperationResult.Fail("Your account is inactive or unavailable.")
+                    Dim stored As Object
+                    Using cmd As New MySqlCommand("SELECT password_hash FROM " & tableName & " WHERE " & idColumn & "=@Id FOR UPDATE", conn, tx)
+                        cmd.Parameters.AddWithValue("@Id", userId)
+                        stored = cmd.ExecuteScalar()
+                    End Using
+                    If stored Is Nothing OrElse IsDBNull(stored) Then Return OperationResult.Fail("Account not found.")
+                    If Not SecurityHelper.VerifyPassword(currentPassword, stored.ToString()) Then Return OperationResult.Fail("Your current password is not correct.")
+                    Using cmd As New MySqlCommand("UPDATE " & tableName & " SET password_hash=@Hash WHERE " & idColumn & "=@Id", conn, tx)
+                        cmd.Parameters.AddWithValue("@Hash", SecurityHelper.HashPassword(newPassword))
+                        cmd.Parameters.AddWithValue("@Id", userId)
+                        If cmd.ExecuteNonQuery() <= 0 Then Return OperationResult.Fail("Account unavailable; password was not changed.")
+                    End Using
+                    If Not AuditService.LogActionTx(conn, tx, actorRole, userId, "Changed password", actorRole, userId) Then Throw New InvalidOperationException("The password audit entry could not be saved.")
+                    tx.Commit()
+                    Return OperationResult.Ok("Password changed.")
+                End Using
             End Using
-            Dim stored As Object = DatabaseHelper.ExecuteScalar(
-                "SELECT password_hash FROM " & tableName & " WHERE " & idColumn & " = @Id",
-                New MySqlParameter("@Id", userId))
-            If stored Is Nothing OrElse Convert.IsDBNull(stored) Then Return OperationResult.Fail("Account not found.")
-
-            If Not SecurityHelper.VerifyPassword(currentPassword, stored.ToString()) Then
-                Return OperationResult.Fail("Your current password is not correct.")
-            End If
-
-            Dim changed = DatabaseHelper.ExecuteNonQuery(
-                "UPDATE " & tableName & " SET password_hash = @Hash WHERE " & idColumn & " = @Id" & If(tableName = "admin", "", " AND status='Active'"),
-                New MySqlParameter("@Hash", SecurityHelper.HashPassword(newPassword)),
-                New MySqlParameter("@Id", userId))
-            If changed <= 0 Then Return OperationResult.Fail("Account unavailable; password was not changed.")
-
-            AuditService.LogAction(role, userId, "Changed password", role, userId)
-            Return OperationResult.Ok("Password changed.")
         Catch ex As Exception
             Return OperationResult.Fail("Could not change the password: " & ex.Message)
         End Try

@@ -23,6 +23,24 @@ Module Program
         Check(StudentNameOrder.Surname("Juan Cruz, Jr.") = "Cruz", "comma suffix does not become surname")
         Check(StudentNameOrder.CompareNames("Juan Álvarez", "John Brown") < 0, "accented surname sorts alphabetically")
         Check(StudentNameOrder.Surname("") = "", "empty name is safe")
+        Check(StudentNameOrder.FormatForGradebook("Ron Jacob Puyat") = "Puyat, Ron Jacob", "gradebook preserves complete given names")
+        Check(StudentNameOrder.FormatForGradebook("Juan A Cruz") = "Cruz, Juan A.", "gradebook displays recorded middle initial")
+        Check(StudentNameOrder.FormatForGradebook("Cruz, Juan A.") = "Cruz, Juan A.", "surname-first name is not reformatted twice")
+        Check(StudentNameOrder.FormatForGradebook("Juan de la Cruz") = "de la Cruz, Juan", "compound surname displays before given name")
+        Check(StudentNameOrder.FormatForGradebook("Juan Cruz Jr.") = "Cruz Jr., Juan", "name suffix is preserved in gradebook")
+        Check(StudentNameOrder.FormatForGradebook("") = "", "blank display name is safe")
+        Check(StudentNameOrder.CompareNames("Juan Cruz Jr.", "Cruz Jr., Juan") = 0, "display format preserves surname sorting with suffix")
+        Check(ValidationHelper.IsValidAcademicYear("2026-2027"), "academic year accepts consecutive years")
+        For Each invalidYear In {"abcd-efgh", "2026-2026", "2026-2028", "2026/2027", "0000-0001", "9999-10000", "２０２６-２０２７"}
+            Check(Not ValidationHelper.IsValidAcademicYear(invalidYear), "academic year rejects " & invalidYear)
+        Next
+        Dim reportWidths As Single() = {40, 180, 120, 120, 120, 120, 120, 120}
+        Dim reportBands = ReportColumnBands.Build(reportWidths, {0, 1}, 600)
+        Check(reportBands.Count > 1, "wide reports split into horizontal column groups")
+        Check(reportBands.All(Function(band) band.Contains(0) AndAlso band.Contains(1)), "report groups repeat student number and name")
+        Check(reportBands.All(Function(band) band.Sum(Function(index) reportWidths(index)) <= 600), "report groups fit the printable width")
+        Check(reportBands.SelectMany(Function(band) band.Where(Function(index) index > 1)).OrderBy(Function(index) index).SequenceEqual(Enumerable.Range(2, 6)), "report pagination includes every assessment column exactly once")
+        Check(ReportColumnBands.Build(New Single() {150, 150}, Array.Empty(Of Integer)(), 600).Count = 1, "narrow reports stay in one column group")
         Dim service As New GradeService()
         Using conn = DatabaseHelper.GetConnection()
             Dim teacher As String
@@ -197,6 +215,184 @@ Module Program
             Check(CInt(DatabaseHelper.ExecuteScalar("SELECT COUNT(*) FROM teacher WHERE teacher_id=@Id", New MySqlParameter("@Id", teacherId))) = 0, "deleted professor record is absent")
             Check(Not users.DeleteUser("Teacher", teacherId, adminId).Success, "second deletion reports missing account")
             Check(Not users.DeleteUser("Admin", adminId, adminId).Success, "admin deletion is not available from account management")
+            Dim workspace As New AdminWorkspaceService()
+            Check(Not workspace.SetStatuses("Admin", {studentId}, "Inactive", adminId).Success, "bulk status rejects unsupported role")
+            Check(Not workspace.SetStatuses("Student", {studentId}, "Other", adminId).Success, "bulk status rejects invalid status")
+            Check(Not workspace.SetStatuses("Student", Array.Empty(Of String)(), "Inactive", adminId).Success, "bulk status requires a selection")
+            Check(Not workspace.SetStatuses("Student", {studentId}, "Inactive", "invalid-admin").Success, "bulk status requires active administrator")
+            Dim bulkBefore = CInt(DatabaseHelper.ExecuteScalar("SELECT COUNT(*) FROM auditlog WHERE action='Bulk account status'"))
+            Check(Not workspace.SetStatuses("Student", {studentId, "zzMissingAccount"}, "Inactive", adminId).Success, "bulk update rejects missing account")
+            Check(CStr(DatabaseHelper.ExecuteScalar("SELECT status FROM student WHERE student_id=@Id", New MySqlParameter("@Id", studentId))) = "Active", "bulk failure rolls back prior account updates")
+            Check(CInt(DatabaseHelper.ExecuteScalar("SELECT COUNT(*) FROM auditlog WHERE action='Bulk account status'")) = bulkBefore, "bulk failure rolls back audit entries")
+            Check(workspace.SetStatuses("Student", {studentId, studentId.ToLowerInvariant()}, "Inactive", adminId).Success, "bulk status accepts duplicate selections safely")
+            Check(CInt(DatabaseHelper.ExecuteScalar("SELECT COUNT(*) FROM auditlog WHERE action='Bulk account status'")) = bulkBefore + 1, "bulk audit contains one entry per changed account")
+            Check(workspace.SetStatuses("Student", {studentId}, "Inactive", adminId).Success, "bulk status supports already matching accounts")
+            Check(CInt(DatabaseHelper.ExecuteScalar("SELECT COUNT(*) FROM auditlog WHERE action='Bulk account status'")) = bulkBefore + 1, "unchanged bulk status adds no audit entry")
+            Check(workspace.SetStatuses("Student", {studentId}, "Active", adminId).Success, "bulk reactivation succeeds")
+            Dim blockers = workspace.DeletionBlockers("Student", studentId, adminId)
+            Check(blockers.Rows.Cast(Of DataRow).Any(Function(row) Convert.ToInt64(row("Records")) > 0), "deletion preflight returns linked student counts")
+            Check(workspace.DeletionBlockers("Teacher", teacher, adminId).Rows.Cast(Of DataRow).Any(Function(row) Convert.ToInt64(row("Records")) > 0), "deletion preflight returns linked professor counts")
+            Check(Not workspace.AccountProfile("Student", studentId, adminId).Columns.Contains("password_hash"), "account detail read excludes credential hashes")
+            Check(workspace.AccountClasses("Student", studentId, adminId).Rows.Count > 0, "student details list enrolled classes")
+            Check(workspace.AccountClasses("Teacher", teacher, adminId).Rows.Count > 0, "professor details list assigned classes")
+            Dim personalActivity = workspace.AuditRows(adminId, accountRole:="Student", accountId:=studentId)
+            Check(personalActivity.Rows.Count > 0 AndAlso personalActivity.Rows.Count <= 25, "account activity includes changes concerning the selected account")
+            Dim bulkRows = workspace.AuditRows(adminId, actor:=adminId, action:="Bulk account status", search:=studentId)
+            Check(bulkRows.Rows.Count = 2, "audit actor action and entity search filters combine")
+            Dim oneLog = workspace.AuditRows(adminId, logId:=CInt(bulkRows.Rows(0)("Log ID")))
+            Check(oneLog.Rows.Count = 1 AndAlso CStr(oneLog.Rows(0)("Before")) <> CStr(oneLog.Rows(0)("After")), "audit detail returns exact log with before and after values")
+            Check(workspace.AuditRows(adminId, Date.Today, Date.Today, action:="Bulk account status").Rows.Count = 2, "audit date range includes the whole end date")
+            Check(workspace.AuditRows(adminId, Date.Today.AddDays(2), Date.Today.AddDays(3)).Rows.Count = 0, "audit date range excludes records outside its dates")
+            Check(workspace.AuditRows(adminId, action:="%").Rows.Count = 0, "audit search treats percent as literal text")
+            Dim invalidRange = False
+            Try
+                workspace.AuditRows(adminId, Date.Today, Date.Today.AddDays(-1))
+            Catch ex As ArgumentException
+                invalidRange = True
+            End Try
+            Check(invalidRange, "audit rejects reversed date range")
+            Dim unauthorizedRead = False
+            Try
+                workspace.AccountProfile("Student", studentId, "invalid-admin")
+            Catch ex As UnauthorizedAccessException
+                unauthorizedRead = True
+            End Try
+            Check(unauthorizedRead, "administrative details reject unauthorized reads")
+            Dim originalStudentStatus = CStr(DatabaseHelper.ExecuteScalar("SELECT status FROM student WHERE student_id=@Id", New MySqlParameter("@Id", student)))
+            Check(workspace.SetStatuses("Student", {studentId, student}, "Inactive", adminId).Success, "bulk update changes two distinct accounts together")
+            Check(CInt(DatabaseHelper.ExecuteScalar("SELECT COUNT(*) FROM student WHERE student_id IN (@First,@Second) AND status='Inactive'", New MySqlParameter("@First", studentId), New MySqlParameter("@Second", student))) = 2, "all selected student statuses persist")
+            Check(workspace.SetStatuses("Student", {studentId}, "Active", adminId).Success AndAlso workspace.SetStatuses("Student", {student}, originalStudentStatus, adminId).Success, "bulk fixture statuses restore safely")
+            Dim originalTeacherStatus = CStr(DatabaseHelper.ExecuteScalar("SELECT status FROM teacher WHERE teacher_id=@Id", New MySqlParameter("@Id", teacher)))
+            Check(workspace.SetStatuses("Teacher", {teacher}, "Inactive", adminId).Success, "bulk status supports professor accounts")
+            Check(workspace.SetStatuses("Teacher", {teacher}, originalTeacherStatus, adminId).Success, "professor bulk fixture status restores")
+            Dim classAdmin As New ClassService()
+            For Each badYear In {"abcd-efgh", "2026-2026", "2026-2028"}
+                Check(Not classAdmin.CreateClass("REJECTYEAR", "Invalid year", "TEST", "1st Semester", badYear, teacher, adminId).Success, "class creation rejects malformed academic year " & badYear)
+            Next
+            Dim fixtureClass = DatabaseHelper.ExecuteQuery("SELECT course_code,section FROM class WHERE class_id=@Id", New MySqlParameter("@Id", classId)).Rows(0)
+            Check(classAdmin.CreateClass(fixtureClass("course_code").ToString(), "", fixtureClass("section").ToString(), "2nd Semester", "2088-2089", teacher, adminId).Success, "another semester and academic year creates a distinct offering")
+            Dim entryChoices = classAdmin.GetGradeEntryClasses()
+            Check(entryChoices.Rows.Cast(Of DataRow).Select(Function(row) row("class_title").ToString()).Distinct().Count() = entryChoices.Rows.Count, "admin quick-entry labels distinguish offerings")
+            Check(entryChoices.Rows.Cast(Of DataRow).Any(Function(row) row("class_title").ToString().Contains("2nd Semester, 2088-2089")), "admin quick-entry labels include semester and year")
+            Dim requestsForStudent = revision.GetRevisionRequestsByStudent(student)
+            Check(requestsForStudent.Columns.Contains("class_label") AndAlso requestsForStudent.Columns.Contains("enrollment_id"), "student request results identify their course offering")
+            If requestsForStudent.Rows.Count > 0 Then
+                Dim chosenEnrollment = CInt(requestsForStudent.Rows(0)("enrollment_id"))
+                Check(revision.GetRevisionRequestsByStudent(student, chosenEnrollment).Rows.Cast(Of DataRow).All(Function(row) CInt(row("enrollment_id")) = chosenEnrollment), "student requests filter by the selected enrollment")
+                Check(revision.GetRevisionRequestsByStudent(studentId, chosenEnrollment).Rows.Count = 0, "request enrollment filter cannot reveal another student's requests")
+            End If
+            Dim adminRequests = workspace.RequestRows(adminId)
+            Check(adminRequests.Rows.Count > 0 AndAlso adminRequests.Columns("requested_at").DataType = GetType(DateTime), "admin requests include sortable request dates")
+            Check(adminRequests.Columns.Contains("reviewed_at") AndAlso adminRequests.Columns.Contains("reviewed_by") AndAlso adminRequests.Columns.Contains("response"), "admin requests include review history and response")
+            Check(adminRequests.Rows.Cast(Of DataRow).Any(Function(row) Not IsDBNull(row("response")) AndAlso row("response").ToString().Contains("Rechecked your submitted answer.")), "admin oversight shows the professor response stored with the decision")
+            Dim expectedRequestOrder = adminRequests.Rows.Cast(Of DataRow).OrderByDescending(Function(row) CDate(row("requested_at"))).ThenByDescending(Function(row) CInt(row("request_id"))).Select(Function(row) CInt(row("request_id")))
+            Check(adminRequests.Rows.Cast(Of DataRow).Select(Function(row) CInt(row("request_id"))).SequenceEqual(expectedRequestOrder), "admin requests default to newest first with stable ordering")
+            For Each requestStatus In {"Pending", "Under Review", "Approved", "Closed"}
+                Check(workspace.RequestRows(adminId, status:=requestStatus).Rows.Cast(Of DataRow).All(Function(row) CStr(row("status")) = requestStatus), "admin request status filter " & requestStatus)
+            Next
+            Check(workspace.RequestRows(adminId, status:="Open").Rows.Cast(Of DataRow).All(Function(row) {"Pending", "Under Review"}.Contains(CStr(row("status")))), "admin open filter includes pending and under-review requests only")
+            Dim firstRequest = adminRequests.Rows(0)
+            Dim requestStudent = CStr(firstRequest("student_id")), requestClass = CInt(firstRequest("class_id"))
+            Check(workspace.RequestRows(adminId, search:=requestStudent).Rows.Cast(Of DataRow).All(Function(row) CStr(row("student_id")) = requestStudent), "admin request student ID search is scoped correctly")
+            Check(workspace.RequestRows(adminId, search:=CStr(firstRequest("student_name")).ToUpperInvariant()).Rows.Count > 0, "admin request student name search ignores case")
+            Check(workspace.RequestRows(adminId, search:="%").Rows.Count = 0, "admin request search escapes literal wildcard characters")
+            Check(workspace.RequestRows(adminId, classId:=requestClass).Rows.Cast(Of DataRow).All(Function(row) CInt(row("class_id")) = requestClass), "admin request course filter uses exact class IDs")
+            Dim requestDay = CDate(firstRequest("requested_at")).Date
+            Dim dayRequests = workspace.RequestRows(adminId, fromDate:=requestDay, toDate:=requestDay)
+            Check(dayRequests.Rows.Cast(Of DataRow).Any(Function(row) CInt(row("request_id")) = CInt(firstRequest("request_id"))) AndAlso dayRequests.Rows.Cast(Of DataRow).All(Function(row) CDate(row("requested_at")).Date = requestDay), "admin request date range includes the entire end date")
+            Check(workspace.RequestRows(adminId, search:=requestStudent, classId:=requestClass, status:=CStr(firstRequest("status")), fromDate:=requestDay, toDate:=requestDay).Rows.Cast(Of DataRow).Any(Function(row) CInt(row("request_id")) = CInt(firstRequest("request_id"))), "admin request filters combine without losing matching rows")
+            Check(workspace.RequestCourses(adminId).Rows.Cast(Of DataRow).All(Function(row) row("class_label").ToString().Contains("Semester")), "admin request course choices identify semester and year")
+            Dim rejectedRequestRead = False
+            Try
+                workspace.RequestRows("invalid-admin")
+            Catch ex As UnauthorizedAccessException
+                rejectedRequestRead = True
+            End Try
+            Check(rejectedRequestRead, "admin request overview rejects unauthorized access")
+            Dim rejectedRequestDates = False
+            Try
+                workspace.RequestRows(adminId, fromDate:=Date.Today, toDate:=Date.Today.AddDays(-1))
+            Catch ex As ArgumentException
+                rejectedRequestDates = True
+            End Try
+            Check(rejectedRequestDates, "admin request overview rejects reversed date ranges")
+            Dim rejectedRequestStatus = False
+            Try
+                workspace.RequestRows(adminId, status:="Invalid")
+            Catch ex As ArgumentException
+                rejectedRequestStatus = True
+            End Try
+            Check(rejectedRequestStatus, "admin request overview rejects unknown status filters")
+            Check(AssessmentNames.NextTitle("Quiz", {"Quiz 1", "Quiz 3"}) = "Quiz 2", "assessment numbering finds an unused gap")
+            Check(AssessmentNames.NextTitle("Quiz", {"quiz 1", "QUIZ 2"}) = "Quiz 3", "assessment numbering ignores title case")
+            Check(Not service.CreateAssessment(classId, "Review test", "Quiz", 20, "Midterm", teacher).Success, "duplicate assessment title is rejected")
+            Check(Not service.SaveAssessmentScore(student, classId, id, 15.555, teacher).Success, "scores with excess precision are rejected")
+            Check(Not service.CreateAssessment(classId, "Bad precision", "Quiz", 20.555, "Midterm", teacher).Success, "maximum score precision is validated")
+            Check(Not service.CreateAssessment(classId, "Bad weight precision", "Quiz", 20, "Midterm", teacher, 10.555).Success, "assessment weight precision is validated")
+            Dim oldScore = CDbl(DatabaseHelper.ExecuteScalar("SELECT score FROM studentgrade WHERE grade_id=@Id", New MySqlParameter("@Id", gradeId)))
+            Dim auditCount = CInt(DatabaseHelper.ExecuteScalar("SELECT COUNT(*) FROM auditlog"))
+            Check(Not service.SaveScoreBatch(classId, New List(Of (StudentId As String, AssessmentId As Integer, Score As Double)) From {(student, id, 19), (student, id, 21)}, teacher).Success, "paste rejects a failing later score")
+            Check(CDbl(DatabaseHelper.ExecuteScalar("SELECT score FROM studentgrade WHERE grade_id=@Id", New MySqlParameter("@Id", gradeId))) = oldScore, "failed paste rolls back earlier scores")
+            Check(CInt(DatabaseHelper.ExecuteScalar("SELECT COUNT(*) FROM auditlog")) = auditCount, "failed paste rolls back audit entries")
+            Check(service.SaveScoreBatch(classId, New List(Of (StudentId As String, AssessmentId As Integer, Score As Double)) From {(student, id, 17.25)}, teacher).Success, "valid pasted score commits")
+            Check(CDbl(DatabaseHelper.ExecuteScalar("SELECT score FROM studentgrade WHERE grade_id=@Id", New MySqlParameter("@Id", gradeId))) = 17.25, "pasted value retains exact supported precision")
+            Dim existingCode = Convert.ToString(DatabaseHelper.ExecuteScalar("SELECT course_code FROM class WHERE class_id=@Id", New MySqlParameter("@Id", classId)))
+            Dim existingName = Convert.ToString(DatabaseHelper.ExecuteScalar("SELECT course_name FROM course WHERE course_code=@Code", New MySqlParameter("@Code", existingCode)))
+            Dim secondSection As Integer
+            Check(importer.ImportClass(existingCode, existingName, "TEST" & Guid.NewGuid().ToString("N").Substring(0, 6), "2nd Semester", "2026-2027", "Midterm", Nothing, secondSection).Success, "existing course supports another section and semester")
+            Dim selectedStudent = DatabaseHelper.ExecuteQuery("SELECT full_name FROM student WHERE student_id=@Id", New MySqlParameter("@Id", student)).Rows(0)
+            Check(rosterImporter.ImportStudents(secondSection, teacher, New List(Of String()) From {New String() {student, selectedStudent("full_name").ToString()}}).Success, "manual enrollment saves into chosen destination class")
+            Check(service.GetEnrollmentsByClass(secondSection, teacher).Select("student_id='" & student & "'").Length = 1, "destination class contains selected registered student")
+            Check(service.GetEnrollmentsByStudent(student).Select("class_id=" & secondSection).Length = 1, "student catalog query discovers new enrollment")
+            Check(service.GetClassesByTeacher(teacher).Select("class_id=" & secondSection).Length = 1, "professor catalog query discovers new offering")
+            Check(Not rosterImporter.ImportStudents(secondSection, teacher, New List(Of String()) From {New String() {student, "Not the registered name"}}).Success, "manual enrollment cannot substitute a mismatched name")
+            Dim assessmentBatch As New List(Of (Type As String, Max As Double, Term As String, Weight As Double)) From {("Quiz", 20, "Midterm", 10), ("Activity", 50, "Finals", 10)}
+            Dim baselineAssessments = CInt(DatabaseHelper.ExecuteScalar("SELECT COUNT(*) FROM assessment WHERE class_id=" & secondSection))
+            Dim baselineGrades = CInt(DatabaseHelper.ExecuteScalar("SELECT COUNT(*) FROM studentgrade"))
+            Dim baselineAudit = CInt(DatabaseHelper.ExecuteScalar("SELECT COUNT(*) FROM auditlog"))
+            Check(Not service.ImportAssessments(secondSection, Nothing, teacher).Success, "assessment import requires a batch")
+            Check(Not service.ImportAssessments(secondSection, New List(Of (Type As String, Max As Double, Term As String, Weight As Double)), teacher).Success, "assessment import rejects an empty batch")
+            Check(Not service.ImportAssessments(secondSection, New List(Of (Type As String, Max As Double, Term As String, Weight As Double)) From {("Quiz", 20, "Midterm", 10), ("Activity", Double.NaN, "Finals", 10)}, teacher).Success, "assessment import validates every row before writing")
+            Dim otherTeacher = CStr(DatabaseHelper.ExecuteScalar("SELECT teacher_id FROM teacher WHERE status='Active' AND teacher_id<>@Teacher LIMIT 1", New MySqlParameter("@Teacher", teacher)))
+            Check(Not service.ImportAssessments(secondSection, assessmentBatch, otherTeacher).Success, "assessment batch rejects another class professor")
+            Check(CInt(DatabaseHelper.ExecuteScalar("SELECT COUNT(*) FROM assessment WHERE class_id=" & secondSection)) = baselineAssessments, "invalid or unauthorized batches add no assessments")
+            DatabaseHelper.ExecuteNonQuery("CREATE TRIGGER handoff_fail_assessment BEFORE INSERT ON assessment FOR EACH ROW BEGIN IF NEW.class_id=" & secondSection & " AND NEW.assessment_type='Activity' THEN SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='Simulated later import failure'; END IF; END")
+            Try
+                Check(Not service.ImportAssessments(secondSection, assessmentBatch, teacher).Success, "later database failure rejects the whole assessment batch")
+                Check(CInt(DatabaseHelper.ExecuteScalar("SELECT COUNT(*) FROM assessment WHERE class_id=" & secondSection)) = baselineAssessments, "failed batch rolls back earlier assessments")
+                Check(CInt(DatabaseHelper.ExecuteScalar("SELECT COUNT(*) FROM studentgrade")) = baselineGrades, "failed batch rolls back seeded student grades")
+                Check(CInt(DatabaseHelper.ExecuteScalar("SELECT COUNT(*) FROM auditlog")) = baselineAudit, "failed batch rolls back assessment audit entries")
+            Finally
+                DatabaseHelper.ExecuteNonQuery("DROP TRIGGER handoff_fail_assessment")
+            End Try
+            DatabaseHelper.ExecuteNonQuery("CREATE TRIGGER handoff_fail_assessment_audit BEFORE INSERT ON auditlog FOR EACH ROW BEGIN IF NEW.action='Created assessment' THEN SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='Simulated assessment audit failure'; END IF; END")
+            Try
+                Check(Not service.ImportAssessments(secondSection, assessmentBatch, teacher).Success, "assessment batch fails if its audit insert fails")
+                Check(CInt(DatabaseHelper.ExecuteScalar("SELECT COUNT(*) FROM assessment WHERE class_id=" & secondSection)) = baselineAssessments AndAlso CInt(DatabaseHelper.ExecuteScalar("SELECT COUNT(*) FROM studentgrade")) = baselineGrades AndAlso CInt(DatabaseHelper.ExecuteScalar("SELECT COUNT(*) FROM auditlog")) = baselineAudit, "audit failure rolls back the entire assessment import")
+            Finally
+                DatabaseHelper.ExecuteNonQuery("DROP TRIGGER handoff_fail_assessment_audit")
+            End Try
+            Check(service.ImportAssessments(secondSection, assessmentBatch, teacher).Success, "retry imports the complete two-row batch")
+            Check(CInt(DatabaseHelper.ExecuteScalar("SELECT COUNT(*) FROM assessment WHERE class_id=" & secondSection)) = baselineAssessments + 2, "retry leaves exactly two assessments rather than partial duplicates")
+            Check(CInt(DatabaseHelper.ExecuteScalar("SELECT COUNT(*) FROM studentgrade")) = baselineGrades + 2 AndAlso CInt(DatabaseHelper.ExecuteScalar("SELECT COUNT(*) FROM auditlog")) = baselineAudit + 2, "successful import commits seeded grades and audit entries together")
+            Check(service.GetAssessmentsByClass(secondSection, teacher).Rows.Cast(Of DataRow).Select(Function(row) CStr(row("title"))).OrderBy(Function(title) title).SequenceEqual({"Activity 1", "Quiz 1"}), "failed import does not consume generated assessment titles")
+            Check(service.ImportAssessments(secondSection, New List(Of (Type As String, Max As Double, Term As String, Weight As Double)) From {("Quiz", 30, "Midterm", 10), ("Quiz", 40, "Finals", 10)}, teacher).Success, "batch reserves distinct titles for repeated assessment types")
+            Check(service.GetAssessmentsByClass(secondSection, teacher).Rows.Cast(Of DataRow).Any(Function(row) CStr(row("title")) = "Quiz 2") AndAlso service.GetAssessmentsByClass(secondSection, teacher).Rows.Cast(Of DataRow).Any(Function(row) CStr(row("title")) = "Quiz 3"), "same-type batch titles advance within one transaction")
+            Dim originalHash = CStr(DatabaseHelper.ExecuteScalar("SELECT password_hash FROM student WHERE student_id=@Id", New MySqlParameter("@Id", studentId)))
+            Dim passwordAuditBefore = CInt(DatabaseHelper.ExecuteScalar("SELECT COUNT(*) FROM auditlog WHERE action='Changed password' AND student_id=@Id", New MySqlParameter("@Id", studentId)))
+            Dim changedPassword = "handoff changed password"
+            DatabaseHelper.ExecuteNonQuery("CREATE TRIGGER handoff_fail_password_audit BEFORE INSERT ON auditlog FOR EACH ROW BEGIN IF NEW.action='Changed password' THEN SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='Simulated password audit failure'; END IF; END")
+            Try
+                Check(Not auth.ChangePassword("Student", studentId, password, changedPassword).Success, "password change fails when its audit insert fails")
+                Check(CStr(DatabaseHelper.ExecuteScalar("SELECT password_hash FROM student WHERE student_id=@Id", New MySqlParameter("@Id", studentId))) = originalHash, "audit failure rolls back the password hash")
+                Check(auth.VerifyLogin(studentId, password, "Student") IsNot Nothing AndAlso auth.VerifyLogin(studentId, changedPassword, "Student") Is Nothing, "original password remains valid after audit failure")
+                Check(CInt(DatabaseHelper.ExecuteScalar("SELECT COUNT(*) FROM auditlog WHERE action='Changed password' AND student_id=@Id", New MySqlParameter("@Id", studentId))) = passwordAuditBefore, "failed password change creates no partial audit entry")
+            Finally
+                DatabaseHelper.ExecuteNonQuery("DROP TRIGGER handoff_fail_password_audit")
+            End Try
+            Check(auth.ChangePassword("Student", studentId, password, changedPassword).Success, "password change retries successfully when auditing recovers")
+            Check(auth.VerifyLogin(studentId, changedPassword, "Student") IsNot Nothing AndAlso auth.VerifyLogin(studentId, password, "Student") Is Nothing, "successful change replaces the original password")
+            Check(CInt(DatabaseHelper.ExecuteScalar("SELECT COUNT(*) FROM auditlog WHERE action='Changed password' AND student_id=@Id", New MySqlParameter("@Id", studentId))) = passwordAuditBefore + 1, "successful password change commits exactly one audit entry")
         End Using
     End Sub
     Sub Check(ok As Boolean, name As String)

@@ -1,4 +1,4 @@
-﻿Imports System.Drawing
+Imports System.Drawing
 Imports System.Windows.Forms
 
 ' Small helpers so the dialogs that are built in code look like the rest of the app (dark green style).
@@ -59,6 +59,39 @@ Public Module UiKit
         b.Font = New Font("Segoe UI Semibold", 9.5F)
         b.Cursor = Cursors.Hand
         Return b
+    End Function
+
+    ' Keep read failures inside the window and offer a retry without reopening it.
+    Public Function TryLoadData(owner As Form, description As String, load As Action) As Boolean
+        If owner.IsDisposed OrElse owner.Disposing Then Return False
+        Try
+            load()
+            Dim existing = owner.Controls.Find("pnlDataLoadError", False).FirstOrDefault()
+            If existing IsNot Nothing AndAlso Convert.ToString(existing.Tag) = description Then existing.Visible = False
+            Return True
+        Catch ex As Exception
+            Diagnostics.Debug.WriteLine(ex.ToString())
+            If owner.IsDisposed OrElse owner.Disposing Then Return False
+            Dim banner = TryCast(owner.Controls.Find("pnlDataLoadError", False).FirstOrDefault(), Panel)
+            If banner Is Nothing Then
+                banner = New Panel With {.Name = "pnlDataLoadError", .Dock = DockStyle.Bottom, .Height = 58, .BackColor = SoftGreenColor, .Padding = New Padding(10, 5, 10, 5)}
+                Dim message As New Label With {.Name = "lblDataLoadError", .Dock = DockStyle.Fill, .ForeColor = Color.DarkRed, .AutoEllipsis = True}
+                Dim retry = MakeSecondaryButton("Retry", 80)
+                retry.Name = "btnRetryDataLoad" : retry.Dock = DockStyle.Right
+                AddHandler retry.Click, Sub(sender, args)
+                                            Dim retryLoad = TryCast(retry.Tag, Action)
+                                            If retryLoad IsNot Nothing Then retryLoad()
+                                        End Sub
+                banner.Controls.Add(message) : banner.Controls.Add(retry) : message.BringToFront()
+                owner.Controls.Add(banner)
+                owner.Controls.SetChildIndex(banner, owner.Controls.Count - 1)
+            End If
+            banner.Tag = description
+            banner.Controls("lblDataLoadError").Text = "Could not load " & description & ". Check the database connection, then choose Retry." & vbCrLf & ex.Message
+            banner.Controls("btnRetryDataLoad").Tag = CType(Sub() TryLoadData(owner, description, load), Action)
+            banner.Visible = True
+            Return False
+        End Try
     End Function
 
     ' Small popup that asks for a password (typed characters are hidden). Returns Nothing when cancelled.

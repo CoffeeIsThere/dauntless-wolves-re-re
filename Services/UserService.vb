@@ -1,7 +1,7 @@
-﻿Imports MySql.Data.MySqlClient
+Imports MySql.Data.MySqlClient
 Imports System.Data
 
-' Accounts: list, create, edit, deactivate / reactivate (never delete).
+' Accounts: list, create, edit, deactivate / reactivate, and protected individual deletion.
 ' The old method names and Boolean return types are KEPT so existing forms still compile.
 ' Each one calls a matching "...Result" method that returns an OperationResult with a real message
 ' (for example "That email address is already used by another account.").
@@ -21,7 +21,7 @@ Public Class UserService
         Dim params As New List(Of MySqlParameter)()
 
         If Not String.IsNullOrWhiteSpace(searchQuery) Then
-            sql &= " AND (LOWER(t.full_name) LIKE @Search OR LOWER(t.teacher_id) LIKE @Search OR LOWER(t.email) LIKE @Search)"
+            sql &= " AND (LOWER(t.full_name) LIKE @Search OR LOWER(t.teacher_id) LIKE @Search OR LOWER(t.email) LIKE @Search OR LOWER(t.department) LIKE @Search)"
             params.Add(New MySqlParameter("@Search", "%" & searchQuery.Trim().ToLower() & "%"))
         End If
 
@@ -39,7 +39,7 @@ Public Class UserService
         Dim params As New List(Of MySqlParameter)()
 
         If Not String.IsNullOrWhiteSpace(searchQuery) Then
-            sql &= " AND (LOWER(full_name) LIKE @Search OR LOWER(student_id) LIKE @Search OR LOWER(email) LIKE @Search)"
+            sql &= " AND (LOWER(full_name) LIKE @Search OR LOWER(student_id) LIKE @Search OR LOWER(email) LIKE @Search OR LOWER(program) LIKE @Search)"
             params.Add(New MySqlParameter("@Search", "%" & searchQuery.Trim().ToLower() & "%"))
         End If
 
