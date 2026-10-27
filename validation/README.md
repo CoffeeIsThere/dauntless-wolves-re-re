@@ -6,7 +6,7 @@ Run only against a disposable database populated with the supplied grading-syste
 2. Place `dbconfig.json` next to the generated `validation/bin/Debug/net8.0/professor-services.dll`, using DatabaseHelper's Host, Port, Database, User and Password fields. Do not commit credentials.
 3. Run: `dotnet validation/bin/Debug/net8.0/professor-services.dll`.
 
-Ninety-two checks exercise CSV import validation, request approval/status transitions, re-check score overrides, duplicate approval protection, and assessment ownership, term validation, assessment creation, score saving, range validation, rejected clearing, persisted values, grade-sheet columns and audit queries. The harness compiles the actual grading services for Linux without loading Windows Forms. Its session stub is used only by the test executable.
+109 checks exercise CSV import validation, request approval/status transitions, re-check score overrides, duplicate approval protection, and assessment ownership, term validation, assessment creation, score saving, range validation, rejected clearing, persisted values, grade-sheet columns and audit queries. The harness compiles the actual grading services for Linux without loading Windows Forms. Its session stub is used only by the test executable.
 
 Windows manual checks: switch between sections of the same course; confirm assessment titles and maximum scores match each section; edit and paste scores, reopen and verify persistence; enroll an existing student; create a weighted Midterm/Finals assessment; approve an Under Review request; inspect audit timestamps and exported class headers. Gradebook inputs now represent persisted assessment scores, and summaries use the shared weighted calculator. The old attendance/bonus/project/exam worksheet-only inputs are hidden to avoid conflicting grades. Removing a saved grade or changing an existing assessment maximum is explicitly blocked on this screen rather than silently changing only the display.
 
@@ -91,3 +91,17 @@ Manually check the Record Scores page:
 Surname sorting: Record Scores students, Class Grades rows, and gradebook rows use the shared surname ordering. Keep original display names. Verify names such as Jasmine Faye Catapang, Kyla Mae Dimaculangan and Elijah Rebolledo are ordered by Catapang/Dimaculangan/Rebolledo rather than their first names. Equal surnames use given names and then student IDs as tie breakers. Verify Enter-to-submit follows this new order while retaining the class/assessment, and clicking the Class Grades Student header restores surname A–Z after another column sort.
 
 The schema has only full_name, so the sorter supports First Last and Last, First formats, common surname particles and suffixes. Ambiguous multiword surnames should use the explicit Last, First format (e.g. Garcia Lopez, Juan) rather than relying on surname inference. No names are rewritten and no database migration is needed.
+
+
+Final review fixes:
+
+- Add Student now chooses an active registered student (ID plus canonical name) and the exact destination class. Choose a different class than the gradebook behind the dialog and verify the enrollment is created only in the chosen class. The gradebook switches to that class after success. CSV import remains available in the dialog.
+- Add Class must allow an existing course code with a different section, semester or year. An exact duplicate offering is still rejected by the database constraint.
+- Import assessments named Quiz 1 and Quiz 3, then add another quiz. The generated title must be unused (Quiz 2); duplicate titles must be rejected even if another window created them after the form loaded.
+- Scores, assessment maxima, weights and requested points support at most two decimal places. Enter 15.555: it must be rejected and must not advance the student or alter the old score. Enter 15.55 and verify all displays agree after reload.
+- Clipboard paste validates every editable target first and commits the entire batch in one transaction. Test a valid first score followed by an out-of-range or unknown assessment/student entry. No score or audit entry from the failed batch may persist. Valid batches update existing grid cells without rebuilding rows.
+- Type an unsaved professor score, then manually change student, class or assessment. The draft must clear with an explanatory inline message. A same-class catalog refresh must preserve a draft when the actual student and assessment IDs have not changed; invalid submission retains the draft.
+- In another window/session, enroll a student or assign a class. Return to the student/professor window or select another tab and verify the catalog refreshes without logging out. Existing selections stay on the same IDs if they remain available. Reopen an already-open gradebook from the professor window and verify new assignments are available there too.
+- Professor class labels and Class Grades headings include section, semester and year. Check both short and long labels in the widened dropdown.
+
+The backend suite now contains 109 checks, including failed-paste score/audit rollback, precision rejection, duplicate-title protection, destination-aware enrollment and refreshed catalog query results. Both Windows interaction harnesses compile, but must be run on Windows.

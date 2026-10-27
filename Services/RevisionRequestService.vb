@@ -65,8 +65,8 @@ Public Class RevisionRequestService
 
         ' 2) Requested points must make sense (empty = plain re-check)
         If request.RequestedPoints.HasValue Then
-            If request.RequestedPoints.Value <= 0 Then
-                Return OperationResult.Fail("Requested points must be more than 0, or leave it empty to ask for a re-check.")
+            If Not ValidationHelper.HasTwoDecimalPlaces(request.RequestedPoints.Value) OrElse request.RequestedPoints.Value <= 0 Then
+                Return OperationResult.Fail("Requested points must be positive with at most two decimal places, or leave it empty for a re-check.")
             End If
             If score.Value + request.RequestedPoints.Value > total Then
                 Return OperationResult.Fail("That would go above the maximum score of " & Fmt(total) & ".")

@@ -166,6 +166,7 @@ Public Class GradeService
         If Not sameClass Then
             Return OperationResult.Fail("That assessment belongs to a different class.")
         End If
+        If Not ValidationHelper.HasTwoDecimalPlaces(newScore) Then Return OperationResult.Fail("Use at most two decimal places for scores.")
         If Not ValidationHelper.IsValidScore(newScore, totalScore) Then
             Return OperationResult.Fail("Score must be between 0 and " & Fmt(totalScore) & ".")
         End If
@@ -589,6 +590,9 @@ Public Class GradeService
     End Function
 
     Public Function CreateAssessment(classId As Integer, title As String, assessmentType As String, maxScore As Double, term As String, createdBy As String, Optional weight As Double = 10) As OperationResult
+        title = title.Trim()
+        If title.Length = 0 OrElse title.Length > 100 Then Return OperationResult.Fail("Enter a title of at most 100 characters.")
+        If Not ValidationHelper.HasTwoDecimalPlaces(maxScore) OrElse Not ValidationHelper.HasTwoDecimalPlaces(weight) Then Return OperationResult.Fail("Use at most two decimal places for maximum scores and weights.")
         If term <> "Midterm" AndAlso term <> "Finals" Then Return OperationResult.Fail("Term must be Midterm or Finals.")
         If Not {"Quiz", "Activity", "Exam", "Project", "Attendance"}.Contains(assessmentType) Then Return OperationResult.Fail("Choose Quiz, Activity, Exam, Project, or Attendance as the assessment type.")
         If Double.IsNaN(maxScore) OrElse Double.IsInfinity(maxScore) OrElse maxScore <= 0 OrElse maxScore > 9999.99 OrElse weight <= 0 OrElse weight > 100 OrElse Double.IsNaN(weight) Then Return OperationResult.Fail("Invalid maximum score or weight.")
@@ -599,6 +603,11 @@ Public Class GradeService
                     Using cmd As New MySqlCommand("SELECT teacher_id FROM class WHERE class_id = @Id FOR UPDATE", conn, tx)
                         cmd.Parameters.AddWithValue("@Id", classId)
                         If Convert.ToString(cmd.ExecuteScalar()) <> createdBy Then Return OperationResult.Fail("You can only create assessments for your own classes.")
+                    End Using
+                    Using duplicate As New MySqlCommand("SELECT COUNT(*) FROM assessment WHERE class_id=@Class AND title=@Title", conn, tx)
+                        duplicate.Parameters.AddWithValue("@Class", classId)
+                        duplicate.Parameters.AddWithValue("@Title", title)
+                        If CInt(duplicate.ExecuteScalar()) > 0 Then Return OperationResult.Fail("This assessment title already exists. Refresh the class and choose another title.")
                     End Using
                     Using cmd As New MySqlCommand("INSERT INTO assessment (class_id,title,assessment_type,total_score,term,weight) VALUES (@Id,@Title,@Type,@Max,@Term,@Weight)", conn, tx)
                         cmd.Parameters.AddWithValue("@Id", classId)
@@ -622,6 +631,35 @@ Public Class GradeService
             End Using
         Catch ex As Exception
             Return OperationResult.Fail("Could not create assessment: " & ex.Message)
+        End Try
+    End Function
+
+    Public Function SaveScoreBatch(classId As Integer, changes As IEnumerable(Of (StudentId As String, AssessmentId As Integer, Score As Double)), teacher As String) As OperationResult
+        Dim batch = changes.ToList()
+        If batch.Count = 0 Then Return OperationResult.Fail("No assessment scores were selected.")
+        Try
+            Using conn = DatabaseHelper.GetConnection()
+                Using tx = conn.BeginTransaction()
+                    If Not AccountAccess.IsActive(conn, tx, "Teacher", teacher) Then Return OperationResult.Fail("Your professor account is inactive.")
+                    For Each change In batch
+                        Dim enrollment As Integer
+                        Using cmd As New MySqlCommand("SELECT e.enrollment_id FROM enrollment e JOIN class c ON c.class_id=e.class_id WHERE e.class_id=@Class AND e.student_id=@Student AND c.teacher_id=@Teacher", conn, tx)
+                            cmd.Parameters.AddWithValue("@Class", classId)
+                            cmd.Parameters.AddWithValue("@Student", change.StudentId)
+                            cmd.Parameters.AddWithValue("@Teacher", teacher)
+                            Dim value = cmd.ExecuteScalar()
+                            If value Is Nothing Then Return OperationResult.Fail("Paste cancelled: a student is not enrolled in your selected class. No scores were saved.")
+                            enrollment = CInt(value)
+                        End Using
+                        Dim result = RecordScoreTx(conn, tx, enrollment, change.AssessmentId, change.Score, teacher, "Gradebook clipboard paste")
+                        If Not result.Success Then Return OperationResult.Fail("Paste cancelled: " & result.Message & " No scores were saved.")
+                    Next
+                    tx.Commit()
+                    Return OperationResult.Ok("Saved " & batch.Count & " pasted scores.")
+                End Using
+            End Using
+        Catch ex As Exception
+            Return OperationResult.Fail("Paste cancelled. No scores were saved: " & ex.Message)
         End Try
     End Function
 

@@ -14,6 +14,8 @@ Public Class frmStudent
 
 
     Private _currentStudentId As String = ""
+    Private refreshingCourses As Boolean
+    Private catalogsReady As Boolean
     Private ReadOnly gradeRows As New List(Of String())
     Private ReadOnly standingItems As New List(Of (Term As String, Item As ScoreItem))
     Private ReadOnly performanceClassIds As New List(Of Integer)
@@ -83,6 +85,7 @@ Public Class frmStudent
         LoadHistory()
         LoadRequests()
         LoadPerformance()
+        catalogsReady = True
 
         ShowPage(btnMyGrades) ' Keep this last
     End Sub
@@ -104,6 +107,7 @@ Public Class frmStudent
         ' Reload data only when the student selects a page.
         Try
 
+            LoadEnrolledCourses()
             If selectedTab Is btnMyGrades Then
 
                 LoadGrades()
@@ -437,41 +441,54 @@ Public Class frmStudent
 
         Dim dt As DataTable = DatabaseHelper.ExecuteQuery(sql, New MySqlParameter() {New MySqlParameter("@StudentId", _currentStudentId)})
 
-        cboCourse.DataSource = Nothing
-        cboCourse.Items.Clear()
-
-        cboclass.DataSource = Nothing
-        cboclass.Items.Clear()
-
-        cboperfcourse.Items.Clear()
-        cboperfcourse.Items.Add(OverallLabel)
-        performanceClassIds.Clear()
-        performanceClassIds.Add(0)
-
-        If dt IsNot Nothing AndAlso dt.Rows.Count > 0 Then
+        Dim gradeEnrollment = If(IsNumeric(cboCourse.SelectedValue), CInt(cboCourse.SelectedValue), 0)
+        Dim requestEnrollment = If(IsNumeric(cboclass.SelectedValue), CInt(cboclass.SelectedValue), 0)
+        Dim performanceClass = If(cboperfcourse.SelectedIndex > 0 AndAlso cboperfcourse.SelectedIndex < performanceClassIds.Count, performanceClassIds(cboperfcourse.SelectedIndex), 0)
+        refreshingCourses = True
+        Try
+            cboCourse.DataSource = Nothing
+            cboclass.DataSource = Nothing
+            cboperfcourse.Items.Clear()
+            performanceClassIds.Clear()
+            cboperfcourse.Items.Add(OverallLabel)
+            performanceClassIds.Add(0)
             cboCourse.DisplayMember = "full_title"
             cboCourse.ValueMember = "enrollment_id"
             cboCourse.DataSource = dt.Copy()
-
             cboclass.DisplayMember = "full_title"
             cboclass.ValueMember = "enrollment_id"
             cboclass.DataSource = dt.Copy()
-
+            If dt.AsEnumerable().Any(Function(row) CInt(row("enrollment_id")) = gradeEnrollment) Then cboCourse.SelectedValue = gradeEnrollment
+            cboclass.SelectedIndex = -1
+            If dt.AsEnumerable().Any(Function(row) CInt(row("enrollment_id")) = requestEnrollment) Then cboclass.SelectedValue = requestEnrollment
             For Each row As DataRow In dt.Rows
                 performanceClassIds.Add(CInt(row("class_id")))
                 cboperfcourse.Items.Add(row("full_title").ToString())
             Next
+            cboperfcourse.SelectedIndex = Math.Max(0, performanceClassIds.IndexOf(performanceClass))
+        Finally
+            refreshingCourses = False
+        End Try
+        LoadGrades()
+        Dim newRequestEnrollment = If(IsNumeric(cboclass.SelectedValue), CInt(cboclass.SelectedValue), 0)
+        If newRequestEnrollment <> requestEnrollment Then cboClass_SelectedIndexChanged(cboclass, EventArgs.Empty)
+        If dt.Rows.Count = 0 Then lblstanding.Text = "Current Standing: No enrolled classes"
+    End Sub
 
-            cboCourse.SelectedIndex = 0
-            cboclass.SelectedIndex = -1
-        Else
-            lblstanding.Text = "Current Standing: No enrolled classes"
-        End If
+    Private Sub RefreshStudentOnActivate(sender As Object, e As EventArgs) Handles MyBase.Activated
+        If Not catalogsReady OrElse refreshingCourses OrElse Not AppSession.IsStudent Then Return
+        Try
+            LoadEnrolledCourses()
+        Catch ex As Exception
+            ' Keep the current view available; page navigation lets the user retry.
+            Console.WriteLine("[COURSE REFRESH] " & ex.Message)
+        End Try
     End Sub
 
     ' ---------- MY GRADES ----------
 
     Private Sub cboCourse_SelectedIndexChanged(sender As Object, e As EventArgs) Handles cboCourse.SelectedIndexChanged
+        If refreshingCourses Then Return
         LoadGrades()
     End Sub
 
@@ -609,6 +626,7 @@ Public Class frmStudent
     ' ---------- REQUEST REVISION ----------
 
     Private Sub cboClass_SelectedIndexChanged(sender As Object, e As EventArgs) Handles cboclass.SelectedIndexChanged
+        If refreshingCourses Then Return
         cboAssessment.Items.Clear()
         assessmentMap.Clear()
         txtCurrentGrade.Clear()
@@ -810,10 +828,12 @@ Public Class frmStudent
     End Sub
 
     Private Sub cboPerfTerm_SelectedIndexChanged(sender As Object, e As EventArgs) Handles cboperfterm.SelectedIndexChanged
+        If refreshingCourses Then Return
         ShowPerformance()
     End Sub
 
     Private Sub cboPerfCourse_SelectedIndexChanged(sender As Object, e As EventArgs) Handles cboperfcourse.SelectedIndexChanged
+        If refreshingCourses Then Return
         ShowPerformance()
     End Sub
 

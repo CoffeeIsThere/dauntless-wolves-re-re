@@ -25,3 +25,8 @@ Use **Import → Refresh assigned classes from MySQL** to reload existing class 
 To add registered students to an existing class without creating assessments, use **Add Student → Import → CSV** with only `student_id,full_name`. This import is transactional, validates active registered identities, preserves existing enrollments and creates pending grade rows for the class's assessments.
 
 All screens use the same weighted grade formula over graded items: `sum(score / maximum × relative weight) / sum(relative weights) × 100`. Category averages are display summaries, not extra contributions.
+
+
+Scores, maximum scores and assessment weights accept at most two decimal places. Extra precision is rejected rather than silently rounded. Additional sections/semesters/years can reuse an existing course code; only the complete offering identity must be unique.
+
+Manual Add Student now selects the registered account and the exact destination offering. It uses the same identity validation as roster imports, instead of trusting separately typed names.

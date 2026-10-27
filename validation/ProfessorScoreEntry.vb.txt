@@ -51,6 +51,12 @@ Module Program
             Check(score.Text = "" AndAlso score.Focused, "button submission restores input focus")
             GetType(frmprof).GetMethod("ComboBox1_SelectedIndexChanged", Flags).Invoke(form, {Nothing, EventArgs.Empty})
             Check(CInt(students.SelectedValue) = lastEnrollment AndAlso CInt(assessments.SelectedValue) = assessmentId, "same-class refresh preserves entry progress")
+            score.Text = "9"
+            students.SelectedIndex = 0
+            Check(score.Text = "", "manual student change clears draft score")
+            score.Text = "10"
+            assessments.SelectedIndex = If(assessments.SelectedIndex = 0, 1, 0)
+            Check(score.Text = "", "manual assessment change clears draft score")
             form.Close()
         End Using
     End Sub

@@ -1,4 +1,4 @@
-Imports MySql.Data.MySqlClient
+﻿Imports MySql.Data.MySqlClient
 Imports System.Globalization
 Imports System.Text.RegularExpressions
 
@@ -23,7 +23,7 @@ Public Class ClassImportService
             For Each header In rows(0).Skip(2)
                 Dim match = Regex.Match(header.Trim(), "^(.+?)\s*/\s*(\d+(?:\.\d+)?)$")
                 Dim maximum As Double
-                If Not match.Success OrElse Not Double.TryParse(match.Groups(2).Value, NumberStyles.Float, CultureInfo.InvariantCulture, maximum) OrElse maximum <= 0 OrElse maximum > 9999.99 Then Return OperationResult.Fail("Each assessment header needs a maximum: Quiz 1 /20.")
+                If Not match.Success OrElse Not Double.TryParse(match.Groups(2).Value, NumberStyles.Float, CultureInfo.InvariantCulture, maximum) OrElse Not ValidationHelper.HasTwoDecimalPlaces(maximum) OrElse maximum <= 0 OrElse maximum > 9999.99 Then Return OperationResult.Fail("Each assessment header needs a maximum: Quiz 1 /20.")
                 Dim title = match.Groups(1).Value.Trim()
                 If title.Length > 100 OrElse titles.Any(Function(existing) existing.Equals(title, StringComparison.OrdinalIgnoreCase)) Then Return OperationResult.Fail("Assessment titles must be unique and at most 100 characters.")
                 titles.Add(title)
@@ -34,7 +34,7 @@ Public Class ClassImportService
                 If row.Length <> rows(0).Length OrElse String.IsNullOrWhiteSpace(row(1)) OrElse Not ids.Add(row(0).Trim()) Then Return OperationResult.Fail("Each CSV row needs a unique student ID, name, and the same number of columns as the header.")
                 For i = 2 To row.Length - 1
                     Dim score As Double
-                    If row(i).Trim() <> "" AndAlso (Not Double.TryParse(row(i), NumberStyles.Float, CultureInfo.InvariantCulture, score) OrElse Not Double.IsFinite(score) OrElse score < 0 OrElse score > maxima(i - 2)) Then Return OperationResult.Fail("Invalid score for student " & row(0) & ", " & titles(i - 2))
+                    If row(i).Trim() <> "" AndAlso (Not Double.TryParse(row(i), NumberStyles.Float, CultureInfo.InvariantCulture, score) OrElse Not ValidationHelper.HasTwoDecimalPlaces(score) OrElse score < 0 OrElse score > maxima(i - 2)) Then Return OperationResult.Fail("Invalid score for student " & row(0) & ", " & titles(i - 2))
                 Next
             Next
         End If
