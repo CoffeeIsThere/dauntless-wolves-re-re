@@ -1,8 +1,9 @@
-﻿Public Class ProfessorInfo
+Public Class ProfessorInfo
     Public Property Name As String
     Public Property EmployeeID As String
     Public Property Department As String
     Public Property Classes As Integer
+    Public Property Email As String
     Public Property Status As String
     Public Property EmploymentType As String
 
@@ -15,5 +16,6 @@ Public Class StudentInfo
     Public Property YearLevel As Integer
     Public Property Section As String
     Public Property Program As String
+    Public Property Email As String
     Public Property Status As String      ' "Active" or "Inactive"
 End Class

@@ -6,7 +6,7 @@ Run only against a disposable database populated with the supplied grading-syste
 2. Place `dbconfig.json` next to the generated `validation/bin/Debug/net8.0/professor-services.dll`, using DatabaseHelper's Host, Port, Database, User and Password fields. Do not commit credentials.
 3. Run: `dotnet validation/bin/Debug/net8.0/professor-services.dll`.
 
-116 checks exercise CSV import validation, request approval/status transitions, re-check score overrides, duplicate approval protection, and assessment ownership, term validation, assessment creation, score saving, range validation, rejected clearing, persisted values, grade-sheet columns and audit queries. The harness compiles the actual grading services for Linux without loading Windows Forms. Its session stub is used only by the test executable.
+146 checks exercise CSV import validation, request approval/status transitions, re-check score overrides, duplicate approval protection, and assessment ownership, term validation, assessment creation, score saving, range validation, rejected clearing, persisted values, grade-sheet columns and audit queries. The harness compiles the actual grading services for Linux without loading Windows Forms. Its session stub is used only by the test executable.
 
 Windows manual checks: switch between sections of the same course; confirm assessment titles and maximum scores match each section; edit and paste scores, reopen and verify persistence; enroll an existing student; create a weighted Midterm/Finals assessment; approve an Under Review request; inspect audit timestamps and exported class headers. Gradebook inputs now represent persisted assessment scores, and summaries use the shared weighted calculator. The old attendance/bonus/project/exam worksheet-only inputs are hidden to avoid conflicting grades. Removing a saved grade or changing an existing assessment maximum is explicitly blocked on this screen rather than silently changing only the display.
 
@@ -104,9 +104,25 @@ Final review fixes:
 - In another window/session, enroll a student or assign a class. Return to the student/professor window or select another tab and verify the catalog refreshes without logging out. Existing selections stay on the same IDs if they remain available. Reopen an already-open gradebook from the professor window and verify new assignments are available there too.
 - Professor class labels and Class Grades headings include section, semester and year. Check both short and long labels in the widened dropdown.
 
-The backend suite now contains 116 checks, including failed-paste score/audit rollback, precision rejection, duplicate-title protection, destination-aware enrollment and refreshed catalog query results. Both Windows interaction harnesses compile, but must be run on Windows.
+The backend suite now contains 146 checks, including failed-paste score/audit rollback, precision rejection, duplicate-title protection, destination-aware enrollment and refreshed catalog query results. Both Windows interaction harnesses compile, but must be run on Windows.
 
 
 Gradebook names and Add Student design: gradebook cells and the enrollment picker's display labels show surname first, for example `Puyat, Ron Jacob` and `Cruz, Juan A.`. Complete given names remain intact because the database has no separate middle-name field. Existing initial letters gain a period, already-formatted names are not reordered twice, and compound surnames/suffixes are preserved. Stored full_name and student ID remain unchanged.
 
 On Windows, compare Add Student with Add Class/Add Assessment: it should have no native title bar, a dark green header with Import, white body, gray labels with green underlines, and matching Cancel/Enroll buttons. Check long dropdown values, 125% scaling, inline missing-selection validation, Escape/cancellation, CSV import, and enrollment into a class different from the one behind the popup.
+
+## Admin workspace improvements
+
+The service suite now passes 146 checks, including administrative bulk-status transactions and rollback, duplicate selections, authorization, linked-record counts, safe account detail reads, and audit filtering (dates, actor, action, literal wildcard text, entity and account activity). The audit viewer exports its displayed result set; PDF exports wrap complete values across pages.
+
+Windows interaction harness: `dotnet build validation/admin-workspace.vbproj -p:EnableWindowsTargeting=true`, then run the generated executable against a disposable seeded database with its own local `dbconfig.json`. It checks background refresh, selection across pages, page/current-row preservation, status and employment filters, account detail tabs, and audit search/export availability. This harness requires Windows Forms and cannot run on Linux.
+
+Manual Windows review at 100% and 125% scaling:
+
+- Manage Students / Professors: search name, ID, email, program or department; use Clear, Status, Employment, Reset and Refresh. Filters wrap on narrow windows. Check long values, empty results, and the footer loading/error status.
+- Select several accounts on different pages, including accounts hidden by a filter. Confirm the bulk bar counts all selected accounts, cancellation changes nothing, Activate/Deactivate changes only confirmed accounts, and each changed account has an audit entry. There is no bulk delete.
+- Double-click an account name for Profile, Enrolled/Assigned classes and Recent activity. Double-click activity to read its full before/after/details fields. Password hashes must never appear.
+- Delete an account with links: verify exact enrollment, grade, request, assigned-class and actor-audit counts as applicable, then test cancel and the offered Mark Inactive action. An unlinked account requires a separate permanent-deletion confirmation.
+- Click the dashboard totals to open Students, Professors, the Class directory or open revision requests. Click an Updates row for full details. Dashboard updates continue refreshing automatically; Refresh retries failures.
+- Audit viewer: combine actor/action/search/date filters, clear optional date checkboxes, use Reset and Refresh, and try reversed dates. Errors retain old results but disable export until a successful reload. CSV/PDF exports use the loaded results and their displayed sort order; PDF includes the applied filter description and full long values across pages. Edit a filter without applying it and verify export still matches the displayed results.
+- Edit or toggle an account while on page 2 with filters applied. Refresh preserves the page (clamped if it no longer exists), current account/cell, scroll and bulk selections. Returning from another window refreshes the active account directory.

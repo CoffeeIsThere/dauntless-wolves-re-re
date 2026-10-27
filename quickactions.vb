@@ -1,9 +1,10 @@
-﻿Imports System.Data
+Imports System.Data
 Imports MySql.Data.MySqlClient
 Imports System.Drawing
 Imports System.Drawing.Printing
 
 Public Class quickactions
+    Public Property OnlyOpenRequests As Boolean
 
     Public Enum FormMode
         EnterGrades
@@ -120,6 +121,7 @@ Public Class quickactions
                            "JOIN assessment a ON sg.assessment_id = a.assessment_id " &
                            "JOIN enrollment e ON sg.enrollment_id = e.enrollment_id " &
                            "JOIN student s ON e.student_id = s.student_id " &
+                           If(OnlyOpenRequests, "WHERE r.status IN ('Pending','Under Review') ", "") &
                            "ORDER BY r.requested_at DESC"
 
         Dim dt As DataTable = DatabaseHelper.ExecuteQuery(sql)

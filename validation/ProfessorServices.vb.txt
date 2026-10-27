@@ -204,6 +204,56 @@ Module Program
             Check(CInt(DatabaseHelper.ExecuteScalar("SELECT COUNT(*) FROM teacher WHERE teacher_id=@Id", New MySqlParameter("@Id", teacherId))) = 0, "deleted professor record is absent")
             Check(Not users.DeleteUser("Teacher", teacherId, adminId).Success, "second deletion reports missing account")
             Check(Not users.DeleteUser("Admin", adminId, adminId).Success, "admin deletion is not available from account management")
+            Dim workspace As New AdminWorkspaceService()
+            Check(Not workspace.SetStatuses("Admin", {studentId}, "Inactive", adminId).Success, "bulk status rejects unsupported role")
+            Check(Not workspace.SetStatuses("Student", {studentId}, "Other", adminId).Success, "bulk status rejects invalid status")
+            Check(Not workspace.SetStatuses("Student", Array.Empty(Of String)(), "Inactive", adminId).Success, "bulk status requires a selection")
+            Check(Not workspace.SetStatuses("Student", {studentId}, "Inactive", "invalid-admin").Success, "bulk status requires active administrator")
+            Dim bulkBefore = CInt(DatabaseHelper.ExecuteScalar("SELECT COUNT(*) FROM auditlog WHERE action='Bulk account status'"))
+            Check(Not workspace.SetStatuses("Student", {studentId, "zzMissingAccount"}, "Inactive", adminId).Success, "bulk update rejects missing account")
+            Check(CStr(DatabaseHelper.ExecuteScalar("SELECT status FROM student WHERE student_id=@Id", New MySqlParameter("@Id", studentId))) = "Active", "bulk failure rolls back prior account updates")
+            Check(CInt(DatabaseHelper.ExecuteScalar("SELECT COUNT(*) FROM auditlog WHERE action='Bulk account status'")) = bulkBefore, "bulk failure rolls back audit entries")
+            Check(workspace.SetStatuses("Student", {studentId, studentId.ToLowerInvariant()}, "Inactive", adminId).Success, "bulk status accepts duplicate selections safely")
+            Check(CInt(DatabaseHelper.ExecuteScalar("SELECT COUNT(*) FROM auditlog WHERE action='Bulk account status'")) = bulkBefore + 1, "bulk audit contains one entry per changed account")
+            Check(workspace.SetStatuses("Student", {studentId}, "Inactive", adminId).Success, "bulk status supports already matching accounts")
+            Check(CInt(DatabaseHelper.ExecuteScalar("SELECT COUNT(*) FROM auditlog WHERE action='Bulk account status'")) = bulkBefore + 1, "unchanged bulk status adds no audit entry")
+            Check(workspace.SetStatuses("Student", {studentId}, "Active", adminId).Success, "bulk reactivation succeeds")
+            Dim blockers = workspace.DeletionBlockers("Student", studentId, adminId)
+            Check(blockers.Rows.Cast(Of DataRow).Any(Function(row) Convert.ToInt64(row("Records")) > 0), "deletion preflight returns linked student counts")
+            Check(workspace.DeletionBlockers("Teacher", teacher, adminId).Rows.Cast(Of DataRow).Any(Function(row) Convert.ToInt64(row("Records")) > 0), "deletion preflight returns linked professor counts")
+            Check(Not workspace.AccountProfile("Student", studentId, adminId).Columns.Contains("password_hash"), "account detail read excludes credential hashes")
+            Check(workspace.AccountClasses("Student", studentId, adminId).Rows.Count > 0, "student details list enrolled classes")
+            Check(workspace.AccountClasses("Teacher", teacher, adminId).Rows.Count > 0, "professor details list assigned classes")
+            Dim personalActivity = workspace.AuditRows(adminId, accountRole:="Student", accountId:=studentId)
+            Check(personalActivity.Rows.Count > 0 AndAlso personalActivity.Rows.Count <= 25, "account activity includes changes concerning the selected account")
+            Dim bulkRows = workspace.AuditRows(adminId, actor:=adminId, action:="Bulk account status", search:=studentId)
+            Check(bulkRows.Rows.Count = 2, "audit actor action and entity search filters combine")
+            Dim oneLog = workspace.AuditRows(adminId, logId:=CInt(bulkRows.Rows(0)("Log ID")))
+            Check(oneLog.Rows.Count = 1 AndAlso CStr(oneLog.Rows(0)("Before")) <> CStr(oneLog.Rows(0)("After")), "audit detail returns exact log with before and after values")
+            Check(workspace.AuditRows(adminId, Date.Today, Date.Today, action:="Bulk account status").Rows.Count = 2, "audit date range includes the whole end date")
+            Check(workspace.AuditRows(adminId, Date.Today.AddDays(2), Date.Today.AddDays(3)).Rows.Count = 0, "audit date range excludes records outside its dates")
+            Check(workspace.AuditRows(adminId, action:="%").Rows.Count = 0, "audit search treats percent as literal text")
+            Dim invalidRange = False
+            Try
+                workspace.AuditRows(adminId, Date.Today, Date.Today.AddDays(-1))
+            Catch ex As ArgumentException
+                invalidRange = True
+            End Try
+            Check(invalidRange, "audit rejects reversed date range")
+            Dim unauthorizedRead = False
+            Try
+                workspace.AccountProfile("Student", studentId, "invalid-admin")
+            Catch ex As UnauthorizedAccessException
+                unauthorizedRead = True
+            End Try
+            Check(unauthorizedRead, "administrative details reject unauthorized reads")
+            Dim originalStudentStatus = CStr(DatabaseHelper.ExecuteScalar("SELECT status FROM student WHERE student_id=@Id", New MySqlParameter("@Id", student)))
+            Check(workspace.SetStatuses("Student", {studentId, student}, "Inactive", adminId).Success, "bulk update changes two distinct accounts together")
+            Check(CInt(DatabaseHelper.ExecuteScalar("SELECT COUNT(*) FROM student WHERE student_id IN (@First,@Second) AND status='Inactive'", New MySqlParameter("@First", studentId), New MySqlParameter("@Second", student))) = 2, "all selected student statuses persist")
+            Check(workspace.SetStatuses("Student", {studentId}, "Active", adminId).Success AndAlso workspace.SetStatuses("Student", {student}, originalStudentStatus, adminId).Success, "bulk fixture statuses restore safely")
+            Dim originalTeacherStatus = CStr(DatabaseHelper.ExecuteScalar("SELECT status FROM teacher WHERE teacher_id=@Id", New MySqlParameter("@Id", teacher)))
+            Check(workspace.SetStatuses("Teacher", {teacher}, "Inactive", adminId).Success, "bulk status supports professor accounts")
+            Check(workspace.SetStatuses("Teacher", {teacher}, originalTeacherStatus, adminId).Success, "professor bulk fixture status restores")
             Check(AssessmentNames.NextTitle("Quiz", {"Quiz 1", "Quiz 3"}) = "Quiz 2", "assessment numbering finds an unused gap")
             Check(AssessmentNames.NextTitle("Quiz", {"quiz 1", "QUIZ 2"}) = "Quiz 3", "assessment numbering ignores title case")
             Check(Not service.CreateAssessment(classId, "Review test", "Quiz", 20, "Midterm", teacher).Success, "duplicate assessment title is rejected")
