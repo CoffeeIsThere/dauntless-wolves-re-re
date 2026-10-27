@@ -26,6 +26,11 @@ Public Class frmGradebook
         Public Group As String    ' "Quiz" or "CW"
     End Class
     Private loadingClass As Boolean
+    Private finishingEdit As Boolean
+    Private reloadQueued As Boolean
+    Private reloadAfterEdit As Boolean
+    Private loadedClassId As Integer
+    Private originalEditValue As Object
     Private assessmentIds As New Dictionary(Of String, Integer)
     Private items As New List(Of AssessItem)
 
@@ -357,7 +362,7 @@ Public Class frmGradebook
 
         Dim v As Double
         Dim maxVal As Double = MaxFor(colName)
-        If Not TryNum(text, v) OrElse v < 0 OrElse (maxVal > 0 AndAlso v > maxVal) Then
+        If Not TryNum(text, v) OrElse Not Double.IsFinite(v) OrElse v < 0 OrElse (maxVal > 0 AndAlso v > maxVal) Then
             cell.Value = Nothing
             Return False
         End If
@@ -701,32 +706,71 @@ Public Class frmGradebook
 
     ' Only cells on real student rows can be edited
     Private Sub dgvGrades_CellBeginEdit(sender As Object, e As DataGridViewCellCancelEventArgs) Handles dgvGrades.CellBeginEdit
-        If Not IsStudentRow(dgvGrades.Rows(e.RowIndex)) Then e.Cancel = True
+        If loadingClass OrElse e.RowIndex < 0 OrElse e.ColumnIndex < 0 OrElse Not IsStudentRow(dgvGrades.Rows(e.RowIndex)) Then
+            e.Cancel = True
+            Return
+        End If
+        originalEditValue = dgvGrades.Rows(e.RowIndex).Cells(e.ColumnIndex).Value
     End Sub
 
+    ' Keep this event free of row/column rebuilds: WinForms is still navigating cells.
     Private Sub dgvGrades_CellEndEdit(sender As Object, e As DataGridViewCellEventArgs) Handles dgvGrades.CellEndEdit
-        If e.RowIndex < 0 Then Return
-
-        Dim row As DataGridViewRow = dgvGrades.Rows(e.RowIndex)
+        If loadingClass OrElse finishingEdit OrElse e.RowIndex < 0 OrElse e.ColumnIndex < 0 Then Return
+        Dim row = dgvGrades.Rows(e.RowIndex)
         If Not IsStudentRow(row) Then Return
+        finishingEdit = True
+        Try
+            Dim cell = row.Cells(e.ColumnIndex)
+            SaveEditedCell(cell, Convert.ToString(cell.Value), originalEditValue)
+        Finally
+            finishingEdit = False
+            If reloadAfterEdit Then
+                reloadAfterEdit = False
+                QueueClassReload()
+            End If
+        End Try
+    End Sub
 
-        Dim cell As DataGridViewCell = row.Cells(e.ColumnIndex)
-        Dim colName As String = dgvGrades.Columns(e.ColumnIndex).Name
-
-        If Not ApplyScore(cell, Convert.ToString(cell.Value)) Then
-            MessageBox.Show(InputHint(colName), "Digital Gradebook")
+    Private Function SaveEditedCell(cell As DataGridViewCell, text As String, previousValue As Object) As Boolean
+        Dim row = dgvGrades.Rows(cell.RowIndex)
+        Dim columnName = dgvGrades.Columns(cell.ColumnIndex).Name
+        Dim message As String = Nothing
+        If Not ApplyScore(cell, text) Then
+            message = InputHint(columnName)
+        ElseIf assessmentIds.ContainsKey(columnName) Then
+            Try
+                Dim result = _gradeService.SaveAssessmentScore(
+                    Convert.ToString(row.Cells("StudentName").Tag), loadedClassId,
+                    assessmentIds(columnName), If(cell.Value Is Nothing, CType(Nothing, Double?), CDbl(cell.Value)), AppSession.CurrentUser.UserId)
+                If Not result.Success Then message = result.Message
+            Catch ex As Exception
+                message = "Could not save the score: " & ex.Message
+            End Try
         End If
-
+        If message IsNot Nothing Then cell.Value = previousValue
         ComputeRow(row)
         UpdateSummary()
-
-        If Not loadingClass AndAlso assessmentIds.ContainsKey(colName) Then
-            Dim result = _gradeService.SaveAssessmentScore(
-                Convert.ToString(row.Cells("StudentName").Tag), GetClassIdFromCode(SelectedClassCode()),
-                assessmentIds(colName), If(cell.Value Is Nothing, CType(Nothing, Double?), CDbl(cell.Value)), AppSession.CurrentUser.UserId)
-            If Not result.Success Then MessageBox.Show(result.Message, "Score not saved", MessageBoxButtons.OK, MessageBoxIcon.Error)
-            LoadClassData()
+        If message IsNot Nothing Then
+            MessageBox.Show(message, "Score not saved", MessageBoxButtons.OK, MessageBoxIcon.Warning)
+            Return False
         End If
+        Return True
+    End Function
+
+    ' Coalesce structural reloads and finish navigation before touching rows/columns.
+    Private Sub QueueClassReload()
+        If reloadQueued OrElse IsDisposed OrElse Disposing OrElse Not IsHandleCreated Then Return
+        reloadQueued = True
+        BeginInvoke(New MethodInvoker(Sub()
+                                          reloadQueued = False
+                                          If IsDisposed OrElse Disposing Then Return
+                                          If finishingEdit Then
+                                              reloadAfterEdit = True
+                                              Return
+                                          End If
+                                          If dgvGrades.IsCurrentCellInEditMode AndAlso Not dgvGrades.EndEdit() Then Return
+                                          LoadClassData()
+                                      End Sub))
     End Sub
 
     ' Excel-style keys: Delete clears, Ctrl+V pastes (Ctrl+C copy is built in)
@@ -752,6 +796,7 @@ Public Class frmGradebook
 
     Private Sub PasteFromClipboard()
         If Not Clipboard.ContainsText() OrElse dgvGrades.CurrentCell Is Nothing Then Return
+        If dgvGrades.IsCurrentCellInEditMode AndAlso Not dgvGrades.EndEdit() Then Return
 
         Dim lines() As String = Clipboard.GetText().Replace(vbCrLf, vbLf).TrimEnd(ControlChars.Lf).Split(ControlChars.Lf)
         Dim r0 As Integer = dgvGrades.CurrentCell.RowIndex
@@ -763,13 +808,9 @@ Public Class frmGradebook
             For j As Integer = 0 To parts.Length - 1
                 If c0 + j >= dgvGrades.Columns.Count Then Exit For
                 Dim cell As DataGridViewCell = dgvGrades.Rows(r0 + i).Cells(c0 + j)
-                If CanEditCell(cell) AndAlso ApplyScore(cell, parts(j)) AndAlso assessmentIds.ContainsKey(dgvGrades.Columns(cell.ColumnIndex).Name) Then
-                    Dim result = _gradeService.SaveAssessmentScore(Convert.ToString(dgvGrades.Rows(cell.RowIndex).Cells("StudentName").Tag), GetClassIdFromCode(SelectedClassCode()), assessmentIds(dgvGrades.Columns(cell.ColumnIndex).Name), If(cell.Value Is Nothing, CType(Nothing, Double?), CDbl(cell.Value)), AppSession.CurrentUser.UserId)
-                    If Not result.Success Then
-                        MessageBox.Show(result.Message, "Paste stopped")
-                        LoadClassData()
-                        Return
-                    End If
+                If CanEditCell(cell) Then
+                    Dim previous = cell.Value
+                    If Not SaveEditedCell(cell, parts(j), previous) Then Return
                 End If
             Next
         Next
@@ -941,6 +982,15 @@ Public Class frmGradebook
     End Sub
 
     Private Sub LoadClassData()
+        If loadingClass OrElse IsDisposed OrElse Disposing Then Return
+        If finishingEdit Then
+            reloadAfterEdit = True
+            Return
+        End If
+        If dgvGrades.IsCurrentCellInEditMode Then
+            QueueClassReload()
+            Return
+        End If
         loadingClass = True
         Try
             dgvGrades.Rows.Clear()
@@ -953,6 +1003,7 @@ Public Class frmGradebook
             maxScores.Clear()
             maxScores("ExamRaw") = 100
             Dim classId = GetClassIdFromCode(SelectedClassCode())
+            loadedClassId = classId
             If classId = 0 Then Return
             For Each a As DataRow In _gradeService.GetAssessmentsByClass(classId, AppSession.CurrentUser.UserId).Rows
                 Dim key = "Assessment" & a("assessment_id").ToString()
@@ -981,9 +1032,12 @@ Public Class frmGradebook
             Next
             SortAndRenumber()
         Finally
-            loadingClass = False
-            FillEmptyRows()
-            ComputeAll()
+            Try
+                FillEmptyRows()
+                ComputeAll()
+            Finally
+                loadingClass = False
+            End Try
         End Try
     End Sub
 
