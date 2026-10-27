@@ -233,6 +233,7 @@ Public Class ClassService
             Using conn As MySqlConnection = DatabaseHelper.GetConnection()
                 Using tx As MySqlTransaction = conn.BeginTransaction()
 
+                    If Not AccountAccess.IsActive(conn, tx, If(isTeacher, "Teacher", "Admin"), actorId) Then Return OperationResult.Fail("Your account is inactive or unavailable.")
                     ' Class exists, and the teacher owns it
                     Dim owner As Object
                     Using cmd As New MySqlCommand("SELECT teacher_id FROM class WHERE class_id = @Id", conn, tx)

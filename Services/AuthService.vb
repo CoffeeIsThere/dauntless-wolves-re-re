@@ -4,7 +4,7 @@ Imports DAUNTLESS_WOLVES_PROF.Models
 
 Public Class AuthService
 
-    Public Function VerifyLogin(login As String, rawPassword As String) As UserModel
+    Public Function VerifyLogin(login As String, rawPassword As String, Optional preferredRole As String = Nothing) As UserModel
         Dim cleanLogin As String = ValidationHelper.CleanInput(login)
         If cleanLogin = "" OrElse String.IsNullOrEmpty(rawPassword) Then Return Nothing
 
@@ -22,7 +22,8 @@ Public Class AuthService
         Dim params As MySqlParameter() = {New MySqlParameter("@Login", cleanLogin)}
         Dim dt As DataTable = DatabaseHelper.ExecuteQuery(sql, params)
 
-        For Each row As DataRow In dt.Rows
+        For Each row As DataRow In dt.AsEnumerable().OrderByDescending(Function(r) String.Equals(r("Role").ToString(), preferredRole, StringComparison.OrdinalIgnoreCase))
+            If preferredRole IsNot Nothing AndAlso row("Role").ToString() <> "Admin" AndAlso Not row("Role").ToString().Equals(preferredRole, StringComparison.OrdinalIgnoreCase) Then Continue For
             Dim storedHash As String = row("password_hash").ToString()
 
             If SecurityHelper.VerifyPassword(rawPassword, storedHash) Then
@@ -106,6 +107,9 @@ Public Class AuthService
         End Select
 
         Try
+            Using conn = DatabaseHelper.GetConnection()
+                If Not AccountAccess.IsActive(conn, Nothing, If(tableName = "admin", "Admin", If(tableName = "teacher", "Teacher", "Student")), userId) Then Return OperationResult.Fail("Your account is inactive or unavailable.")
+            End Using
             Dim stored As Object = DatabaseHelper.ExecuteScalar(
                 "SELECT password_hash FROM " & tableName & " WHERE " & idColumn & " = @Id",
                 New MySqlParameter("@Id", userId))
@@ -115,10 +119,11 @@ Public Class AuthService
                 Return OperationResult.Fail("Your current password is not correct.")
             End If
 
-            DatabaseHelper.ExecuteNonQuery(
-                "UPDATE " & tableName & " SET password_hash = @Hash WHERE " & idColumn & " = @Id",
+            Dim changed = DatabaseHelper.ExecuteNonQuery(
+                "UPDATE " & tableName & " SET password_hash = @Hash WHERE " & idColumn & " = @Id" & If(tableName = "admin", "", " AND status='Active'"),
                 New MySqlParameter("@Hash", SecurityHelper.HashPassword(newPassword)),
                 New MySqlParameter("@Id", userId))
+            If changed <= 0 Then Return OperationResult.Fail("Account unavailable; password was not changed.")
 
             AuditService.LogAction(role, userId, "Changed password", role, userId)
             Return OperationResult.Ok("Password changed.")

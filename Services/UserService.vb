@@ -312,6 +312,7 @@ Public Class UserService
         Try
             Using conn As MySqlConnection = DatabaseHelper.GetConnection()
                 Using tx As MySqlTransaction = conn.BeginTransaction()
+                    If Not AccountAccess.IsActive(conn, tx, "Admin", adminId) Then Return OperationResult.Fail("Administrator access is required.")
                     Dim rows As Integer
                     Using cmd As New MySqlCommand(sql, conn, tx)
                         cmd.Parameters.AddRange(params)

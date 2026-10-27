@@ -549,39 +549,19 @@ Public Class frmprof
             Return
         End If
 
-        ' 1. Query Class Performance Summary Tiles
-        Dim sqlSummary As String = "SELECT " &
-                                  "    IFNULL(AVG(running_grade), 0) AS class_avg, " &
-                                  "    IFNULL(SUM(CASE WHEN running_grade >= 75.0 THEN 1 ELSE 0 END), 0) AS passing_count, " &
-                                  "    IFNULL(SUM(CASE WHEN running_grade < 75.0 AND running_grade IS NOT NULL THEN 1 ELSE 0 END), 0) AS at_risk_count, " &
-                                  "    IFNULL(MAX(running_grade), 0) AS top_score " &
-                                  "FROM enrollment " &
-                                  "WHERE class_id = @ClassId"
-
-        Dim dtSummary As DataTable = DatabaseHelper.ExecuteQuery(sqlSummary, New MySqlParameter() {New MySqlParameter("@ClassId", classId)})
-
-        If dtSummary IsNot Nothing AndAlso dtSummary.Rows.Count > 0 Then
-            Dim row As DataRow = dtSummary.Rows(0)
-            Dim avgVal As Double = Convert.ToDouble(row("class_avg"))
-            Dim passVal As Integer = Convert.ToInt32(row("passing_count"))
-            Dim riskVal As Integer = Convert.ToInt32(row("at_risk_count"))
-            Dim topVal As Double = Convert.ToDouble(row("top_score"))
-
-            If lblClassAvg IsNot Nothing Then lblClassAvg.Text = If(avgVal > 0, avgVal.ToString("0.0"), "--")
-            If lblPassing IsNot Nothing Then lblPassing.Text = passVal.ToString()
-            If lblAtRisk IsNot Nothing Then lblAtRisk.Text = riskVal.ToString()
-            If lblTopScore IsNot Nothing Then lblTopScore.Text = If(topVal > 0, topVal.ToString("0.0"), "--")
-        Else
-            ResetAnalyticsUI()
-        End If
+        Dim summary = _gradeService.GetClassSummary(classId, _currentTeacherId)
+        If lblClassAvg IsNot Nothing Then lblClassAvg.Text = If(summary.Average.HasValue, summary.Average.GetValueOrDefault().ToString("0.0"), "--")
+        If lblPassing IsNot Nothing Then lblPassing.Text = summary.Passing.ToString()
+        If lblAtRisk IsNot Nothing Then lblAtRisk.Text = summary.AtRisk.ToString()
+        If lblTopScore IsNot Nothing Then lblTopScore.Text = If(summary.Top.HasValue, summary.Top.GetValueOrDefault().ToString("0.0"), "--")
 
         ' 2. Query Averages by Assessment Type
         Dim sqlTypes As String = "SELECT " &
                                 "    LOWER(a.assessment_type) AS type_name, " &
-                                "    IFNULL(AVG((sg.score / a.total_score) * 100.0), 0) AS avg_pct " &
+                                "    IFNULL(SUM(sg.score / a.total_score * a.weight) / NULLIF(SUM(a.weight),0) * 100.0, 0) AS avg_pct " &
                                 "FROM studentgrade sg " &
                                 "JOIN assessment a ON sg.assessment_id = a.assessment_id " &
-                                "WHERE a.class_id = @ClassId AND sg.score IS NOT NULL AND a.total_score > 0 " &
+                                "WHERE a.class_id = @ClassId AND sg.score IS NOT NULL AND a.total_score > 0 AND a.weight > 0 " &
                                 "GROUP BY LOWER(a.assessment_type)"
 
         Dim dtTypes As DataTable = DatabaseHelper.ExecuteQuery(sqlTypes, New MySqlParameter() {New MySqlParameter("@ClassId", classId)})
@@ -619,10 +599,10 @@ Public Class frmprof
         SetTypeBars(0, 0, 0, 0)
     End Sub
     Private Sub SetAnalyticsTiles(avgVal As Double, passCount As Integer, riskCount As Integer, topVal As Double)
-        If lblClassAvg IsNot Nothing Then lblClassAvg.Text = If(avgVal > 0, avgVal.ToString("0.0"), "--")
+        If lblClassAvg IsNot Nothing Then lblClassAvg.Text = avgVal.ToString("0.0")
         If lblPassing IsNot Nothing Then lblPassing.Text = passCount.ToString()
         If lblAtRisk IsNot Nothing Then lblAtRisk.Text = riskCount.ToString()
-        If lblTopScore IsNot Nothing Then lblTopScore.Text = If(topVal > 0, topVal.ToString("0.0"), "--")
+        If lblTopScore IsNot Nothing Then lblTopScore.Text = topVal.ToString("0.0")
     End Sub
 
     Private Sub SetTypeBars(quizPct As Integer, actPct As Integer, examPct As Integer, projPct As Integer)
@@ -841,7 +821,15 @@ Public Class frmprof
     End Sub
 
     Private Sub UpdateSelectedStudentDisplay()
-        If ComboBox2.SelectedItem Is Nothing Then Return
+        If ComboBox2.SelectedItem Is Nothing Then
+            If _lblRightStudentName IsNot Nothing Then _lblRightStudentName.Text = "No student selected"
+            If _lblRightStudentId IsNot Nothing Then _lblRightStudentId.Text = ""
+            If _pnlRightScoresContainer IsNot Nothing Then
+                _pnlRightScoresContainer.Controls.Clear()
+                _pnlRightScoresContainer.Controls.Add(New Label With {.Text = "No enrolled students in this class.", .AutoSize = True, .Location = New Point(15, 15), .ForeColor = Color.DarkGreen})
+            End If
+            Return
+        End If
 
         InitRightPanelReferences()
 

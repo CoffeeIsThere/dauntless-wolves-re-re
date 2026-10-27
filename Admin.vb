@@ -975,16 +975,16 @@ Public Class Admin
     End Sub
 
     Private Sub LoadDashboard()
-        lblStatStudents.Text = allStudents.Count.ToString("N0")
-        lblStatProfs.Text = allProfs.Count.ToString("N0")
-
-        Dim classCountObj As Object = DatabaseHelper.ExecuteScalar("SELECT COUNT(*) FROM class")
-        lblStatClasses.Text = If(classCountObj IsNot Nothing AndAlso Not IsDBNull(classCountObj), Convert.ToInt32(classCountObj).ToString("N0"), "0")
-
-        Dim pendingObj As Object = DatabaseHelper.ExecuteScalar("SELECT COUNT(*) FROM revisionrequest WHERE status IN ('Pending','Under Review')")
-        lblStatPending.Text = If(pendingObj IsNot Nothing AndAlso Not IsDBNull(pendingObj), Convert.ToInt32(pendingObj).ToString("N0"), "0")
-
+        ApplyDashboardStatistics(DashboardService.GetStatistics())
         LoadDashboardUpdates()
+    End Sub
+
+    Private Sub ApplyDashboardStatistics(totals As DataTable)
+        Dim row = totals.Rows(0)
+        lblStatStudents.Text = Convert.ToInt32(row("students")).ToString("N0")
+        lblStatProfs.Text = Convert.ToInt32(row("teachers")).ToString("N0")
+        lblStatClasses.Text = Convert.ToInt32(row("classes")).ToString("N0")
+        lblStatPending.Text = Convert.ToInt32(row("pending")).ToString("N0")
     End Sub
 
     Private Async Sub LoadDashboardUpdates()
@@ -1033,8 +1033,10 @@ Public Class Admin
         sql &= " ORDER BY logged_at DESC, log_id DESC LIMIT 6"
 
         Try
-            Dim dt As DataTable = Await Task.Run(Function() DatabaseHelper.ExecuteQuery(sql))
+            Dim snapshot = Await Task.Run(Function() (Updates:=DatabaseHelper.ExecuteQuery(sql), Totals:=DashboardService.GetStatistics()))
+            Dim dt = snapshot.Updates
             If IsDisposed OrElse Disposing OrElse revision <> updatesRevision OrElse selectedFilter <> _selectedUpdatesFilter Then Return
+            ApplyDashboardStatistics(snapshot.Totals)
             Dim rows As New List(Of String())
             For Each record As DataRow In dt.Rows
                 Dim text = record("action").ToString()

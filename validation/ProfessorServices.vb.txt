@@ -106,6 +106,59 @@ Module Program
             roster(1)(0) = student
             roster(1)(2) = "21"
             Check(Not importer.ImportClass("BAD", "Bad score", "A", "1st Semester", "2026-2027", "Midterm", roster, importedClass).Success, "reject imported score above maximum")
+            Check(GradeCalculator.CalculateRunningGrade({New ScoreItem(14.99, 20, 10)}).Value = 74.95, "standing uses full precision below passing boundary")
+            Check(GradeCalculator.CalculateRunningGrade({New ScoreItem(0, 20, 10)}).Value = 0, "zero grade remains a real grade")
+            Check(GradeCalculator.CalculateRunningGrade({New ScoreItem(10, 20, 10), New ScoreItem(100, 100, 90)}).Value = 95, "weighted average differs from simple average")
+            Dim historyCount = service.GetGradeHistoryForStudent(student).Rows.Count
+            Dim gradeId = CInt(DatabaseHelper.ExecuteScalar("SELECT sg.grade_id FROM studentgrade sg JOIN enrollment e ON e.enrollment_id=sg.enrollment_id WHERE sg.assessment_id=@Id AND e.student_id=@Student", New MySqlParameter("@Id", id), New MySqlParameter("@Student", student)))
+            AuditService.LogAction("Teacher", teacher, "Unrelated enrollment event", "Enrollment", gradeId.ToString())
+            Check(service.GetGradeHistoryForStudent(student).Rows.Count = historyCount, "history excludes numeric ID collisions with other entity types")
+            DatabaseHelper.ExecuteNonQuery("UPDATE teacher SET status='Inactive' WHERE teacher_id=@Id", New MySqlParameter("@Id", teacher))
+            Try
+                Check(Not New ClassService().EnrollStudent(student, classId, "Teacher", teacher).Success, "deactivated professor cannot enroll students")
+                Check(Not service.SaveAssessmentScore(student, classId, id, 19, teacher).Success, "deactivated professor cannot save grades in existing session")
+                Check(Not service.CreateAssessment(classId, "Denied inactive", "Quiz", 20, "Midterm", teacher).Success, "deactivated professor cannot create assessments")
+                Check(Not revision.ReviewRequestResult(requestId, "Under Review", teacher).Success, "deactivated professor cannot review requests")
+            Finally
+                DatabaseHelper.ExecuteNonQuery("UPDATE teacher SET status='Active' WHERE teacher_id=@Id", New MySqlParameter("@Id", teacher))
+            End Try
+            DatabaseHelper.ExecuteNonQuery("UPDATE student SET status='Inactive' WHERE student_id=@Id", New MySqlParameter("@Id", student))
+            Try
+                Check(Not revision.SubmitRequestResult(New RevisionRequest With {.GradeId = gradeId, .Reason = "Inactive test"}, student).Success, "deactivated student cannot submit requests")
+            Finally
+                DatabaseHelper.ExecuteNonQuery("UPDATE student SET status='Active' WHERE student_id=@Id", New MySqlParameter("@Id", student))
+            End Try
+            Dim email = Guid.NewGuid().ToString("N") & "@example.test"
+            Dim studentId = "S" & Guid.NewGuid().ToString("N").Substring(0, 8)
+            Dim teacherId = "T" & Guid.NewGuid().ToString("N").Substring(0, 8)
+            Dim password = " test password "
+            Dim hash = SecurityHelper.HashPassword(password)
+            Dim before = DashboardService.GetStatistics().Rows(0)
+            DatabaseHelper.ExecuteNonQuery("INSERT INTO student(student_id,full_name,email,password_hash,program,year_level,section) VALUES(@Id,'Review Login Student',@Email,@Hash,'BSCS',1,'TEST')", New MySqlParameter("@Id", studentId), New MySqlParameter("@Email", email), New MySqlParameter("@Hash", hash))
+            DatabaseHelper.ExecuteNonQuery("INSERT INTO teacher(teacher_id,full_name,email,password_hash,department,employment_type) VALUES(@Id,'Review Login Teacher',@Email,@Hash,'CCS','Full-time')", New MySqlParameter("@Id", teacherId), New MySqlParameter("@Email", email), New MySqlParameter("@Hash", hash))
+            Dim auth As New AuthService()
+            Check(auth.VerifyLogin(email, password, "Student").UserId = studentId, "shared email authenticates selected student role")
+            Check(auth.VerifyLogin(email, password, "Teacher").UserId = teacherId, "shared email authenticates selected teacher role")
+            Check(auth.VerifyLogin(email, password.Trim(), "Student") Is Nothing, "password spaces are significant")
+            DatabaseHelper.ExecuteNonQuery("UPDATE student SET status='Inactive' WHERE student_id=@Id", New MySqlParameter("@Id", studentId))
+            Try
+                Check(Not auth.ChangePassword("Student", studentId, password, "Changed password").Success, "deactivated session cannot change its password")
+            Finally
+                DatabaseHelper.ExecuteNonQuery("UPDATE student SET status='Active' WHERE student_id=@Id", New MySqlParameter("@Id", studentId))
+            End Try
+            Dim adminId = Convert.ToString(DatabaseHelper.ExecuteScalar("SELECT admin_id FROM admin LIMIT 1"))
+            Check(New UserService().ResetPassword("Student", studentId, password, adminId).Success, "admin can reset a password containing spaces")
+            Check(auth.VerifyLogin(email, password, "Student").UserId = studentId, "reset password preserves spaces at authentication")
+            Check(Not New UserService().ResetPassword("Student", studentId, password, "invalid-admin").Success, "invalid admin cannot reset account password")
+            Dim after = DashboardService.GetStatistics().Rows(0)
+            Check(CInt(after("students")) = CInt(before("students")) + 1 AndAlso CInt(after("teachers")) = CInt(before("teachers")) + 1, "dashboard statistics reflect new database accounts")
+            Dim rosterImporter As New RosterImportService()
+            Check(rosterImporter.ImportStudents(classId, teacher, New List(Of String()) From {New String() {studentId, "Review Login Student"}}).Success, "student CSV creates a persistent enrollment")
+            Check(service.GetEnrollmentsByClass(classId, teacher).Select("student_id='" & studentId & "'").Length = 1, "imported student can be reloaded by identity")
+            Check(Not rosterImporter.ImportStudents(classId, teacher, New List(Of String()) From {New String() {studentId, "Wrong name"}}).Success, "roster import rejects ID and name mismatch")
+            Check(rosterImporter.ImportStudents(classId, teacher, New List(Of String()) From {New String() {studentId, "Review Login Student"}}).Success, "reimport preserves existing enrollment")
+            DatabaseHelper.ExecuteNonQuery("UPDATE enrollment SET running_grade=NULL WHERE class_id=@Class AND student_id=@Student", New MySqlParameter("@Class", classId), New MySqlParameter("@Student", student))
+            Check(Not IsDBNull(service.GetEnrollmentsByClass(classId, teacher).Select("student_id='" & student & "'")(0)("running_grade")), "professor reads calculated grade instead of stale cached grade")
         End Using
     End Sub
     Sub Check(ok As Boolean, name As String)

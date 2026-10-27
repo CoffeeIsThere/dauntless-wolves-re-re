@@ -20,3 +20,8 @@ The class is assigned to the logged-in professor. A new section requires its own
 The complete import is transactional: a validation or database failure rolls back the course, class, enrollments, assessments, scores and audit changes. Cancelling the dialog does not save the staged CSV.
 
 Use **Import → Refresh assigned classes from MySQL** to reload existing class assignments instead of creating a new one.
+
+
+To add registered students to an existing class without creating assessments, use **Add Student → Import → CSV** with only `student_id,full_name`. This import is transactional, validates active registered identities, preserves existing enrollments and creates pending grade rows for the class's assessments.
+
+All screens use the same weighted grade formula over graded items: `sum(score / maximum × relative weight) / sum(relative weights) × 100`. Category averages are display summaries, not extra contributions.

@@ -38,6 +38,7 @@ Public Class RevisionRequestService
 
     Private Shared Function SubmitTx(conn As MySqlConnection, tx As MySqlTransaction,
                                      request As RevisionRequest, reason As String, studentId As String) As OperationResult
+        If Not AccountAccess.IsActive(conn, tx, "Student", studentId) Then Return OperationResult.Fail("Your student account is inactive.")
         ' 1) The grade must belong to THIS student and must already have a score
         Dim score As Double? = Nothing
         Dim total As Double = 0
@@ -269,6 +270,7 @@ Public Class RevisionRequestService
     Private Function ApproveTx(conn As MySqlConnection, tx As MySqlTransaction,
                                requestId As Integer, teacherId As String,
                                overrideScore As Double?, reviewerResponse As String) As OperationResult
+        If Not AccountAccess.IsActive(conn, tx, "Teacher", teacherId) Then Return OperationResult.Fail("Your professor account is inactive.")
         Dim info As RequestInfo = LoadRequest(conn, tx, requestId)
         Dim check As OperationResult = CheckOpenAndOwned(info, teacherId)
         If Not check.Success Then Return check
@@ -310,6 +312,7 @@ Public Class RevisionRequestService
     Private Shared Function ChangeStatusTx(conn As MySqlConnection, tx As MySqlTransaction,
                                            requestId As Integer, teacherId As String,
                                            newStatus As String, note As String) As OperationResult
+        If Not AccountAccess.IsActive(conn, tx, "Teacher", teacherId) Then Return OperationResult.Fail("Your professor account is inactive.")
         Dim info As RequestInfo = LoadRequest(conn, tx, requestId)
         Dim check As OperationResult = CheckOpenAndOwned(info, teacherId)
         If Not check.Success Then Return check

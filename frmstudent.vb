@@ -15,6 +15,8 @@ Public Class frmStudent
 
     Private _currentStudentId As String = ""
     Private ReadOnly gradeRows As New List(Of String())
+    Private ReadOnly standingItems As New List(Of (Term As String, Item As ScoreItem))
+    Private ReadOnly performanceClassIds As New List(Of Integer)
     Private ReadOnly assessmentMap As New Dictionary(Of Integer, DataRow)()
 
 
@@ -427,7 +429,7 @@ Public Class frmStudent
 
     Private Sub LoadEnrolledCourses()
         Dim sql As String = "SELECT e.enrollment_id, e.class_id, " &
-                           "CONCAT(co.course_code, ' - ', co.course_name) AS full_title " &
+                           "CONCAT(co.course_code, ' - ', co.course_name, ' (', c.section, ', ', c.semester, ' ', c.academic_year, ')') AS full_title " &
                            "FROM enrollment e " &
                            "JOIN class c ON e.class_id = c.class_id " &
                            "JOIN course co ON c.course_code COLLATE utf8mb4_unicode_ci = co.course_code COLLATE utf8mb4_unicode_ci " &
@@ -443,6 +445,8 @@ Public Class frmStudent
 
         cboperfcourse.Items.Clear()
         cboperfcourse.Items.Add(OverallLabel)
+        performanceClassIds.Clear()
+        performanceClassIds.Add(0)
 
         If dt IsNot Nothing AndAlso dt.Rows.Count > 0 Then
             cboCourse.DisplayMember = "full_title"
@@ -454,6 +458,7 @@ Public Class frmStudent
             cboclass.DataSource = dt.Copy()
 
             For Each row As DataRow In dt.Rows
+                performanceClassIds.Add(CInt(row("class_id")))
                 cboperfcourse.Items.Add(row("full_title").ToString())
             Next
 
@@ -477,7 +482,9 @@ Public Class frmStudent
             Next
         End If
 
+        If dgvgrades.Columns.Contains("Weight") Then dgvgrades.Columns("Weight").HeaderText = "Relative Weight"
         gradeRows.Clear()
+        standingItems.Clear()
 
         If cboCourse.SelectedValue IsNot Nothing AndAlso IsNumeric(cboCourse.SelectedValue) Then
             Dim enrollmentId As Integer = Convert.ToInt32(cboCourse.SelectedValue)
@@ -495,8 +502,9 @@ Public Class frmStudent
             If dt IsNot Nothing Then
                 For Each row As DataRow In dt.Rows
                     Dim term As String = row("term").ToString()
+                    standingItems.Add((term, New ScoreItem(If(IsDBNull(row("score")), CType(Nothing, Double?), CDbl(row("score"))), CDbl(row("total_score")), CDbl(row("weight")))))
                     Dim title As String = row("title").ToString()
-                    Dim weightStr As String = $"{Convert.ToDouble(row("weight")):0.#}%"
+                    Dim weightStr As String = $"{Convert.ToDouble(row("weight")):0.##}"
 
                     Dim scoreStr As String = "---"
                     Dim runningGradeStr As String = "Pending"
@@ -509,12 +517,12 @@ Public Class frmStudent
                         Dim totalVal As Double = Convert.ToDouble(row("total_score"))
 
                         ' Always show the recorded score.
-                        scoreStr = $"{scoreVal:0.#}/{totalVal:0.#}"
+                        scoreStr = $"{scoreVal:0.##}/{totalVal:0.##}"
 
                         ' Only calculate percentages when maximum points are valid.
                         If totalVal > 0 Then
 
-                            Dim pct As Double = (scoreVal / totalVal) * 100.0
+                            Dim pct As Double = GradeCalculator.CalculateScorePercentage(scoreVal, totalVal)
 
                             runningGradeStr = $"{pct:0.0}"
                             statusStr = If(pct >= 75.0, "Passed", "At Risk")
@@ -559,30 +567,9 @@ Public Class frmStudent
     End Sub
 
     Private Sub UpdateStanding(term As String)
-        Dim total As Double = 0
-        Dim weights As Double = 0
-
-        For Each row As DataGridViewRow In dgvgrades.Rows
-            If row.Cells(1).Value Is Nothing Then Continue For
-            Dim parts = Convert.ToString(row.Cells(1).Value).Split("/"c)
-            If parts.Length <> 2 Then Continue For
-
-            Dim score, maxScore, weight As Double
-            If Double.TryParse(parts(0), score) AndAlso
-               Double.TryParse(parts(1), maxScore) AndAlso maxScore > 0 AndAlso
-               Double.TryParse(Convert.ToString(row.Cells(2).Value).TrimEnd("%"c), weight) Then
-                total += (score / maxScore) * 100.0 * weight
-                weights += weight
-            End If
-        Next
-
+        Dim running = GradeCalculator.CalculateRunningGrade(standingItems.Where(Function(item) term = "Combined" OrElse item.Term.Equals(term, StringComparison.OrdinalIgnoreCase)).Select(Function(item) item.Item))
         Dim label As String = If(term = "Combined", "Current Standing", term & " Standing")
-        If weights > 0 Then
-            Dim pct As Double = Math.Round(total / weights, 1)
-            lblstanding.Text = $"{label}: {pct}% " & If(pct >= 75.0, "(Passing)", "(At Risk)")
-        Else
-            lblstanding.Text = $"{label}: No grades recorded yet"
-        End If
+        lblstanding.Text = If(running.HasValue, $"{label}: {running.GetValueOrDefault():0.##}% " & If(running.GetValueOrDefault() >= GradeCalculator.PassingGrade, "(Passing)", "(At Risk)"), label & ": No grades recorded yet")
     End Sub
 
     Private Sub dgvGrades_CellFormatting(sender As Object, e As DataGridViewCellFormattingEventArgs) Handles dgvgrades.CellFormatting
@@ -608,28 +595,11 @@ Public Class frmStudent
             Next
         End If
 
-        ' Force uniform collation across auditlog, student, teacher, and studentgrade string comparisons
-        Dim sql As String = "SELECT DATE_FORMAT(al.logged_at, '%Y-%m-%d') AS change_date, " &
-                           "a.title AS assessment_title, " &
-                           "IFNULL(al.old_value, '---') AS old_score, " &
-                           "IFNULL(al.new_value, '---') AS new_score, " &
-                           "COALESCE(t.full_name, adm.full_name, s.full_name, 'System') AS changed_by, " &
-                           "IFNULL(al.details, 'Grade Update') AS reason " &
-                           "FROM auditlog al " &
-                           "LEFT JOIN studentgrade sg ON al.entity_id COLLATE utf8mb4_unicode_ci = CAST(sg.grade_id AS CHAR) COLLATE utf8mb4_unicode_ci " &
-                           "LEFT JOIN enrollment e ON sg.enrollment_id = e.enrollment_id " &
-                           "LEFT JOIN assessment a ON sg.assessment_id = a.assessment_id " &
-                           "LEFT JOIN teacher t ON al.teacher_id COLLATE utf8mb4_unicode_ci = t.teacher_id COLLATE utf8mb4_unicode_ci " &
-                           "LEFT JOIN admin adm ON al.admin_id = adm.admin_id " &
-                           "LEFT JOIN student s ON al.student_id COLLATE utf8mb4_unicode_ci = s.student_id COLLATE utf8mb4_unicode_ci " &
-                           "WHERE e.student_id COLLATE utf8mb4_unicode_ci = @StudentId OR al.student_id COLLATE utf8mb4_unicode_ci = @StudentId " &
-                           "ORDER BY al.logged_at DESC"
-
-        Dim dt As DataTable = DatabaseHelper.ExecuteQuery(sql, New MySqlParameter() {New MySqlParameter("@StudentId", _currentStudentId)})
+        Dim dt = _gradeService.GetGradeHistoryForStudent(_currentStudentId)
 
         If dt IsNot Nothing Then
             For Each row As DataRow In dt.Rows
-                dgvHistory.Rows.Add(row("change_date"), row("assessment_title"), row("old_score"), row("new_score"), row("changed_by"), row("reason"))
+                dgvHistory.Rows.Add(CDate(row("changed_at")).ToString("yyyy-MM-dd HH:mm"), row("assessment"), If(IsDBNull(row("old_value")), "---", row("old_value")), If(IsDBNull(row("new_value")), "---", row("new_value")), row("changed_by"), row("reason"))
             Next
         End If
 
@@ -699,7 +669,7 @@ Public Class frmStudent
         Dim scoreVal As Double = Convert.ToDouble(row("score"))
         Dim totalVal As Double = Convert.ToDouble(row("total_score"))
 
-        txtCurrentGrade.Text = $"{scoreVal:0.#}/{totalVal:0.#}"
+        txtCurrentGrade.Text = $"{scoreVal:0.##}/{totalVal:0.##}"
 
     End Sub
 
@@ -855,7 +825,7 @@ Public Class frmStudent
 
         Dim sql As String =
             "SELECT a.term, a.assessment_type AS type, " &
-            "sg.score, a.total_score, " &
+            "sg.score, a.total_score, a.weight, " &
             "CASE WHEN EXISTS ( " &
             "    SELECT 1 FROM revisionrequest r " &
             "    WHERE r.grade_id = sg.grade_id " &
@@ -873,8 +843,9 @@ Public Class frmStudent
         Dim params As New List(Of MySqlParameter) From {New MySqlParameter("@StudentId", _currentStudentId)}
 
         If courseFilter <> OverallLabel Then
-            sql &= " AND CONCAT(co.course_code, ' - ', co.course_name) = @CourseTitle"
-            params.Add(New MySqlParameter("@CourseTitle", courseFilter))
+            If cboperfcourse.SelectedIndex >= performanceClassIds.Count Then Return
+            sql &= " AND c.class_id = @ClassId"
+            params.Add(New MySqlParameter("@ClassId", performanceClassIds(cboperfcourse.SelectedIndex)))
         End If
 
         If termFilter <> "Combined" Then
@@ -885,18 +856,20 @@ Public Class frmStudent
         Dim dt As DataTable = DatabaseHelper.ExecuteQuery(sql, params.ToArray())
 
         If dt IsNot Nothing AndAlso dt.Rows.Count > 0 Then
+            Dim performanceItems As New List(Of ScoreItem)
             Dim totalPct As Double = 0
             Dim scoreCount As Integer = 0
             Dim passedCount As Integer = 0
             Dim pendingCount As Integer = 0
             Dim maxPct As Double = 0
 
-            Dim quizScores As New List(Of Double)()
-            Dim actScores As New List(Of Double)()
-            Dim examScores As New List(Of Double)()
-            Dim projScores As New List(Of Double)()
+            Dim quizScores As New List(Of ScoreItem)()
+            Dim actScores As New List(Of ScoreItem)()
+            Dim examScores As New List(Of ScoreItem)()
+            Dim projScores As New List(Of ScoreItem)()
 
             For Each row As DataRow In dt.Rows
+                performanceItems.Add(New ScoreItem(If(IsDBNull(row("score")), CType(Nothing, Double?), CDbl(row("score"))), CDbl(row("total_score")), CDbl(row("weight"))))
                 Dim typeStr As String = row("type").ToString().ToLower()
                 Dim reqStatus As String = If(IsDBNull(row("req_status")), "", row("req_status").ToString())
 
@@ -909,7 +882,7 @@ Public Class frmStudent
                     Dim totalVal As Double = Convert.ToDouble(row("total_score"))
 
                     If totalVal > 0 Then
-                        Dim pct As Double = (scoreVal / totalVal) * 100.0
+                        Dim pct As Double = GradeCalculator.CalculateScorePercentage(scoreVal, totalVal)
                         totalPct += pct
                         scoreCount += 1
 
@@ -918,28 +891,28 @@ Public Class frmStudent
 
                         Select Case typeStr
                             Case "quiz"
-                                quizScores.Add(pct)
+                                quizScores.Add(New ScoreItem(scoreVal, totalVal, CDbl(row("weight"))))
                             Case "activity", "seatwork", "homework"
-                                actScores.Add(pct)
+                                actScores.Add(New ScoreItem(scoreVal, totalVal, CDbl(row("weight"))))
                             Case "exam"
-                                examScores.Add(pct)
+                                examScores.Add(New ScoreItem(scoreVal, totalVal, CDbl(row("weight"))))
                             Case "project"
-                                projScores.Add(pct)
+                                projScores.Add(New ScoreItem(scoreVal, totalVal, CDbl(row("weight"))))
                         End Select
                     End If
                 End If
             Next
 
-            Dim avgPct As Double = If(scoreCount > 0, Math.Round(totalPct / scoreCount, 1), 0.0)
-            SetStat(lblAverageValue, avgPct.ToString("0.0"), "CURRENT AVERAGE")
+            Dim avgPct = GradeCalculator.CalculateRunningGrade(performanceItems)
+            SetStat(lblAverageValue, If(avgPct.HasValue, avgPct.GetValueOrDefault().ToString("0.##"), "--"), "CURRENT AVERAGE")
             SetStat(lblPassedValue, passedCount.ToString(), "ACTIVITIES PASSED")
             SetStat(lblPendingValue, pendingCount.ToString(), "OPEN REQUESTS")
             SetStat(lblHighestValue, maxPct.ToString("0.0"), "HIGHEST SCORE")
 
-            quizPct = If(quizScores.Count > 0, CInt(quizScores.Average()), 0)
-            activityPct = If(actScores.Count > 0, CInt(actScores.Average()), 0)
-            examPct = If(examScores.Count > 0, CInt(examScores.Average()), 0)
-            projectPct = If(projScores.Count > 0, CInt(projScores.Average()), 0)
+            quizPct = If(quizScores.Count > 0, CInt(GradeCalculator.CalculateRunningGrade(quizScores).GetValueOrDefault()), 0)
+            activityPct = If(actScores.Count > 0, CInt(GradeCalculator.CalculateRunningGrade(actScores).GetValueOrDefault()), 0)
+            examPct = If(examScores.Count > 0, CInt(GradeCalculator.CalculateRunningGrade(examScores).GetValueOrDefault()), 0)
+            projectPct = If(projScores.Count > 0, CInt(GradeCalculator.CalculateRunningGrade(projScores).GetValueOrDefault()), 0)
         Else
             SetStat(lblAverageValue, "--", "CURRENT AVERAGE")
             SetStat(lblPassedValue, "--", "ACTIVITIES PASSED")
