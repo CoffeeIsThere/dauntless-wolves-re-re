@@ -11,7 +11,6 @@ Partial Public Class Admin
     ' Dropdown menu for the Updates filter
     Private ReadOnly _updatesFilterMenu As New ContextMenuStrip()
 
-    Private tabButtons As Button()
     Private WithEvents updatesTimer As New Global.System.Windows.Forms.Timer With {.Interval = 2000}
     Private dashboardReady As Boolean
     Private updatesLoading As Boolean
@@ -55,7 +54,6 @@ Partial Public Class Admin
         ' Displays actual full name from session
         lblAdminName.Text = AppSession.CurrentUser.FullName
 
-        tabButtons = {btnDashboard, btnStudents, btnProfessors}
         ShowPanel(pnlDashboard, btnDashboard)
         InitProfessorPage()
         InitStudentPage()
@@ -73,7 +71,8 @@ Partial Public Class Admin
         p.Visible = True
         p.BringToFront()
 
-        For Each b As Button In tabButtons
+        ' Read the constructed controls instead of caching designer fields before they exist.
+        For Each b As Button In pnlTabs.Controls.OfType(Of Button)()
             Dim isActive As Boolean = (b Is activeBtn)
             ' Fix: Update NormalColor on CustomButtons so hover doesn't wipe out active color
             If TypeOf b Is CustomButton Then

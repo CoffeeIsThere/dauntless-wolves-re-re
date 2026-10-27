@@ -13,6 +13,14 @@ Module Program
         Dim record = DatabaseHelper.ExecuteQuery("SELECT admin_id,full_name FROM admin LIMIT 1").Rows(0)
         AppSession.StartSession(New UserModel(record("admin_id").ToString(), record("full_name").ToString(), "", "Admin"))
         Using form As New Admin()
+            ' Navigation must work before Load; designer fields may not have populated an old cached array.
+            Dim tabs = Control(form, "pnlTabs")
+            Using ordinary As New Button With {.Text = "Regression tab"}
+                tabs.Controls.Add(ordinary)
+                GetType(Admin).GetMethod("ShowPanel", flags).Invoke(form, {Control(form, "pnlDashboard"), Control(form, "btnDashboard")})
+                Check(ordinary.BackColor = Drawing.Color.FromArgb(200, 215, 205), "tab styling uses initialized controls before the Load event")
+                tabs.Controls.Remove(ordinary)
+            End Using
             form.Show() : Application.DoEvents()
             Pump(DirectCast(GetType(Admin).GetMethod("RefreshAccountsAsync", flags).Invoke(form, {"Student"}), Task))
             Pump(DirectCast(GetType(Admin).GetMethod("RefreshAccountsAsync", flags).Invoke(form, {"Teacher"}), Task))
