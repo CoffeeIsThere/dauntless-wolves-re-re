@@ -2,7 +2,6 @@
 Imports MySql.Data.MySqlClient
 
 Public Class frmGradebook
-    Private ReadOnly _revisionService As New RevisionRequestService()
     Private ReadOnly _exportService As New ExportService()
     Private ReadOnly _classService As New ClassService()
     Private ReadOnly _gradeService As New GradeService()
@@ -2162,68 +2161,10 @@ Public Class frmGradebook
     End Function
 
     Public Sub ReviewPendingRevisionRequests()
-        Dim dt As DataTable = _revisionService.GetPendingRequestsByTeacher(AppSession.CurrentUser.UserId)
-
-        If dt Is Nothing OrElse dt.Rows.Count = 0 Then
-            MessageBox.Show("There are no pending grade revision requests at this time.", "Revision Requests", MessageBoxButtons.OK, MessageBoxIcon.Information)
-            Return
-        End If
-
-        ' Review top pending request
-        Dim row As DataRow = dt.Rows(0)
-        Dim reqId As Integer = Convert.ToInt32(row("request_id"))
-        Dim studentName As String = Convert.ToString(row("student_name"))
-        Dim assessmentTitle As String = Convert.ToString(row("assessment_title"))
-        Dim currentScore As String = If(row("current_score") Is DBNull.Value, "N/A", Convert.ToString(row("current_score")))
-        Dim totalScore As String = Convert.ToString(row("total_score"))
-        Dim reqPoints As String = If(row("requested_points") Is DBNull.Value, "Re-check requested", Convert.ToString(row("requested_points")))
-        Dim reason As String = Convert.ToString(row("reason"))
-
-        Dim msg As String = $"[PENDING REVISION REQUEST #{reqId}]" & vbCrLf & vbCrLf &
-                             $"Student Name: {studentName}" & vbCrLf &
-                             $"Assessment: {assessmentTitle} (Max: {totalScore})" & vbCrLf &
-                             $"Current Recorded Score: {currentScore}" & vbCrLf &
-                             $"Requested Adjustment: {reqPoints}" & vbCrLf &
-                             $"Reason: {reason}" & vbCrLf & vbCrLf &
-                             "Click YES to APPROVE and apply this revision." & vbCrLf &
-                             "Click NO to REJECT this request." & vbCrLf &
-                             "Click CANCEL to dismiss."
-
-        Dim dlg As DialogResult = MessageBox.Show(msg, "Review Student Revision Request", MessageBoxButtons.YesNoCancel, MessageBoxIcon.Question)
-
-        If dlg = DialogResult.Yes Then
-            ' Call ApproveAndApplyRevision from your service
-            Dim res As OperationResult = _revisionService.ApproveAndApplyRevision(reqId, AppSession.CurrentUser.UserId)
-
-            ' If no points were specified by the student, ask the professor for the exact corrected score
-            If Not res.Success AndAlso res.Message = "NEEDSCORE" Then
-                Dim input As String = InputBox($"Enter the corrected score for {studentName} (Max {totalScore}):", "Score Override Required", currentScore)
-                Dim overrideVal As Double
-                If Double.TryParse(input, overrideVal) AndAlso overrideVal >= 0 AndAlso overrideVal <= Convert.ToDouble(totalScore) Then
-                    res = _revisionService.ApproveAndApplyRevision(reqId, AppSession.CurrentUser.UserId, overrideVal)
-                Else
-                    MessageBox.Show("Invalid score entered. Request approval canceled.", "Canceled", MessageBoxButtons.OK, MessageBoxIcon.Warning)
-                    Return
-                End If
-            End If
-
-            If res.Success Then
-                MessageBox.Show(res.Message, "Request Approved", MessageBoxButtons.OK, MessageBoxIcon.Information)
-                LoadClassData() ' Refresh gradebook grid with updated score
-            Else
-                MessageBox.Show(res.Message, "Approval Error", MessageBoxButtons.OK, MessageBoxIcon.Error)
-            End If
-
-        ElseIf dlg = DialogResult.No Then
-            Dim rejectReason As String = InputBox("Optional: Enter reason for rejecting this request:", "Reject Revision Request", "Insufficient justification.")
-            Dim success As Boolean = _revisionService.RejectRequest(reqId, AppSession.CurrentUser.UserId, rejectReason)
-
-            If success Then
-                MessageBox.Show($"Revision request #{reqId} has been rejected.", "Request Rejected", MessageBoxButtons.OK, MessageBoxIcon.Information)
-            Else
-                MessageBox.Show("Failed to reject request.", "Database Error", MessageBoxButtons.OK, MessageBoxIcon.Error)
-            End If
-        End If
+        Using requests As New RevisionRequestsForm(AppSession.CurrentUser.UserId, GetClassIdFromCode(SelectedClassCode()))
+            requests.ShowDialog(Me)
+        End Using
+        LoadClassData()
     End Sub
 
     Private Sub HookUpRevisionButton()

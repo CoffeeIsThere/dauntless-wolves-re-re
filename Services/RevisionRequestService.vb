@@ -136,7 +136,7 @@ Public Class RevisionRequestService
     Public Function GetRequestsByTeacher(teacherId As String, Optional statusFilter As String = "Open") As DataTable
         Dim sql As String =
             "SELECT r.request_id, r.grade_id, sg.enrollment_id, sg.assessment_id, s.student_id, s.full_name AS student_name, " &
-            "       a.title AS assessment_title, sg.score AS current_score, a.total_score, " &
+            "       c.class_id, CONCAT(c.course_code, ' - ', c.section) AS class_label, a.title AS assessment_title, sg.score AS current_score, a.total_score, " &
             "       r.requested_points, r.reason, r.status, r.requested_at, r.reviewed_at " &
             "FROM revisionrequest r " &
             "JOIN studentgrade sg ON r.grade_id = sg.grade_id " &

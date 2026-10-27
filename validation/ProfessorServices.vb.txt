@@ -71,6 +71,11 @@ Module Program
             Check(revision.RejectRequestResult(requestId, teacher, "Insufficient evidence").Success, "close request with reason")
             Check(revision.GetRevisionRequestsByStudent(student).Select("request_id=" & requestId)(0)("reviewer_response").ToString() = "Insufficient evidence", "student sees closure reason")
             Check(revision.GetRevisionRequestsByStudent("not-this-student").Rows.Count = 0, "other student cannot read responses")
+            Dim browserRequests = revision.GetRequestsByTeacher(teacher, "All")
+            Check(browserRequests.Select("request_id=" & requestId).Length = 1, "request chooser includes closed decisions")
+            Check(CInt(browserRequests.Select("request_id=" & requestId)(0)("class_id")) = classId, "request chooser supplies correct class identity")
+            Check(revision.GetRequestsByTeacher("not-this-teacher", "All").Rows.Count = 0, "request chooser excludes other professors' records")
+            Check(revision.GetRequestsByTeacher(teacher, "Open").Select("request_id=" & requestId).Length = 0, "open filter excludes closed requests")
             AppSession.CurrentUser.UserId = teacher
             Dim registeredName As String
             Using cmd As New MySqlCommand("SELECT full_name FROM student WHERE student_id=@Id", conn)
