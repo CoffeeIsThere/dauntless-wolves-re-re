@@ -206,7 +206,7 @@ Partial Class frmGradebook
         Controls.Add(Panel1)
         Name = "frmGradebook"
         StartPosition = FormStartPosition.CenterScreen
-        Text = "frmGradebook"
+        Text = "The Dauntless Grading System — Gradebook"
         Panel2.ResumeLayout(False)
         CType(PictureBox1, ComponentModel.ISupportInitialize).EndInit()
         PnlGrid.ResumeLayout(False)

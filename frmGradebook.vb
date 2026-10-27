@@ -84,6 +84,7 @@ Public Class frmGradebook
     End Sub
 
     Private Sub frmGradebook_Load(sender As Object, e As EventArgs) Handles MyBase.Load
+        Me.Text = "The Dauntless Grading System — Gradebook"
         Me.BackColor = Color.White
         EnableDoubleBuffer()
         SetupGrid()
@@ -917,12 +918,21 @@ Public Class frmGradebook
 
     Private Sub btnAddClass_Click(sender As Object, e As EventArgs) Handles btnAddClass.Click
 
-        MessageBox.Show(
-        "Please use the Admin Dashboard to create and assign classes.",
-        "Class Management",
-        MessageBoxButtons.OK,
-        MessageBoxIcon.Information
-    )
+        pendingClassImport = Nothing
+        Dim info = ShowClassDialog()
+        If info Is Nothing Then Return
+        Dim term = If(pendingClassImport Is Nothing, "Midterm", ShowInputDialog("Assessment term", "Imported assessments belong to Midterm or Finals", "Midterm"))
+        If term = "" Then Return
+        If pendingClassImport IsNot Nothing AndAlso MessageBox.Show("Import this roster and all assessment columns? Blank scores stay ungraded. Assessments receive equal weight (10 each). Student IDs and names must already be registered in Admin.", "Confirm class import", MessageBoxButtons.YesNo) <> DialogResult.Yes Then Return
+        Dim id As Integer
+        Dim result = New ClassImportService().ImportClass(info.Code, info.Name, info.Schedule, info.Term, info.SY, term, pendingClassImport, id)
+        MessageBox.Show(result.Message, If(result.Success, "Class saved", "Class not saved"))
+        If result.Success Then
+            LoadClassesFromDatabase()
+            SelectClass(id)
+            Dim professor = TryCast(Owner, frmprof)
+            If professor IsNot Nothing Then professor.ReloadClasses(id)
+        End If
 
     End Sub
 
@@ -1249,6 +1259,8 @@ Public Class frmGradebook
         Return accepted
     End Function
 
+    Private pendingClassImport As List(Of String())
+
     Private Function ShowClassDialog() As ClassInfo
         Dim dark As Color = Color.FromArgb(0, 100, 0)
         Dim green As Color = Color.FromArgb(0, 191, 99)
@@ -1282,7 +1294,7 @@ Public Class frmGradebook
                 .Location = New Point(18, 12)
             })
             header.Controls.Add(MakeImportButton(dlg,
-                {"From file (CSV)...", "From MySQL (approved classes)...", "Admin requests (approve / decline)..."},
+                {"From file (CSV)...", "Refresh assigned classes from MySQL"},
                 Function(choice) ImportClasses(choice)))
 
             Dim grey As Color = Color.Gray
@@ -1300,8 +1312,8 @@ Public Class frmGradebook
             Dim lineName As New Panel() With {.BackColor = green, .Location = New Point(24, 178), .Size = New Size(332, 2)}
 
             ' Schedule
-            Dim lblSched As New Label() With {.Text = "Schedule (e.g. MWF 8:00-9:30 AM)", .ForeColor = grey, .Font = small, .AutoSize = True, .Location = New Point(24, 194)}
-            Dim txtSched As New TextBox() With {.BorderStyle = BorderStyle.None, .Font = big, .Location = New Point(24, 216), .Width = 332, .MaxLength = 60}
+            Dim lblSched As New Label() With {.Text = "Section (e.g. CS2A)", .ForeColor = grey, .Font = small, .AutoSize = True, .Location = New Point(24, 194)}
+            Dim txtSched As New TextBox() With {.BorderStyle = BorderStyle.None, .Font = big, .Location = New Point(24, 216), .Width = 332, .MaxLength = 20}
             Dim lineSched As New Panel() With {.BackColor = green, .Location = New Point(24, 244), .Size = New Size(332, 2)}
 
             ' Term (pick or type) + SY side by side
@@ -1315,7 +1327,7 @@ Public Class frmGradebook
                 .Width = 190,
                 .MaxLength = 20
             }
-            cboTerm.Items.AddRange({"1st Semester", "2nd Semester", "Midyear", "Summer"})
+            cboTerm.Items.AddRange({"1st Semester", "2nd Semester"})
             Dim lineTerm As New Panel() With {.BackColor = green, .Location = New Point(24, 312), .Size = New Size(190, 2)}
 
             Dim lblSY As New Label() With {.Text = "SY", .ForeColor = grey, .Font = small, .AutoSize = True, .Location = New Point(232, 260)}
@@ -1921,29 +1933,19 @@ Public Class frmGradebook
 
     ' File columns: Class Code, Class Name, Schedule, Term, SY
     Private Function ImportClasses(choice As String) As Boolean
-        If choice.StartsWith("Admin") Then Return ImportFromAdmin()
-
-        Dim rows As New List(Of String())
         If choice.StartsWith("From file") Then
-            Dim loaded As List(Of String()) = LoadCsvRows("code", "classcode")
-            If loaded Is Nothing Then Return False
-            rows = loaded
-        Else
-            Dim dt As DataTable = RunQuery("SELECT class_code, class_name, schedule, term, sy FROM classes WHERE status = 'approved'")
-            If dt Is Nothing Then Return False
-            For Each r As DataRow In dt.Rows
-                rows.Add(New String() {Convert.ToString(r("class_code")), Convert.ToString(r("class_name")),
-                                       Convert.ToString(r("schedule")), Convert.ToString(r("term")),
-                                       Convert.ToString(r("sy"))})
-            Next
-        End If
-
-        Dim added As Integer = AddClassRows(rows)
-        If added = 0 Then
-            MessageBox.Show("No new classes were found (empty, incomplete or already in the list).", "Digital Gradebook")
+            Dim path = PickCsv()
+            If path = "" Then Return False
+            Try
+                pendingClassImport = ReadCsv(path)
+                MessageBox.Show("CSV loaded. Fill in the class details, then click Add to validate and save it. Format: student_id,full_name,Quiz 1 /20,Quiz 2 /20,...")
+            Catch ex As Exception
+                pendingClassImport = Nothing
+                MessageBox.Show("Could not read CSV: " & ex.Message)
+            End Try
             Return False
         End If
-        MessageBox.Show("Imported " & added & " of " & rows.Count & " classes.", "Digital Gradebook")
+        LoadClassesFromDatabase()
         Return True
     End Function
 

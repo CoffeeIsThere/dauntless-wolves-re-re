@@ -1581,7 +1581,7 @@ Partial Class frmprof
         Margin = New Padding(3, 2, 3, 2)
         Name = "frmprof"
         StartPosition = FormStartPosition.CenterScreen
-        Text = "frmprof"
+        Text = "The Dauntless Grading System"
         WindowState = FormWindowState.Maximized
         pnlHeader.ResumeLayout(False)
         pnlHeader.PerformLayout()

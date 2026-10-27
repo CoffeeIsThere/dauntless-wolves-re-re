@@ -1,6 +1,7 @@
 Imports MySql.Data.MySqlClient
 Public Module AppSession
     Public IsAdmin As Boolean = False
+    Public IsTeacher As Boolean = True
     Public CurrentUser As New User()
 End Module
 Public Class User
@@ -70,6 +71,36 @@ Module Program
             Check(revision.RejectRequestResult(requestId, teacher, "Insufficient evidence").Success, "close request with reason")
             Check(revision.GetRevisionRequestsByStudent(student).Select("request_id=" & requestId)(0)("reviewer_response").ToString() = "Insufficient evidence", "student sees closure reason")
             Check(revision.GetRevisionRequestsByStudent("not-this-student").Rows.Count = 0, "other student cannot read responses")
+            AppSession.CurrentUser.UserId = teacher
+            Dim registeredName As String
+            Using cmd As New MySqlCommand("SELECT full_name FROM student WHERE student_id=@Id", conn)
+                cmd.Parameters.AddWithValue("@Id", student)
+                registeredName = CStr(cmd.ExecuteScalar())
+            End Using
+            Dim importer As New ClassImportService()
+            Dim importedClass As Integer
+            Dim code = "TEST" & Guid.NewGuid().ToString("N").Substring(0, 8)
+            Dim roster As New List(Of String()) From {
+                New String() {"student_id", "full_name", "Quiz 1 /20", "Quiz 2 /20", "Quiz 3 /30"},
+                New String() {student, registeredName, "18", "", "25"}}
+            Check(importer.ImportClass(code, "Import test", "A", "1st Semester", "2026-2027", "Midterm", roster, importedClass).Success, "import class roster with three quizzes")
+            Using cmd As New MySqlCommand("SELECT COUNT(*) FROM assessment WHERE class_id=" & importedClass, conn)
+                Check(CInt(cmd.ExecuteScalar()) = 3, "all CSV quiz headers create assessments")
+            End Using
+            Using cmd As New MySqlCommand("SELECT COUNT(*) FROM studentgrade sg JOIN enrollment e ON e.enrollment_id=sg.enrollment_id WHERE e.class_id=" & importedClass & " AND sg.score IS NULL", conn)
+                Check(CInt(cmd.ExecuteScalar()) = 1, "blank imported score remains ungraded")
+            End Using
+            Check(service.GetClassGradeSheet(importedClass, teacher).Rows.Count = 1, "imported roster appears in grade sheet")
+            roster(1)(0) = "UNKNOWN"
+            Dim failedCode = "FAIL" & Guid.NewGuid().ToString("N").Substring(0, 8)
+            Check(Not importer.ImportClass(failedCode, "Rollback test", "A", "1st Semester", "2026-2027", "Midterm", roster, importedClass).Success, "reject unregistered student")
+            Using cmd As New MySqlCommand("SELECT COUNT(*) FROM course WHERE course_code=@Code", conn)
+                cmd.Parameters.AddWithValue("@Code", failedCode)
+                Check(CInt(cmd.ExecuteScalar()) = 0, "failed roster import rolls back course and class")
+            End Using
+            roster(1)(0) = student
+            roster(1)(2) = "21"
+            Check(Not importer.ImportClass("BAD", "Bad score", "A", "1st Semester", "2026-2027", "Midterm", roster, importedClass).Success, "reject imported score above maximum")
         End Using
     End Sub
     Sub Check(ok As Boolean, name As String)

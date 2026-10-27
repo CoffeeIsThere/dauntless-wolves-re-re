@@ -65,6 +65,7 @@ Public Class frmprof
         ConfigureAuditGrid()
         BuildAnalyticsLabels()
         ConfigureProfessorLayout()
+        ApplyProfessorTheme()
         LoadAnalytics()
     End Sub
 
@@ -100,7 +101,7 @@ Public Class frmprof
             kvp.Key.Font = If(isActive, boldFont, normalFont)
 
             ' Change button background
-            kvp.Key.BackColor = If(isActive, Color.White, Color.FromArgb(208, 216, 224))
+            kvp.Key.BackColor = If(isActive, Color.White, Color.FromArgb(232, 242, 232))
         Next
 
         ' Put the selected panel in front
@@ -1007,7 +1008,8 @@ Public Class frmprof
         End If
         Dim book = My.Forms.frmGradebook
         book.InitialClassId = SelectedClassId()
-        book.Show()
+        book.ShowInTaskbar = False
+        book.Show(Me)
         book.SelectClass(SelectedClassId())
         book.BringToFront()
     End Sub
@@ -1131,6 +1133,38 @@ Public Class frmprof
             LoadAnalytics()
             UpdateSelectedStudentDisplay()
         End Using
+    End Sub
+
+    Public Sub ReloadClasses(classId As Integer)
+        LoadTeacherInfo()
+        ComboBox1.SelectedValue = classId
+    End Sub
+
+    Private Sub ApplyProfessorTheme()
+        Text = "The Dauntless Grading System"
+        Lbltransparentgradingsytem.Text = "The Dauntless Grading System"
+        Lbltransparentgradingsytem.Parent.BackColor = Color.DarkGreen
+        Lbltransparentgradingsytem.BackColor = Color.DarkGreen
+        Lbltransparentgradingsytem.ForeColor = Color.White
+        LblRole.BackColor = Color.DarkGreen
+        For Each button As CustomButton In {CustomButton4, CustomButton6}
+            button.NormalColor = Color.DarkGreen
+            button.HoverColor = Color.FromArgb(0, 125, 45)
+            button.ForeColor = Color.White
+        Next
+        BackColor = Color.White
+        pnlTabs.BackColor = Color.FromArgb(240, 248, 240)
+        pnl2ndtab.BackColor = pnlTabs.BackColor
+        For Each control As Control In {btnLogout, btnRecordScores, btnClassGrades, btnRevisionRequests, btnAnalytics, btnAuditLogs}
+            control.ForeColor = Color.DarkGreen
+            Dim button = TryCast(control, Button)
+            If button IsNot Nothing Then
+                button.FlatStyle = FlatStyle.Flat
+                button.FlatAppearance.BorderColor = Color.DarkGreen
+                button.FlatAppearance.MouseOverBackColor = Color.FromArgb(220, 238, 220)
+                button.UseVisualStyleBackColor = False
+            End If
+        Next
     End Sub
 
     Private Sub ConfigureProfessorLayout()
