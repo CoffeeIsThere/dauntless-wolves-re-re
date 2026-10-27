@@ -1,4 +1,4 @@
-﻿Imports MySql.Data.MySqlClient
+Imports MySql.Data.MySqlClient
 Imports System.Globalization
 Imports System.Text.RegularExpressions
 
@@ -14,7 +14,7 @@ Public Class ClassImportService
         section = section.Trim().ToUpperInvariant()
         If code.Length = 0 OrElse code.Length > 20 OrElse name.Length = 0 OrElse name.Length > 100 OrElse section.Length = 0 OrElse section.Length > 20 Then Return OperationResult.Fail("Enter a course code, name, and section (up to 20 characters).")
         If Not {"1st Semester", "2nd Semester"}.Contains(semester) Then Return OperationResult.Fail("Choose 1st Semester or 2nd Semester.")
-        If Not Regex.IsMatch(year, "^\d{4}-\d{4}$") OrElse Integer.Parse(year.Substring(5)) <> Integer.Parse(year.Substring(0, 4)) + 1 Then Return OperationResult.Fail("Enter an academic year such as 2026-2027.")
+        If Not ValidationHelper.IsValidAcademicYear(year) Then Return OperationResult.Fail("Enter an academic year such as 2026-2027.")
         If Not {"Midterm", "Finals"}.Contains(term) Then Return OperationResult.Fail("Choose Midterm or Finals for imported assessments.")
         Dim titles As New List(Of String)
         Dim maxima As New List(Of Double)

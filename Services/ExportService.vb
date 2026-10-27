@@ -1,4 +1,4 @@
-﻿Imports System.Drawing
+Imports System.Drawing
 Imports System.Drawing.Printing
 Imports System.IO
 Imports System.Windows.Forms
@@ -98,116 +98,121 @@ Public Class ExportService
     End Function
 
     Private Class GridPrinter
-        Private ReadOnly _headers As New List(Of String)()
-        Private ReadOnly _weights As New List(Of Single)()
-        Private ReadOnly _rows As New List(Of String())()
-        Private ReadOnly _title As String
-        Private ReadOnly _subtitle As String
-        Private _rowIndex As Integer = 0
-        Private _pageNo As Integer = 0
+        Private ReadOnly headers As New List(Of String)
+        Private ReadOnly widths As New List(Of Single)
+        Private ReadOnly rows As New List(Of String())
+        Private ReadOnly identities As New List(Of Integer)
+        Private ReadOnly title, subtitle As String
+        Private bands As List(Of Integer())
+        Private bandIndex, rowIndex, pageNo As Integer
+        Private offsets As Integer()
 
         Public ReadOnly Property ColumnCount As Integer
             Get
-                Return _headers.Count
+                Return headers.Count
             End Get
         End Property
 
-        Public Sub New(dgv As DataGridView, title As String, subtitle As String)
-            _title = title
-            _subtitle = subtitle
-
-            Dim cols As New List(Of DataGridViewColumn)()
-            For Each c As DataGridViewColumn In dgv.Columns
-                If c.Visible Then cols.Add(c)
+        Public Sub New(grid As DataGridView, reportTitle As String, reportSubtitle As String)
+            title = reportTitle : subtitle = reportSubtitle
+            Dim columns = grid.Columns.Cast(Of DataGridViewColumn).Where(Function(column) column.Visible).OrderBy(Function(column) column.DisplayIndex).ToList()
+            For Each column In columns
+                Dim caption = If(String.IsNullOrEmpty(column.HeaderText), column.Name, column.HeaderText)
+                headers.Add(caption.Replace(vbCrLf, " ").Replace(vbLf, " "))
+                Dim identity = column.Name.Equals("StudentName", StringComparison.OrdinalIgnoreCase) OrElse column.Name.Equals("Student", StringComparison.OrdinalIgnoreCase) OrElse column.Name.Equals("No", StringComparison.OrdinalIgnoreCase)
+                If identity Then identities.Add(headers.Count - 1)
+                widths.Add(If(column.Name.Equals("No", StringComparison.OrdinalIgnoreCase), 40.0F, If(identity, 180.0F, Math.Max(100.0F, Math.Min(220.0F, column.Width)))))
             Next
-
-            For Each c As DataGridViewColumn In cols
-                Dim h As String = If(String.IsNullOrEmpty(c.HeaderText), c.Name, c.HeaderText)
-                _headers.Add(h.Replace(vbCrLf, " ").Replace(vbLf, " "))
-                _weights.Add(Math.Max(c.Width, 40))
-            Next
-
-            ' Copy the text now, so the report matches what the user sees at this moment
-            For Each row As DataGridViewRow In dgv.Rows
-                If row.IsNewRow Then Continue For
-                Dim cells(cols.Count - 1) As String
-                For i As Integer = 0 To cols.Count - 1
-                    Dim v As Object = row.Cells(cols(i).Index).Value
-                    cells(i) = If(v Is Nothing OrElse Convert.IsDBNull(v), "", Convert.ToString(v))
-                Next
-                _rows.Add(cells)
+            For Each row As DataGridViewRow In grid.Rows
+                If row.IsNewRow OrElse Not row.Visible Then Continue For
+                rows.Add(columns.Select(Function(column) Convert.ToString(row.Cells(column.Index).Value)).ToArray())
             Next
         End Sub
 
-        Public Sub OnBeginPrint(sender As Object, e As PrintEventArgs)
-            _rowIndex = 0
-            _pageNo = 0
+        Public Sub OnBeginPrint(sender As Object, args As PrintEventArgs)
+            bandIndex = 0 : rowIndex = 0 : pageNo = 0 : bands = Nothing : offsets = Nothing
         End Sub
 
-        Public Sub OnPrintPage(sender As Object, e As PrintPageEventArgs)
-            _pageNo += 1
-
-            Using titleFont As New Font("Segoe UI", 14, FontStyle.Bold),
-                  subFont As New Font("Segoe UI", 8.5F, FontStyle.Regular),
-                  headFont As New Font("Segoe UI", 9, FontStyle.Bold),
-                  bodyFont As New Font("Segoe UI", 9, FontStyle.Regular),
-                  fmt As New StringFormat()
-
-                fmt.Trimming = StringTrimming.EllipsisCharacter
-                fmt.FormatFlags = StringFormatFlags.NoWrap
-                fmt.LineAlignment = StringAlignment.Center
-
-                Dim x As Single = e.MarginBounds.Left
-                Dim y As Single = e.MarginBounds.Top
-                Dim width As Single = e.MarginBounds.Width
-                Dim rowH As Single = 22
-
-                e.Graphics.DrawString(_title, titleFont, Brushes.DarkGreen, x, y)
-                y += 28
-                Dim sub1 As String = If(String.IsNullOrEmpty(_subtitle), "", _subtitle & "   |   ")
-                e.Graphics.DrawString(sub1 & "Generated " & DateTime.Now.ToString("MMM d, yyyy HH:mm"), subFont, Brushes.Gray, x, y)
-                y += 24
-
-                ' Column x-positions share the page width in proportion to the screen widths
-                Dim total As Single = 0
-                For Each w As Single In _weights
-                    total += w
+        Public Sub OnPrintPage(sender As Object, args As PrintPageEventArgs)
+            pageNo += 1
+            Dim bounds = args.MarginBounds
+            If bands Is Nothing Then
+                ' Leave space for at least one data column even on a narrow paper size.
+                Dim identityCap = bounds.Width / CSng(Math.Max(3, identities.Count + 2))
+                For index = 0 To widths.Count - 1
+                    widths(index) = Math.Min(widths(index), If(identities.Contains(index), identityCap, bounds.Width / 2.0F))
                 Next
-                Dim xs(_headers.Count) As Single
-                xs(0) = x
-                For i As Integer = 0 To _headers.Count - 1
-                    xs(i + 1) = xs(i) + (_weights(i) / total) * width
+                bands = ReportColumnBands.Build(widths, identities, bounds.Width)
+            End If
+            Using heading As New Font("Segoe UI", 13, FontStyle.Bold), small As New Font("Segoe UI", 8),
+                  headerFont As New Font("Segoe UI", 9, FontStyle.Bold), bodyFont As New Font("Segoe UI", 9),
+                  format As New StringFormat(StringFormat.GenericTypographic), headerBrush As New SolidBrush(Color.FromArgb(224, 240, 228))
+                format.FormatFlags = StringFormatFlags.LineLimit
+                Dim y As Single = bounds.Top
+                args.Graphics.DrawString(title, heading, Brushes.DarkGreen, bounds.Left, y) : y += 28
+                Dim description = subtitle & "   |   Generated " & Date.Now.ToString("MMM d, yyyy HH:mm")
+                Dim descriptionHeight = args.Graphics.MeasureString(description, small, bounds.Width).Height + 8
+                args.Graphics.DrawString(description, small, Brushes.Gray, New RectangleF(bounds.Left, y, bounds.Width, descriptionHeight))
+                y += descriptionHeight
+                If bands.Count = 0 Then
+                    args.Graphics.DrawString("No visible columns to export.", bodyFont, Brushes.Black, bounds.Left, y)
+                    args.HasMorePages = False
+                    Return
+                End If
+                Dim band = bands(bandIndex)
+                args.Graphics.DrawString("Column group " & (bandIndex + 1) & " of " & bands.Count, small, Brushes.Gray, bounds.Left, y) : y += 20
+                Dim headerHeight = band.Max(Function(index) args.Graphics.MeasureString(headers(index), headerFont, CInt(widths(index) - 8)).Height) + 10
+                Dim x As Single = bounds.Left
+                For Each index In band
+                    Dim rectangle As New RectangleF(x, y, widths(index), headerHeight)
+                    args.Graphics.FillRectangle(headerBrush, rectangle)
+                    args.Graphics.DrawString(headers(index), headerFont, Brushes.DarkGreen, New RectangleF(x + 4, y + 4, widths(index) - 8, headerHeight - 8), format)
+                    x += widths(index)
                 Next
-
-                ' Header row
-                e.Graphics.FillRectangle(New SolidBrush(Color.FromArgb(224, 240, 228)), x, y, width, rowH)
-                For i As Integer = 0 To _headers.Count - 1
-                    e.Graphics.DrawString(_headers(i), headFont, Brushes.DarkGreen,
-                                          New RectangleF(xs(i) + 3, y, xs(i + 1) - xs(i) - 6, rowH), fmt)
-                Next
-                y += rowH
-
-                ' Data rows until the page is full
-                Dim shade As New SolidBrush(Color.FromArgb(246, 250, 247))
-                While _rowIndex < _rows.Count
-                    If y + rowH > e.MarginBounds.Bottom - 20 Then Exit While
-
-                    If _rowIndex Mod 2 = 1 Then e.Graphics.FillRectangle(shade, x, y, width, rowH)
-                    Dim cells() As String = _rows(_rowIndex)
-                    For i As Integer = 0 To cells.Length - 1
-                        e.Graphics.DrawString(cells(i), bodyFont, Brushes.Black,
-                                              New RectangleF(xs(i) + 3, y, xs(i + 1) - xs(i) - 6, rowH), fmt)
+                y += headerHeight
+                Dim bodyTop = y
+                Dim bottom As Single = bounds.Bottom - 26
+                If bottom - bodyTop < bodyFont.GetHeight(args.Graphics) + 10 Then Throw New InvalidOperationException("The printable page is too small for this report.")
+                While rowIndex < rows.Count
+                    If offsets Is Nothing Then offsets = New Integer(headers.Count - 1) {}
+                    Dim remaining = bottom - y
+                    If remaining < bodyFont.GetHeight(args.Graphics) + 10 Then Exit While
+                    Dim height As Single = 24
+                    For Each index In band
+                        height = Math.Max(height, args.Graphics.MeasureString(rows(rowIndex)(index).Substring(offsets(index)), bodyFont, CInt(widths(index) - 8)).Height + 10)
                     Next
-                    y += rowH
-                    _rowIndex += 1
+                    ' Start ordinary rows on the next page rather than splitting them needlessly.
+                    If height > remaining AndAlso y > bodyTop Then Exit While
+                    Dim fragmentHeight = Math.Min(height, remaining)
+                    Dim advanced = False
+                    x = bounds.Left
+                    For Each index In band
+                        Dim text = rows(rowIndex)(index).Substring(offsets(index))
+                        Dim characters, lines As Integer
+                        Dim area As New RectangleF(x + 4, y + 4, widths(index) - 8, fragmentHeight - 8)
+                        If text.Length > 0 Then
+                            args.Graphics.MeasureString(text, bodyFont, area.Size, format, characters, lines)
+                            If characters > 0 Then
+                                args.Graphics.DrawString(text.Substring(0, characters), bodyFont, Brushes.Black, area, format)
+                                offsets(index) += characters : advanced = True
+                            End If
+                        End If
+                        args.Graphics.DrawRectangle(Pens.LightGray, x, y, widths(index), fragmentHeight)
+                        x += widths(index)
+                    Next
+                    y += fragmentHeight
+                    If band.All(Function(index) offsets(index) >= rows(rowIndex)(index).Length) Then
+                        rowIndex += 1 : offsets = Nothing
+                    Else
+                        If Not advanced Then Throw New InvalidOperationException("Text cannot fit in the printable area.")
+                        Exit While
+                    End If
                 End While
-                shade.Dispose()
-
-                e.Graphics.DrawLine(Pens.LightGray, x, y, x + width, y)
-                e.Graphics.DrawString("Page " & _pageNo.ToString() & "   |   " & _rows.Count.ToString() & " record(s)", subFont, Brushes.Gray,
-                                      x, e.MarginBounds.Bottom - 14)
-
-                e.HasMorePages = (_rowIndex < _rows.Count)
+                args.Graphics.DrawString("Page " & pageNo & " | " & rows.Count & " record(s)", small, Brushes.Gray, bounds.Left, bounds.Bottom - 18)
+                If rowIndex >= rows.Count Then
+                    bandIndex += 1 : rowIndex = 0 : offsets = Nothing
+                End If
+                args.HasMorePages = bandIndex < bands.Count
             End Using
         End Sub
     End Class

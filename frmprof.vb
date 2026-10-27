@@ -1,4 +1,4 @@
-﻿Imports System.Globalization
+Imports System.Globalization
 Imports MySql.Data.MySqlClient
 
 Public Class frmprof
@@ -154,6 +154,10 @@ Public Class frmprof
     End Sub
 
     Private Sub LoadClassGrades()
+        UiKit.TryLoadData(Me, "class grades", AddressOf LoadClassGradesCore)
+    End Sub
+
+    Private Sub LoadClassGradesCore()
         Dim selectedClass = TryCast(ComboBox1.SelectedItem, DataRowView)
         Label13.Text = If(selectedClass Is Nothing, "No class selected", selectedClass("course_code").ToString() & " - " & selectedClass("section").ToString() & " (" & selectedClass("semester").ToString() & " " & selectedClass("academic_year").ToString() & ")")
         Dim classId As Integer = SelectedClassId()
@@ -324,6 +328,10 @@ Public Class frmprof
     End Sub
 
     Private Sub LoadRequests()
+        UiKit.TryLoadData(Me, "clarification requests", AddressOf LoadRequestsCore)
+    End Sub
+
+    Private Sub LoadRequestsCore()
         Dim dtDb As DataTable = _revisionService.GetPendingRequestsByTeacher(_currentTeacherId)
 
         Dim dt As New DataTable()
@@ -459,6 +467,10 @@ Public Class frmprof
     End Sub
 
     Private Sub LoadAuditLogs()
+        UiKit.TryLoadData(Me, "audit logs", AddressOf LoadAuditLogsCore)
+    End Sub
+
+    Private Sub LoadAuditLogsCore()
         Dim dtDb As DataTable = _gradeService.GetAuditLogsForTeacher(_currentTeacherId)
 
         Dim dt As New DataTable()
@@ -567,6 +579,10 @@ Public Class frmprof
     End Sub
 
     Private Sub LoadAnalytics()
+        UiKit.TryLoadData(Me, "analytics", AddressOf LoadAnalyticsCore)
+    End Sub
+
+    Private Sub LoadAnalyticsCore()
         Dim classId As Integer = SelectedClassId()
         If classId = 0 Then
             ResetAnalyticsUI()
@@ -742,6 +758,10 @@ Public Class frmprof
     End Sub
 
     Private Sub LoadTeacherInfo()
+        UiKit.TryLoadData(Me, "class choices", AddressOf LoadTeacherInfoCore)
+    End Sub
+
+    Private Sub LoadTeacherInfoCore()
         lblProfName.Text = AppSession.CurrentUser.FullName
         Dim previous = SelectedClassId()
         Dim classes = _gradeService.GetClassesByTeacher(_currentTeacherId)
@@ -765,6 +785,10 @@ Public Class frmprof
     End Function
 
     Private Sub ComboBox1_SelectedIndexChanged(sender As Object, e As EventArgs) Handles ComboBox1.SelectedIndexChanged
+        UiKit.TryLoadData(Me, "class selections", Sub() ComboBox1_SelectedIndexChangedCore(sender, e))
+    End Sub
+
+    Private Sub ComboBox1_SelectedIndexChangedCore(sender As Object, e As EventArgs)
         If refreshingClassList OrElse refreshingScoreSelectors Then Return
         Dim previousStudent = TryCast(ComboBox2.SelectedItem, DataRowView)
         Dim previousAssessment = TryCast(ComboBox4.SelectedItem, DataRowView)
@@ -859,6 +883,10 @@ Public Class frmprof
     End Sub
 
     Private Sub UpdateSelectedStudentDisplay()
+        UiKit.TryLoadData(Me, "student scores", AddressOf UpdateSelectedStudentDisplayCore)
+    End Sub
+
+    Private Sub UpdateSelectedStudentDisplayCore()
         If ComboBox2.SelectedItem Is Nothing Then
             If _lblRightStudentName IsNot Nothing Then _lblRightStudentName.Text = "No student selected"
             If _lblRightStudentId IsNot Nothing Then _lblRightStudentId.Text = ""

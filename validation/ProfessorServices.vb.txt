@@ -30,6 +30,17 @@ Module Program
         Check(StudentNameOrder.FormatForGradebook("Juan Cruz Jr.") = "Cruz Jr., Juan", "name suffix is preserved in gradebook")
         Check(StudentNameOrder.FormatForGradebook("") = "", "blank display name is safe")
         Check(StudentNameOrder.CompareNames("Juan Cruz Jr.", "Cruz Jr., Juan") = 0, "display format preserves surname sorting with suffix")
+        Check(ValidationHelper.IsValidAcademicYear("2026-2027"), "academic year accepts consecutive years")
+        For Each invalidYear In {"abcd-efgh", "2026-2026", "2026-2028", "2026/2027", "0000-0001", "9999-10000", "２０２６-２０２７"}
+            Check(Not ValidationHelper.IsValidAcademicYear(invalidYear), "academic year rejects " & invalidYear)
+        Next
+        Dim reportWidths As Single() = {40, 180, 120, 120, 120, 120, 120, 120}
+        Dim reportBands = ReportColumnBands.Build(reportWidths, {0, 1}, 600)
+        Check(reportBands.Count > 1, "wide reports split into horizontal column groups")
+        Check(reportBands.All(Function(band) band.Contains(0) AndAlso band.Contains(1)), "report groups repeat student number and name")
+        Check(reportBands.All(Function(band) band.Sum(Function(index) reportWidths(index)) <= 600), "report groups fit the printable width")
+        Check(reportBands.SelectMany(Function(band) band.Where(Function(index) index > 1)).OrderBy(Function(index) index).SequenceEqual(Enumerable.Range(2, 6)), "report pagination includes every assessment column exactly once")
+        Check(ReportColumnBands.Build(New Single() {150, 150}, Array.Empty(Of Integer)(), 600).Count = 1, "narrow reports stay in one column group")
         Dim service As New GradeService()
         Using conn = DatabaseHelper.GetConnection()
             Dim teacher As String
@@ -254,6 +265,22 @@ Module Program
             Dim originalTeacherStatus = CStr(DatabaseHelper.ExecuteScalar("SELECT status FROM teacher WHERE teacher_id=@Id", New MySqlParameter("@Id", teacher)))
             Check(workspace.SetStatuses("Teacher", {teacher}, "Inactive", adminId).Success, "bulk status supports professor accounts")
             Check(workspace.SetStatuses("Teacher", {teacher}, originalTeacherStatus, adminId).Success, "professor bulk fixture status restores")
+            Dim classAdmin As New ClassService()
+            For Each badYear In {"abcd-efgh", "2026-2026", "2026-2028"}
+                Check(Not classAdmin.CreateClass("REJECTYEAR", "Invalid year", "TEST", "1st Semester", badYear, teacher, adminId).Success, "class creation rejects malformed academic year " & badYear)
+            Next
+            Dim fixtureClass = DatabaseHelper.ExecuteQuery("SELECT course_code,section FROM class WHERE class_id=@Id", New MySqlParameter("@Id", classId)).Rows(0)
+            Check(classAdmin.CreateClass(fixtureClass("course_code").ToString(), "", fixtureClass("section").ToString(), "2nd Semester", "2088-2089", teacher, adminId).Success, "another semester and academic year creates a distinct offering")
+            Dim entryChoices = classAdmin.GetGradeEntryClasses()
+            Check(entryChoices.Rows.Cast(Of DataRow).Select(Function(row) row("class_title").ToString()).Distinct().Count() = entryChoices.Rows.Count, "admin quick-entry labels distinguish offerings")
+            Check(entryChoices.Rows.Cast(Of DataRow).Any(Function(row) row("class_title").ToString().Contains("2nd Semester, 2088-2089")), "admin quick-entry labels include semester and year")
+            Dim requestsForStudent = revision.GetRevisionRequestsByStudent(student)
+            Check(requestsForStudent.Columns.Contains("class_label") AndAlso requestsForStudent.Columns.Contains("enrollment_id"), "student request results identify their course offering")
+            If requestsForStudent.Rows.Count > 0 Then
+                Dim chosenEnrollment = CInt(requestsForStudent.Rows(0)("enrollment_id"))
+                Check(revision.GetRevisionRequestsByStudent(student, chosenEnrollment).Rows.Cast(Of DataRow).All(Function(row) CInt(row("enrollment_id")) = chosenEnrollment), "student requests filter by the selected enrollment")
+                Check(revision.GetRevisionRequestsByStudent(studentId, chosenEnrollment).Rows.Count = 0, "request enrollment filter cannot reveal another student's requests")
+            End If
             Check(AssessmentNames.NextTitle("Quiz", {"Quiz 1", "Quiz 3"}) = "Quiz 2", "assessment numbering finds an unused gap")
             Check(AssessmentNames.NextTitle("Quiz", {"quiz 1", "QUIZ 2"}) = "Quiz 3", "assessment numbering ignores title case")
             Check(Not service.CreateAssessment(classId, "Review test", "Quiz", 20, "Midterm", teacher).Success, "duplicate assessment title is rejected")

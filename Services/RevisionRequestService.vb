@@ -1,4 +1,4 @@
-﻿Imports MySql.Data.MySqlClient
+Imports MySql.Data.MySqlClient
 Imports System.Data
 Imports System.Globalization
 Imports DAUNTLESS_WOLVES_PROF.Models
@@ -105,9 +105,9 @@ Public Class RevisionRequestService
     ' "My Request Status" table.
     ' Columns: request_id, grade_id, assessment_title, current_score, total_score, requested_points, reason,
     '          status, requested_at, reviewed_at
-    Public Function GetRevisionRequestsByStudent(studentId As String) As DataTable
+    Public Function GetRevisionRequestsByStudent(studentId As String, Optional enrollmentId As Integer? = Nothing) As DataTable
         Dim sql As String =
-            "SELECT r.request_id, r.grade_id, a.title AS assessment_title, sg.score AS current_score, a.total_score, " &
+            "SELECT r.request_id, r.grade_id, e.enrollment_id, CONCAT(c.course_code, ' - ', c.section, ' (', c.semester, ', ', c.academic_year, ')') AS class_label, a.title AS assessment_title, sg.score AS current_score, a.total_score, " &
             "       r.requested_points, r.reason, r.status, r.requested_at, r.reviewed_at, " &
             "       (SELECT al.details FROM auditlog al WHERE al.entity_type = 'RevisionRequest' " &
             "        AND CAST(al.entity_id AS BINARY) = CAST(CAST(r.request_id AS CHAR) AS BINARY) AND CAST(al.new_value AS BINARY) = CAST(r.status AS BINARY) " &
@@ -117,9 +117,15 @@ Public Class RevisionRequestService
             "JOIN studentgrade sg ON r.grade_id = sg.grade_id " &
             "JOIN enrollment e ON sg.enrollment_id = e.enrollment_id " &
             "JOIN assessment a ON sg.assessment_id = a.assessment_id " &
-            "WHERE e.student_id = @StudentId " &
-            "ORDER BY r.requested_at DESC, r.request_id DESC"
-        Return DatabaseHelper.ExecuteQuery(sql, {New MySqlParameter("@StudentId", studentId)})
+            "JOIN class c ON e.class_id = c.class_id " &
+            "WHERE e.student_id = @StudentId "
+        Dim parameters As New List(Of MySqlParameter) From {New MySqlParameter("@StudentId", studentId)}
+        If enrollmentId.HasValue Then
+            sql &= " AND e.enrollment_id=@Enrollment"
+            parameters.Add(New MySqlParameter("@Enrollment", enrollmentId.Value))
+        End If
+        sql &= " ORDER BY r.requested_at DESC, r.request_id DESC"
+        Return DatabaseHelper.ExecuteQuery(sql, parameters.ToArray())
     End Function
 
     ' =========================================================

@@ -6,7 +6,7 @@ Run only against a disposable database populated with the supplied grading-syste
 2. Place `dbconfig.json` next to the generated `validation/bin/Debug/net8.0/professor-services.dll`, using DatabaseHelper's Host, Port, Database, User and Password fields. Do not commit credentials.
 3. Run: `dotnet validation/bin/Debug/net8.0/professor-services.dll`.
 
-146 checks exercise CSV import validation, request approval/status transitions, re-check score overrides, duplicate approval protection, and assessment ownership, term validation, assessment creation, score saving, range validation, rejected clearing, persisted values, grade-sheet columns and audit queries. The harness compiles the actual grading services for Linux without loading Windows Forms. Its session stub is used only by the test executable.
+168 checks exercise CSV import validation, request approval/status transitions, re-check score overrides, duplicate approval protection, and assessment ownership, term validation, assessment creation, score saving, range validation, rejected clearing, persisted values, grade-sheet columns and audit queries. The harness compiles the actual grading services for Linux without loading Windows Forms. Its session stub is used only by the test executable.
 
 Windows manual checks: switch between sections of the same course; confirm assessment titles and maximum scores match each section; edit and paste scores, reopen and verify persistence; enroll an existing student; create a weighted Midterm/Finals assessment; approve an Under Review request; inspect audit timestamps and exported class headers. Gradebook inputs now represent persisted assessment scores, and summaries use the shared weighted calculator. The old attendance/bonus/project/exam worksheet-only inputs are hidden to avoid conflicting grades. Removing a saved grade or changing an existing assessment maximum is explicitly blocked on this screen rather than silently changing only the display.
 
@@ -104,7 +104,7 @@ Final review fixes:
 - In another window/session, enroll a student or assign a class. Return to the student/professor window or select another tab and verify the catalog refreshes without logging out. Existing selections stay on the same IDs if they remain available. Reopen an already-open gradebook from the professor window and verify new assignments are available there too.
 - Professor class labels and Class Grades headings include section, semester and year. Check both short and long labels in the widened dropdown.
 
-The backend suite now contains 146 checks, including failed-paste score/audit rollback, precision rejection, duplicate-title protection, destination-aware enrollment and refreshed catalog query results. Both Windows interaction harnesses compile, but must be run on Windows.
+The backend suite now contains 168 checks, including failed-paste score/audit rollback, precision rejection, duplicate-title protection, destination-aware enrollment and refreshed catalog query results. Both Windows interaction harnesses compile, but must be run on Windows.
 
 
 Gradebook names and Add Student design: gradebook cells and the enrollment picker's display labels show surname first, for example `Puyat, Ron Jacob` and `Cruz, Juan A.`. Complete given names remain intact because the database has no separate middle-name field. Existing initial letters gain a period, already-formatted names are not reordered twice, and compound surnames/suffixes are preserved. Stored full_name and student ID remain unchanged.
@@ -113,7 +113,7 @@ On Windows, compare Add Student with Add Class/Add Assessment: it should have no
 
 ## Admin workspace improvements
 
-The service suite now passes 146 checks, including administrative bulk-status transactions and rollback, duplicate selections, authorization, linked-record counts, safe account detail reads, and audit filtering (dates, actor, action, literal wildcard text, entity and account activity). The audit viewer exports its displayed result set; PDF exports wrap complete values across pages.
+The service suite now passes 168 checks, including administrative bulk-status transactions and rollback, duplicate selections, authorization, linked-record counts, safe account detail reads, and audit filtering (dates, actor, action, literal wildcard text, entity and account activity). The audit viewer exports its displayed result set; PDF exports wrap complete values across pages.
 
 Windows interaction harness: `dotnet build validation/admin-workspace.vbproj -p:EnableWindowsTargeting=true`, then run the generated executable against a disposable seeded database with its own local `dbconfig.json`. It checks background refresh, selection across pages, page/current-row preservation, status and employment filters, account detail tabs, and audit search/export availability. This harness requires Windows Forms and cannot run on Linux.
 
@@ -126,3 +126,19 @@ Manual Windows review at 100% and 125% scaling:
 - Click the dashboard totals to open Students, Professors, the Class directory or open revision requests. Click an Updates row for full details. Dashboard updates continue refreshing automatically; Refresh retries failures.
 - Audit viewer: combine actor/action/search/date filters, clear optional date checkboxes, use Reset and Refresh, and try reversed dates. Errors retain old results but disable export until a successful reload. CSV/PDF exports use the loaded results and their displayed sort order; PDF includes the applied filter description and full long values across pages. Edit a filter without applying it and verify export still matches the displayed results.
 - Edit or toggle an account while on page 2 with filters applied. Refresh preserves the page (clamped if it no longer exists), current account/cell, scroll and bulk selections. Returning from another window refreshes the active account directory.
+
+
+## Final submission fixes
+
+The latest service run passes 168 checks. Added coverage includes strict consecutive academic years, distinct semester/year labels in Admin Quick Grade Entry, student request enrollment filtering and ownership, and horizontal PDF column groups with repeated student identity columns.
+
+`dotnet build validation/final-submission.vbproj -p:EnableWindowsTargeting=true` builds the new Windows interaction checks. Run its executable against a disposable database with a local dbconfig.json. It checks student decision/response, performance and history refresh; Admin Add Class saves selected dates; inline read-error recovery; and wide/long report pagination using bitmap graphics without sending a printer job. These Windows interaction checks are compiled on Linux but must be executed on Windows.
+
+Before handing off the application, check these flows on Windows:
+
+1. Open a gradebook for class A, open Add Student, select class B, and import a `student_id,full_name` CSV. Verify new enrollment exists only in B, the gradebook selects B after success, and cancellation changes nothing. The Import refresh option must also select the class chosen in the popup.
+2. Admin Add Class: select 2nd Semester and a new consecutive academic year, save and verify both values. Try `abcd-efgh`, equal years and skipped years; all must be rejected. Review the two new fields at 100% and 125% scaling.
+3. Admin Quick Grade Entry: create the same course/section in another semester/year; both dropdown entries must identify their complete offering.
+4. Student Request Clarification: choose different courses and verify requests follow the selection and identify their course/section/semester/year. Approve a request in a separate professor session, return to the student window and verify status and response update. Repeat with an open Performance or Grade History page after changing a score.
+5. Export a class with many assessment columns and long student names. Each PDF column group must repeat student identification, preserve every assessment, wrap headings and values, and continue long rows across pages. Also test long professor audit details. Use Microsoft Print to PDF for the final saved-file check.
+6. Disconnect the test database while switching professor classes, student courses or loading Admin requests. The form should stay open with an inline error and Retry. Reconnect and retry. Admin Add Class must explain a failed professor lookup and keep Save disabled until a successful load.

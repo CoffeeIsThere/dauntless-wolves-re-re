@@ -1,4 +1,4 @@
-﻿Imports System.Data
+Imports System.Data
 Imports MySql.Data.MySqlClient
 
 Public Class frmGradebook
@@ -111,6 +111,10 @@ Public Class frmGradebook
     End Sub
 
     Private Sub LoadClassesFromDatabase()
+        UiKit.TryLoadData(Me, "assigned classes", AddressOf LoadClassesFromDatabaseCore)
+    End Sub
+
+    Private Sub LoadClassesFromDatabaseCore()
         Dim previous = GetClassIdFromCode(SelectedClassCode())
         Dim dt = _classService.GetClassesByTeacher(AppSession.CurrentUser.UserId)
         refreshingClassChoices = True
@@ -830,6 +834,10 @@ Public Class frmGradebook
     End Sub
 
     Private Sub LoadClassData()
+        UiKit.TryLoadData(Me, "gradebook", AddressOf LoadClassDataCore)
+    End Sub
+
+    Private Sub LoadClassDataCore()
         If loadingClass OrElse IsDisposed OrElse Disposing Then Return
         If finishingEdit Then
             reloadAfterEdit = True
@@ -891,6 +899,10 @@ Public Class frmGradebook
 
     ' ===== Add Student: name goes into the grid, list re-sorts A-Z and renumbers =====
     Private Sub btnAddStudent_Click(sender As Object, e As EventArgs) Handles btnAddStudent.Click
+        UiKit.TryLoadData(Me, "registered students", AddressOf EnrollStudentDialog)
+    End Sub
+
+    Private Sub EnrollStudentDialog()
         Dim fullName As String = ""
         Dim studentNo As String = ""
         Dim course As String = ""
@@ -963,7 +975,8 @@ Public Class frmGradebook
                                      End Sub
             Dim header As New Panel With {.Dock = DockStyle.Top, .Height = 48, .BackColor = dark}
             header.Controls.Add(New Label With {.Text = "Add Student", .AutoSize = True, .Location = New Point(18, 12), .ForeColor = Color.White, .Font = New Font("Segoe UI Semibold", 12)})
-            Dim importButton = MakeImportButton(dialog, {"From file (CSV)...", "Refresh enrolled students from MySQL"}, Function(choice) ImportStudents(choice))
+            Dim classPicker As New ComboBox With {.Location = New Point(24, 172), .Width = 372, .DropDownWidth = 700, .DropDownStyle = ComboBoxStyle.DropDownList, .FlatStyle = FlatStyle.Flat, .BackColor = Color.White, .Font = New Font("Segoe UI", 11)}
+            Dim importButton = MakeImportButton(dialog, {"From file (CSV)...", "Refresh enrolled students from MySQL"}, Function(choice) ImportStudents(choice, GetClassIdFromCode(Convert.ToString(classPicker.SelectedItem))))
             importButton.Location = New Point(dialog.ClientSize.Width - importButton.Width - 18, 10)
             header.Controls.Add(importButton)
             Dim students = StudentNameOrder.Sort(_userService.GetAllStudents(), "full_name", "student_id")
@@ -976,7 +989,6 @@ Public Class frmGradebook
             Dim studentPicker As New ComboBox With {.Location = New Point(24, 92), .Width = 372, .DropDownWidth = 520, .DropDownStyle = ComboBoxStyle.DropDownList, .FlatStyle = FlatStyle.Flat, .BackColor = Color.White, .Font = New Font("Segoe UI", 11), .DisplayMember = "Display", .ValueMember = "student_id", .DataSource = students.DefaultView}
             Dim studentLine As New Panel With {.Location = New Point(24, 124), .Size = New Size(372, 2), .BackColor = green}
             Dim classLabel As New Label With {.Text = "Enroll into class", .AutoSize = True, .Location = New Point(24, 148), .ForeColor = Color.Gray, .Font = New Font("Segoe UI", 9)}
-            Dim classPicker As New ComboBox With {.Location = New Point(24, 172), .Width = 372, .DropDownWidth = 700, .DropDownStyle = ComboBoxStyle.DropDownList, .FlatStyle = FlatStyle.Flat, .BackColor = Color.White, .Font = New Font("Segoe UI", 11)}
             For Each item In cboCourse.Items
                 classPicker.Items.Add(item)
             Next
@@ -1564,18 +1576,26 @@ Public Class frmGradebook
     ' ----- Students -----
     ' Adds many names at once (skips duplicates), then sorts A-Z and renumbers
 
-    ' File columns: Surname, First Name, M.I., Student Number
-    Private Function ImportStudents(choice As String) As Boolean
+    ' CSV columns: student_id,full_name. Import uses the destination selected in the popup.
+    Private Function ImportStudents(choice As String, targetClassId As Integer) As Boolean
+        If targetClassId = 0 Then
+            MessageBox.Show("Select the class to enroll into before importing.")
+            Return False
+        End If
         If Not choice.StartsWith("From file") Then
+            SelectClass(targetClassId)
             LoadClassData()
             MessageBox.Show("Enrolled students refreshed from the configured database.")
             Return True
         End If
         Dim rows = LoadCsvRows("student_id")
         If rows Is Nothing Then Return False
-        Dim result = New RosterImportService().ImportStudents(loadedClassId, AppSession.CurrentUser.UserId, rows)
+        Dim result = New RosterImportService().ImportStudents(targetClassId, AppSession.CurrentUser.UserId, rows)
         MessageBox.Show(result.Message, If(result.Success, "Students imported", "Import not saved"))
-        If result.Success Then LoadClassData()
+        If result.Success Then
+            SelectClass(targetClassId)
+            LoadClassData()
+        End If
         Return result.Success
     End Function
 

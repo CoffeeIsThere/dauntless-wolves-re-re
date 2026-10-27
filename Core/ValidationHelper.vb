@@ -1,9 +1,16 @@
-﻿
+
 Imports System.Text.RegularExpressions
 
 Public Class ValidationHelper
     Public Shared Function IsRequired(input As String) As Boolean
         Return Not String.IsNullOrWhiteSpace(input)
+    End Function
+
+    Public Shared Function IsValidAcademicYear(value As String) As Boolean
+        If value Is Nothing OrElse Not Regex.IsMatch(value, "^[0-9]{4}-[0-9]{4}$") Then Return False
+        Dim startYear = Integer.Parse(value.Substring(0, 4))
+        Dim endYear = Integer.Parse(value.Substring(5, 4))
+        Return startYear >= 1000 AndAlso endYear = startYear + 1
     End Function
 
     Public Shared Function IsValidEmail(email As String) As Boolean
