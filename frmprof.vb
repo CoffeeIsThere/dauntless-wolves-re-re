@@ -74,7 +74,24 @@ Public Class frmprof
         BuildAnalyticsLabels()
         ConfigureProfessorLayout()
         ApplyProfessorTheme()
+        AddPasswordButton()
         LoadAnalytics()
+    End Sub
+
+    Private Sub AddPasswordButton()
+        Dim button = UiKit.MakeSecondaryButton("Change Password", 145)
+        button.Name = "btnProfessorChangePassword"
+        button.Anchor = AnchorStyles.Top Or AnchorStyles.Right
+        button.Height = btnLogout.Height
+        button.Location = New Point(btnLogout.Left - button.Width - 10, btnLogout.Top)
+        AddHandler button.Click, Sub()
+                                     If Not AppSession.IsTeacher Then Return
+                                     Using dialog As New ProfessorPasswordForm()
+                                         dialog.ShowDialog(Me)
+                                     End Using
+                                 End Sub
+        btnLogout.Parent.Controls.Add(button)
+        button.BringToFront()
     End Sub
 
     ' Helper function: loops through all controls, including nested ones
