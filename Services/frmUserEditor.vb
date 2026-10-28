@@ -39,7 +39,7 @@ Public Class frmUserEditor
         _isEdit = Not String.IsNullOrEmpty(editId)
 
         Dim noun As String = If(kind = UserKind.Student, "Student", "Professor")
-        UiKit.StyleDialog(Me, If(_isEdit, "Edit " & noun, "Add " & noun), 500, 470)
+        UiKit.StyleDialog(Me, If(_isEdit, "Edit " & noun, "Add " & noun), 500, 500)
 
         BuildLayout(noun)
         FillChoices()
@@ -82,6 +82,7 @@ Public Class frmUserEditor
 
         If _kind = UserKind.Student Then
             cboGroup.DropDownStyle = ComboBoxStyle.DropDown
+            cboGroup.AccessibleDescription = "Select an existing program or type a new program."
             AddRow("Program", cboGroup)
             numYear.Minimum = 1
             numYear.Maximum = 6
@@ -91,12 +92,24 @@ Public Class frmUserEditor
             AddRow("Section", cboSection)
         Else
             cboGroup.DropDownStyle = ComboBoxStyle.DropDown
+            cboGroup.AccessibleDescription = "Select a department or type another department."
             AddRow("Department", cboGroup)
             cboEmployment.DropDownStyle = ComboBoxStyle.DropDownList
             cboEmployment.Items.AddRange(New Object() {"Full-time", "Part-time"})
             cboEmployment.SelectedIndex = 0
             AddRow("Employment", cboEmployment)
         End If
+
+        Dim groupHint As New Label With {
+            .Text = "Select a suggestion or type another " & If(_kind = UserKind.Student, "program.", "department."),
+            .AutoSize = True,
+            .ForeColor = Color.DimGray,
+            .Margin = New Padding(0, 4, 0, 6)
+        }
+        _table.RowCount += 1
+        _table.RowStyles.Add(New RowStyle(SizeType.AutoSize))
+        _table.Controls.Add(groupHint, 0, _table.RowCount - 1)
+        _table.SetColumnSpan(groupHint, 2)
 
         lblError.ForeColor = Color.Firebrick
         lblError.AutoSize = False
@@ -137,7 +150,7 @@ Public Class frmUserEditor
         _table.Controls.Add(ctrl, 1, _table.RowCount - 1)
     End Sub
 
-    ' Dropdown values come from the database, so they are always current
+    ' Suggest standard departments as well as saved values; allow new typed values.
     Private Sub FillChoices()
         If _kind = UserKind.Student Then
             For Each p In _service.GetPrograms()
@@ -147,10 +160,17 @@ Public Class frmUserEditor
                 cboSection.Items.Add(s)
             Next
         Else
-            For Each d In _service.GetDepartments()
+            Dim departments = New String() {"CCS", "CAS", "COA", "COE", "COED", "COHM"}.
+                Concat(_service.GetDepartments()).
+                Where(Function(value) Not String.IsNullOrWhiteSpace(value)).
+                Select(Function(value) value.Trim()).
+                Distinct(StringComparer.OrdinalIgnoreCase).
+                OrderBy(Function(value) value, StringComparer.OrdinalIgnoreCase)
+            For Each d In departments
                 cboGroup.Items.Add(d)
             Next
         End If
+        If Not _isEdit Then cboGroup.Text = ""
     End Sub
 
     Private Sub LoadExisting()
