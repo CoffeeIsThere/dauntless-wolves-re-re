@@ -1,4 +1,4 @@
-
+﻿
 Imports MySql.Data.MySqlClient
 
 
@@ -344,53 +344,10 @@ Public Class frmStudent
     End Sub
 
     Private Sub ShowMyProfile(sender As Object, e As EventArgs)
-
         If Not AppSession.IsStudent Then Return
-
-        Try
-            Dim sql As String =
-            "SELECT student_id, full_name, email, program, " &
-            "year_level, section, status " &
-            "FROM student WHERE student_id = @StudentId"
-
-            Dim dt As DataTable = DatabaseHelper.ExecuteQuery(
-            sql,
-            New MySqlParameter("@StudentId",
-                               AppSession.CurrentUser.UserId)
-        )
-
-            If dt.Rows.Count = 0 Then
-                MessageBox.Show("Student profile not found.",
-                            "My Profile",
-                            MessageBoxButtons.OK,
-                            MessageBoxIcon.Warning)
-                Return
-            End If
-
-            Dim r As DataRow = dt.Rows(0)
-
-            Dim profile As String =
-            "Student ID: " & r("student_id").ToString() & vbCrLf &
-            "Full Name: " & r("full_name").ToString() & vbCrLf &
-            "Email: " & r("email").ToString() & vbCrLf &
-            "Program: " & r("program").ToString() & vbCrLf &
-            "Year Level: " & r("year_level").ToString() & vbCrLf &
-            "Section: " & r("section").ToString() & vbCrLf &
-            "Account Status: " & r("status").ToString()
-
-            MessageBox.Show(profile,
-                        "My Student Profile",
-                        MessageBoxButtons.OK,
-                        MessageBoxIcon.Information)
-
-        Catch ex As Exception
-            MessageBox.Show(
-            "Unable to load profile: " & ex.Message,
-            "Profile Error",
-            MessageBoxButtons.OK,
-            MessageBoxIcon.Error)
-        End Try
-
+        Using profile As New StudentProfileForm()
+            profile.ShowDialog(Me)
+        End Using
     End Sub
 
     Private Sub btnLogout_Click(sender As Object, e As EventArgs) Handles btnLogout.Click
