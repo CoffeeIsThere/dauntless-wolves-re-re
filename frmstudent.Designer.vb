@@ -170,8 +170,9 @@ Partial Class frmstudent
         Pnlheaderheader.Controls.Add(Label3)
         Pnlheaderheader.Dock = DockStyle.Top
         Pnlheaderheader.Location = New Point(0, 0)
+        Pnlheaderheader.Margin = New Padding(3, 4, 3, 4)
         Pnlheaderheader.Name = "Pnlheaderheader"
-        Pnlheaderheader.Size = New Size(1199, 28)
+        Pnlheaderheader.Size = New Size(1370, 37)
         Pnlheaderheader.TabIndex = 0
         ' 
         ' Label3
@@ -179,9 +180,9 @@ Partial Class frmstudent
         Label3.AutoSize = True
         Label3.Font = New Font("Segoe UI", 9F, FontStyle.Bold, GraphicsUnit.Point, CByte(0))
         Label3.ForeColor = Color.White
-        Label3.Location = New Point(7, 7)
+        Label3.Location = New Point(8, 9)
         Label3.Name = "Label3"
-        Label3.Size = New Size(200, 15)
+        Label3.Size = New Size(252, 20)
         Label3.TabIndex = 0
         Label3.Text = "Dauntless Wolves' Grading System"
         ' 
@@ -189,9 +190,10 @@ Partial Class frmstudent
         ' 
         Pnlfooter.BackColor = Color.DarkGreen
         Pnlfooter.Dock = DockStyle.Bottom
-        Pnlfooter.Location = New Point(0, 535)
+        Pnlfooter.Location = New Point(0, 713)
+        Pnlfooter.Margin = New Padding(3, 4, 3, 4)
         Pnlfooter.Name = "Pnlfooter"
-        Pnlfooter.Size = New Size(1199, 27)
+        Pnlfooter.Size = New Size(1370, 36)
         Pnlfooter.TabIndex = 1
         ' 
         ' Pnltabs
@@ -203,9 +205,10 @@ Partial Class frmstudent
         Pnltabs.Controls.Add(btnGradeHistory)
         Pnltabs.Controls.Add(btnMyGrades)
         Pnltabs.Dock = DockStyle.Top
-        Pnltabs.Location = New Point(0, 64)
+        Pnltabs.Location = New Point(0, 85)
+        Pnltabs.Margin = New Padding(3, 4, 3, 4)
         Pnltabs.Name = "Pnltabs"
-        Pnltabs.Size = New Size(1199, 50)
+        Pnltabs.Size = New Size(1370, 67)
         Pnltabs.TabIndex = 4
         ' 
         ' Panel5
@@ -213,8 +216,9 @@ Partial Class frmstudent
         Panel5.BackColor = Color.DimGray
         Panel5.Dock = DockStyle.Top
         Panel5.Location = New Point(0, 0)
+        Panel5.Margin = New Padding(3, 4, 3, 4)
         Panel5.Name = "Panel5"
-        Panel5.Size = New Size(1199, 2)
+        Panel5.Size = New Size(1370, 3)
         Panel5.TabIndex = 7
         ' 
         ' btnMyPerformance
@@ -224,9 +228,10 @@ Partial Class frmstudent
         btnMyPerformance.Font = New Font("Segoe UI", 9F, FontStyle.Bold, GraphicsUnit.Point, CByte(0))
         btnMyPerformance.ForeColor = Color.DarkGreen
         btnMyPerformance.ImageAlign = ContentAlignment.MiddleLeft
-        btnMyPerformance.Location = New Point(417, 14)
+        btnMyPerformance.Location = New Point(477, 19)
+        btnMyPerformance.Margin = New Padding(3, 4, 3, 4)
         btnMyPerformance.Name = "btnMyPerformance"
-        btnMyPerformance.Size = New Size(144, 35)
+        btnMyPerformance.Size = New Size(165, 47)
         btnMyPerformance.TabIndex = 6
         btnMyPerformance.Text = "My Performance"
         btnMyPerformance.TextImageRelation = TextImageRelation.ImageBeforeText
@@ -239,9 +244,10 @@ Partial Class frmstudent
         btnRequestRevision.Font = New Font("Segoe UI", 9F, FontStyle.Bold, GraphicsUnit.Point, CByte(0))
         btnRequestRevision.ForeColor = Color.DarkGreen
         btnRequestRevision.ImageAlign = ContentAlignment.MiddleLeft
-        btnRequestRevision.Location = New Point(259, 14)
+        btnRequestRevision.Location = New Point(296, 19)
+        btnRequestRevision.Margin = New Padding(3, 4, 3, 4)
         btnRequestRevision.Name = "btnRequestRevision"
-        btnRequestRevision.Size = New Size(145, 35)
+        btnRequestRevision.Size = New Size(166, 47)
         btnRequestRevision.TabIndex = 6
         btnRequestRevision.Text = "Request Clarification"
         btnRequestRevision.TextImageRelation = TextImageRelation.ImageBeforeText
@@ -254,9 +260,10 @@ Partial Class frmstudent
         btnGradeHistory.Font = New Font("Segoe UI", 9.75F, FontStyle.Bold, GraphicsUnit.Point, CByte(0))
         btnGradeHistory.ForeColor = Color.DarkGreen
         btnGradeHistory.ImageAlign = ContentAlignment.MiddleLeft
-        btnGradeHistory.Location = New Point(136, 14)
+        btnGradeHistory.Location = New Point(155, 19)
+        btnGradeHistory.Margin = New Padding(3, 4, 3, 4)
         btnGradeHistory.Name = "btnGradeHistory"
-        btnGradeHistory.Size = New Size(113, 35)
+        btnGradeHistory.Size = New Size(129, 47)
         btnGradeHistory.TabIndex = 6
         btnGradeHistory.Text = "Grade History"
         btnGradeHistory.TextImageRelation = TextImageRelation.ImageBeforeText
@@ -271,9 +278,10 @@ Partial Class frmstudent
         btnMyGrades.Font = New Font("Segoe UI", 9.75F, FontStyle.Bold, GraphicsUnit.Point, CByte(0))
         btnMyGrades.ForeColor = Color.DarkGreen
         btnMyGrades.ImageAlign = ContentAlignment.MiddleLeft
-        btnMyGrades.Location = New Point(14, 14)
+        btnMyGrades.Location = New Point(16, 19)
+        btnMyGrades.Margin = New Padding(3, 4, 3, 4)
         btnMyGrades.Name = "btnMyGrades"
-        btnMyGrades.Size = New Size(113, 35)
+        btnMyGrades.Size = New Size(129, 47)
         btnMyGrades.TabIndex = 5
         btnMyGrades.Text = "My Grades"
         btnMyGrades.TextImageRelation = TextImageRelation.ImageBeforeText
@@ -288,9 +296,10 @@ Partial Class frmstudent
         pnlContent.Controls.Add(pnlGradeHistory)
         pnlContent.Controls.Add(Panel7)
         pnlContent.Dock = DockStyle.Fill
-        pnlContent.Location = New Point(0, 114)
+        pnlContent.Location = New Point(0, 152)
+        pnlContent.Margin = New Padding(3, 4, 3, 4)
         pnlContent.Name = "pnlContent"
-        pnlContent.Size = New Size(1199, 421)
+        pnlContent.Size = New Size(1370, 561)
         pnlContent.TabIndex = 7
         ' 
         ' pnlRequestRevision
@@ -299,10 +308,11 @@ Partial Class frmstudent
         pnlRequestRevision.Controls.Add(tlprevision)
         pnlRequestRevision.Controls.Add(pnlclassbar)
         pnlRequestRevision.Dock = DockStyle.Fill
-        pnlRequestRevision.Location = New Point(0, 3)
+        pnlRequestRevision.Location = New Point(0, 4)
+        pnlRequestRevision.Margin = New Padding(3, 4, 3, 4)
         pnlRequestRevision.Name = "pnlRequestRevision"
-        pnlRequestRevision.Padding = New Padding(30, 15, 30, 30)
-        pnlRequestRevision.Size = New Size(1199, 418)
+        pnlRequestRevision.Padding = New Padding(34, 20, 34, 40)
+        pnlRequestRevision.Size = New Size(1370, 557)
         pnlRequestRevision.TabIndex = 10
         pnlRequestRevision.Visible = False
         ' 
@@ -315,12 +325,13 @@ Partial Class frmstudent
         tlprevision.Controls.Add(cardSubmit, 0, 0)
         tlprevision.Controls.Add(cardStatus, 1, 0)
         tlprevision.Dock = DockStyle.Fill
-        tlprevision.Location = New Point(30, 40)
+        tlprevision.Location = New Point(34, 53)
+        tlprevision.Margin = New Padding(3, 4, 3, 4)
         tlprevision.Name = "tlprevision"
         tlprevision.RowCount = 1
         tlprevision.RowStyles.Add(New RowStyle(SizeType.Percent, 100F))
-        tlprevision.RowStyles.Add(New RowStyle(SizeType.Absolute, 467F))
-        tlprevision.Size = New Size(1139, 348)
+        tlprevision.RowStyles.Add(New RowStyle(SizeType.Absolute, 464F))
+        tlprevision.Size = New Size(1302, 464)
         tlprevision.TabIndex = 1
         ' 
         ' cardSubmit
@@ -337,11 +348,11 @@ Partial Class frmstudent
         cardSubmit.Controls.Add(Panel2)
         cardSubmit.Controls.Add(pnlSubmitHeader)
         cardSubmit.Dock = DockStyle.Fill
-        cardSubmit.Location = New Point(10, 10)
-        cardSubmit.Margin = New Padding(10)
+        cardSubmit.Location = New Point(11, 13)
+        cardSubmit.Margin = New Padding(11, 13, 11, 13)
         cardSubmit.Name = "cardSubmit"
-        cardSubmit.Padding = New Padding(14)
-        cardSubmit.Size = New Size(549, 328)
+        cardSubmit.Padding = New Padding(16, 19, 16, 19)
+        cardSubmit.Size = New Size(629, 438)
         cardSubmit.TabIndex = 0
         ' 
         ' btnSubmitRequest
@@ -350,9 +361,10 @@ Partial Class frmstudent
         btnSubmitRequest.Font = New Font("Segoe UI", 9.75F, FontStyle.Bold, GraphicsUnit.Point, CByte(0))
         btnSubmitRequest.ForeColor = Color.DarkGreen
         btnSubmitRequest.ImageAlign = ContentAlignment.MiddleLeft
-        btnSubmitRequest.Location = New Point(66, 401)
+        btnSubmitRequest.Location = New Point(75, 535)
+        btnSubmitRequest.Margin = New Padding(3, 4, 3, 4)
         btnSubmitRequest.Name = "btnSubmitRequest"
-        btnSubmitRequest.Size = New Size(399, 32)
+        btnSubmitRequest.Size = New Size(458, 43)
         btnSubmitRequest.TabIndex = 19
         btnSubmitRequest.Text = "Submit Request"
         btnSubmitRequest.UseVisualStyleBackColor = True
@@ -361,10 +373,11 @@ Partial Class frmstudent
         ' 
         txtReason.Anchor = AnchorStyles.Top Or AnchorStyles.Left Or AnchorStyles.Right
         txtReason.BackColor = Color.WhiteSmoke
-        txtReason.Location = New Point(36, 282)
+        txtReason.Location = New Point(41, 376)
+        txtReason.Margin = New Padding(3, 4, 3, 4)
         txtReason.Multiline = True
         txtReason.Name = "txtReason"
-        txtReason.Size = New Size(462, 105)
+        txtReason.Size = New Size(529, 139)
         txtReason.TabIndex = 18
         ' 
         ' Label9
@@ -374,9 +387,9 @@ Partial Class frmstudent
         Label9.BackColor = Color.White
         Label9.Font = New Font("Segoe UI", 9.75F, FontStyle.Bold)
         Label9.ForeColor = Color.DarkGreen
-        Label9.Location = New Point(36, 261)
+        Label9.Location = New Point(41, 348)
         Label9.Name = "Label9"
-        Label9.Size = New Size(127, 17)
+        Label9.Size = New Size(164, 23)
         Label9.TabIndex = 17
         Label9.Text = "Reason for Request"
         ' 
@@ -384,10 +397,11 @@ Partial Class frmstudent
         ' 
         txtCurrentGrade.Anchor = AnchorStyles.Top Or AnchorStyles.Left Or AnchorStyles.Right
         txtCurrentGrade.BackColor = Color.WhiteSmoke
-        txtCurrentGrade.Location = New Point(37, 205)
+        txtCurrentGrade.Location = New Point(42, 273)
+        txtCurrentGrade.Margin = New Padding(3, 4, 3, 4)
         txtCurrentGrade.Name = "txtCurrentGrade"
         txtCurrentGrade.ReadOnly = True
-        txtCurrentGrade.Size = New Size(462, 23)
+        txtCurrentGrade.Size = New Size(529, 27)
         txtCurrentGrade.TabIndex = 16
         ' 
         ' Label8
@@ -397,9 +411,9 @@ Partial Class frmstudent
         Label8.BackColor = Color.White
         Label8.Font = New Font("Segoe UI", 9.75F, FontStyle.Bold)
         Label8.ForeColor = Color.DarkGreen
-        Label8.Location = New Point(36, 185)
+        Label8.Location = New Point(41, 247)
         Label8.Name = "Label8"
-        Label8.Size = New Size(94, 17)
+        Label8.Size = New Size(124, 23)
         Label8.TabIndex = 15
         Label8.Text = "Current Grade"
         ' 
@@ -410,9 +424,9 @@ Partial Class frmstudent
         Label7.BackColor = Color.White
         Label7.Font = New Font("Segoe UI", 9.75F, FontStyle.Bold)
         Label7.ForeColor = Color.DarkGreen
-        Label7.Location = New Point(35, 101)
+        Label7.Location = New Point(40, 135)
         Label7.Name = "Label7"
-        Label7.Size = New Size(80, 17)
+        Label7.Size = New Size(101, 23)
         Label7.TabIndex = 13
         Label7.Text = "Assessment"
         ' 
@@ -422,20 +436,22 @@ Partial Class frmstudent
         cboAssessment.BackColor = Color.WhiteSmoke
         cboAssessment.DropDownStyle = ComboBoxStyle.DropDownList
         cboAssessment.FormattingEnabled = True
-        cboAssessment.ItemHeight = 15
-        cboAssessment.Location = New Point(37, 120)
+        cboAssessment.ItemHeight = 20
+        cboAssessment.Location = New Point(42, 160)
+        cboAssessment.Margin = New Padding(3, 4, 3, 4)
         cboAssessment.MaxDropDownItems = 10
         cboAssessment.Name = "cboAssessment"
-        cboAssessment.Size = New Size(462, 23)
+        cboAssessment.Size = New Size(529, 28)
         cboAssessment.TabIndex = 12
         ' 
         ' Panel2
         ' 
         Panel2.BackColor = Color.DimGray
         Panel2.Dock = DockStyle.Top
-        Panel2.Location = New Point(14, 80)
+        Panel2.Location = New Point(16, 107)
+        Panel2.Margin = New Padding(3, 4, 3, 4)
         Panel2.Name = "Panel2"
-        Panel2.Size = New Size(521, 2)
+        Panel2.Size = New Size(597, 3)
         Panel2.TabIndex = 20
         ' 
         ' pnlSubmitHeader
@@ -443,17 +459,19 @@ Partial Class frmstudent
         pnlSubmitHeader.Controls.Add(PictureBox4)
         pnlSubmitHeader.Controls.Add(Label6)
         pnlSubmitHeader.Dock = DockStyle.Top
-        pnlSubmitHeader.Location = New Point(14, 14)
+        pnlSubmitHeader.Location = New Point(16, 19)
+        pnlSubmitHeader.Margin = New Padding(3, 4, 3, 4)
         pnlSubmitHeader.Name = "pnlSubmitHeader"
-        pnlSubmitHeader.Size = New Size(521, 66)
+        pnlSubmitHeader.Size = New Size(597, 88)
         pnlSubmitHeader.TabIndex = 21
         ' 
         ' PictureBox4
         ' 
         PictureBox4.Image = CType(resources.GetObject("PictureBox4.Image"), Image)
-        PictureBox4.Location = New Point(9, 5)
+        PictureBox4.Location = New Point(10, 7)
+        PictureBox4.Margin = New Padding(3, 4, 3, 4)
         PictureBox4.Name = "PictureBox4"
-        PictureBox4.Size = New Size(54, 57)
+        PictureBox4.Size = New Size(62, 76)
         PictureBox4.SizeMode = PictureBoxSizeMode.Zoom
         PictureBox4.TabIndex = 11
         PictureBox4.TabStop = False
@@ -464,9 +482,9 @@ Partial Class frmstudent
         Label6.BackColor = Color.White
         Label6.Font = New Font("Segoe UI", 15.75F, FontStyle.Bold, GraphicsUnit.Point, CByte(0))
         Label6.ForeColor = Color.DarkGreen
-        Label6.Location = New Point(65, 17)
+        Label6.Location = New Point(74, 23)
         Label6.Name = "Label6"
-        Label6.Size = New Size(293, 30)
+        Label6.Size = New Size(383, 37)
         Label6.TabIndex = 10
         Label6.Text = "Submit Clarification Request"
         ' 
@@ -477,11 +495,11 @@ Partial Class frmstudent
         cardStatus.Controls.Add(dgvRequests)
         cardStatus.Controls.Add(pnlStatusHeader)
         cardStatus.Dock = DockStyle.Fill
-        cardStatus.Location = New Point(579, 10)
-        cardStatus.Margin = New Padding(10)
+        cardStatus.Location = New Point(662, 13)
+        cardStatus.Margin = New Padding(11, 13, 11, 13)
         cardStatus.Name = "cardStatus"
-        cardStatus.Padding = New Padding(14)
-        cardStatus.Size = New Size(550, 328)
+        cardStatus.Padding = New Padding(16, 19, 16, 19)
+        cardStatus.Size = New Size(629, 438)
         cardStatus.TabIndex = 0
         ' 
         ' dgvRequests
@@ -489,10 +507,11 @@ Partial Class frmstudent
         dgvRequests.BackgroundColor = Color.White
         dgvRequests.ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.AutoSize
         dgvRequests.Dock = DockStyle.Fill
-        dgvRequests.Location = New Point(14, 75)
+        dgvRequests.Location = New Point(16, 100)
+        dgvRequests.Margin = New Padding(3, 4, 3, 4)
         dgvRequests.Name = "dgvRequests"
         dgvRequests.RowHeadersWidth = 51
-        dgvRequests.Size = New Size(522, 239)
+        dgvRequests.Size = New Size(597, 319)
         dgvRequests.TabIndex = 1
         ' 
         ' pnlStatusHeader
@@ -500,17 +519,19 @@ Partial Class frmstudent
         pnlStatusHeader.Controls.Add(PictureBox5)
         pnlStatusHeader.Controls.Add(lblStatusTitle)
         pnlStatusHeader.Dock = DockStyle.Top
-        pnlStatusHeader.Location = New Point(14, 14)
+        pnlStatusHeader.Location = New Point(16, 19)
+        pnlStatusHeader.Margin = New Padding(3, 4, 3, 4)
         pnlStatusHeader.Name = "pnlStatusHeader"
-        pnlStatusHeader.Size = New Size(522, 61)
+        pnlStatusHeader.Size = New Size(597, 81)
         pnlStatusHeader.TabIndex = 13
         ' 
         ' PictureBox5
         ' 
         PictureBox5.Image = CType(resources.GetObject("PictureBox5.Image"), Image)
-        PictureBox5.Location = New Point(4, 4)
+        PictureBox5.Location = New Point(5, 5)
+        PictureBox5.Margin = New Padding(3, 4, 3, 4)
         PictureBox5.Name = "PictureBox5"
-        PictureBox5.Size = New Size(63, 52)
+        PictureBox5.Size = New Size(72, 69)
         PictureBox5.SizeMode = PictureBoxSizeMode.Zoom
         PictureBox5.TabIndex = 12
         PictureBox5.TabStop = False
@@ -521,9 +542,9 @@ Partial Class frmstudent
         lblStatusTitle.BackColor = Color.White
         lblStatusTitle.Font = New Font("Segoe UI", 15.75F, FontStyle.Bold, GraphicsUnit.Point, CByte(0))
         lblStatusTitle.ForeColor = Color.DarkGreen
-        lblStatusTitle.Location = New Point(66, 15)
+        lblStatusTitle.Location = New Point(75, 20)
         lblStatusTitle.Name = "lblStatusTitle"
-        lblStatusTitle.Size = New Size(194, 30)
+        lblStatusTitle.Size = New Size(254, 37)
         lblStatusTitle.TabIndex = 11
         lblStatusTitle.Text = "My Request Status"
         ' 
@@ -532,9 +553,10 @@ Partial Class frmstudent
         pnlclassbar.Controls.Add(lblClass)
         pnlclassbar.Controls.Add(cboclass)
         pnlclassbar.Dock = DockStyle.Top
-        pnlclassbar.Location = New Point(30, 15)
+        pnlclassbar.Location = New Point(34, 20)
+        pnlclassbar.Margin = New Padding(3, 4, 3, 4)
         pnlclassbar.Name = "pnlclassbar"
-        pnlclassbar.Size = New Size(1139, 25)
+        pnlclassbar.Size = New Size(1302, 33)
         pnlclassbar.TabIndex = 22
         ' 
         ' lblClass
@@ -542,9 +564,9 @@ Partial Class frmstudent
         lblClass.AutoSize = True
         lblClass.Font = New Font("Segoe UI", 11.25F, FontStyle.Bold, GraphicsUnit.Point, CByte(0))
         lblClass.ForeColor = Color.DarkGreen
-        lblClass.Location = New Point(14, 2)
+        lblClass.Location = New Point(16, 3)
         lblClass.Name = "lblClass"
-        lblClass.Size = New Size(57, 20)
+        lblClass.Size = New Size(74, 25)
         lblClass.TabIndex = 1
         lblClass.Text = "Course"
         ' 
@@ -554,9 +576,10 @@ Partial Class frmstudent
         cboclass.Font = New Font("Segoe UI Semibold", 9F, FontStyle.Bold, GraphicsUnit.Point, CByte(0))
         cboclass.ForeColor = Color.FromArgb(CByte(0), CByte(64), CByte(0))
         cboclass.FormattingEnabled = True
-        cboclass.Location = New Point(71, 2)
+        cboclass.Location = New Point(81, 3)
+        cboclass.Margin = New Padding(3, 4, 3, 4)
         cboclass.Name = "cboclass"
-        cboclass.Size = New Size(265, 23)
+        cboclass.Size = New Size(302, 28)
         cboclass.TabIndex = 0
         cboclass.Text = "CS - 103 OBJECT ORIENTED PROGRAMMING"
         ' 
@@ -565,10 +588,11 @@ Partial Class frmstudent
         pnlMyPerformance.BackColor = Color.WhiteSmoke
         pnlMyPerformance.Controls.Add(cardPerformance)
         pnlMyPerformance.Dock = DockStyle.Fill
-        pnlMyPerformance.Location = New Point(0, 3)
+        pnlMyPerformance.Location = New Point(0, 4)
+        pnlMyPerformance.Margin = New Padding(3, 4, 3, 4)
         pnlMyPerformance.Name = "pnlMyPerformance"
-        pnlMyPerformance.Padding = New Padding(30)
-        pnlMyPerformance.Size = New Size(1199, 418)
+        pnlMyPerformance.Padding = New Padding(34, 40, 34, 40)
+        pnlMyPerformance.Size = New Size(1370, 557)
         pnlMyPerformance.TabIndex = 8
         pnlMyPerformance.Visible = False
         ' 
@@ -581,16 +605,17 @@ Partial Class frmstudent
         cardPerformance.Controls.Add(pnlperfheader)
         cardPerformance.Controls.Add(Panel1)
         cardPerformance.Dock = DockStyle.Fill
-        cardPerformance.Location = New Point(30, 30)
+        cardPerformance.Location = New Point(34, 40)
+        cardPerformance.Margin = New Padding(3, 4, 3, 4)
         cardPerformance.Name = "cardPerformance"
-        cardPerformance.Padding = New Padding(20)
-        cardPerformance.Size = New Size(1139, 358)
+        cardPerformance.Padding = New Padding(23, 27, 23, 27)
+        cardPerformance.Size = New Size(1302, 477)
         cardPerformance.TabIndex = 0
         ' 
         ' tlpbars
         ' 
         tlpbars.ColumnCount = 2
-        tlpbars.ColumnStyles.Add(New ColumnStyle(SizeType.Absolute, 110F))
+        tlpbars.ColumnStyles.Add(New ColumnStyle(SizeType.Absolute, 126F))
         tlpbars.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 100F))
         tlpbars.Controls.Add(trackProject, 1, 3)
         tlpbars.Controls.Add(trackExam, 1, 2)
@@ -601,7 +626,7 @@ Partial Class frmstudent
         tlpbars.Controls.Add(Label14, 0, 1)
         tlpbars.Controls.Add(Label11, 0, 0)
         tlpbars.Dock = DockStyle.Fill
-        tlpbars.Location = New Point(20, 192)
+        tlpbars.Location = New Point(23, 256)
         tlpbars.Margin = New Padding(0)
         tlpbars.Name = "tlpbars"
         tlpbars.RowCount = 5
@@ -609,8 +634,8 @@ Partial Class frmstudent
         tlpbars.RowStyles.Add(New RowStyle(SizeType.Percent, 25F))
         tlpbars.RowStyles.Add(New RowStyle(SizeType.Percent, 25F))
         tlpbars.RowStyles.Add(New RowStyle(SizeType.Percent, 25F))
-        tlpbars.RowStyles.Add(New RowStyle(SizeType.Absolute, 20F))
-        tlpbars.Size = New Size(1099, 146)
+        tlpbars.RowStyles.Add(New RowStyle(SizeType.Absolute, 27F))
+        tlpbars.Size = New Size(1256, 194)
         tlpbars.TabIndex = 18
         ' 
         ' trackProject
@@ -620,10 +645,11 @@ Partial Class frmstudent
         trackProject.BorderColor = Color.FromArgb(CByte(0), CByte(85), CByte(0))
         trackProject.Controls.Add(fillproject)
         trackProject.CornerRadius = 13
-        trackProject.Location = New Point(113, 96)
+        trackProject.Location = New Point(129, 127)
+        trackProject.Margin = New Padding(3, 4, 3, 4)
         trackProject.Name = "trackProject"
-        trackProject.Padding = New Padding(7)
-        trackProject.Size = New Size(983, 25)
+        trackProject.Padding = New Padding(8, 9, 8, 9)
+        trackProject.Size = New Size(1124, 33)
         trackProject.TabIndex = 22
         ' 
         ' fillproject
@@ -634,9 +660,10 @@ Partial Class frmstudent
         fillproject.Controls.Add(lblprojectpct)
         fillproject.CornerRadius = 11
         fillproject.Dock = DockStyle.Left
-        fillproject.Location = New Point(7, 7)
+        fillproject.Location = New Point(8, 9)
+        fillproject.Margin = New Padding(3, 4, 3, 4)
         fillproject.Name = "fillproject"
-        fillproject.Size = New Size(872, 11)
+        fillproject.Size = New Size(997, 15)
         fillproject.TabIndex = 1
         ' 
         ' lblprojectpct
@@ -644,9 +671,9 @@ Partial Class frmstudent
         lblprojectpct.AutoSize = True
         lblprojectpct.Font = New Font("Segoe UI", 9.75F, FontStyle.Bold, GraphicsUnit.Point, CByte(0))
         lblprojectpct.ForeColor = Color.White
-        lblprojectpct.Location = New Point(11, 3)
+        lblprojectpct.Location = New Point(13, 4)
         lblprojectpct.Name = "lblprojectpct"
-        lblprojectpct.Size = New Size(26, 17)
+        lblprojectpct.Size = New Size(35, 23)
         lblprojectpct.TabIndex = 1
         lblprojectpct.Text = "0%"
         ' 
@@ -657,10 +684,11 @@ Partial Class frmstudent
         trackExam.BorderColor = Color.FromArgb(CByte(0), CByte(85), CByte(0))
         trackExam.Controls.Add(fillexam)
         trackExam.CornerRadius = 13
-        trackExam.Location = New Point(113, 65)
+        trackExam.Location = New Point(129, 86)
+        trackExam.Margin = New Padding(3, 4, 3, 4)
         trackExam.Name = "trackExam"
-        trackExam.Padding = New Padding(6)
-        trackExam.Size = New Size(983, 25)
+        trackExam.Padding = New Padding(7, 8, 7, 8)
+        trackExam.Size = New Size(1124, 33)
         trackExam.TabIndex = 21
         ' 
         ' fillexam
@@ -671,10 +699,10 @@ Partial Class frmstudent
         fillexam.Controls.Add(lblexampct)
         fillexam.CornerRadius = 10
         fillexam.Dock = DockStyle.Left
-        fillexam.Location = New Point(6, 6)
+        fillexam.Location = New Point(7, 8)
         fillexam.Margin = New Padding(0)
         fillexam.Name = "fillexam"
-        fillexam.Size = New Size(872, 13)
+        fillexam.Size = New Size(997, 17)
         fillexam.TabIndex = 1
         ' 
         ' lblexampct
@@ -682,9 +710,9 @@ Partial Class frmstudent
         lblexampct.AutoSize = True
         lblexampct.Font = New Font("Segoe UI", 9.75F, FontStyle.Bold, GraphicsUnit.Point, CByte(0))
         lblexampct.ForeColor = Color.White
-        lblexampct.Location = New Point(11, 2)
+        lblexampct.Location = New Point(13, 3)
         lblexampct.Name = "lblexampct"
-        lblexampct.Size = New Size(26, 17)
+        lblexampct.Size = New Size(35, 23)
         lblexampct.TabIndex = 1
         lblexampct.Text = "0%"
         ' 
@@ -695,10 +723,11 @@ Partial Class frmstudent
         trackActivity.BorderColor = Color.FromArgb(CByte(0), CByte(85), CByte(0))
         trackActivity.Controls.Add(fillactivity)
         trackActivity.CornerRadius = 13
-        trackActivity.Location = New Point(113, 34)
+        trackActivity.Location = New Point(129, 45)
+        trackActivity.Margin = New Padding(3, 4, 3, 4)
         trackActivity.Name = "trackActivity"
-        trackActivity.Padding = New Padding(6)
-        trackActivity.Size = New Size(983, 25)
+        trackActivity.Padding = New Padding(7, 8, 7, 8)
+        trackActivity.Size = New Size(1124, 33)
         trackActivity.TabIndex = 20
         ' 
         ' fillactivity
@@ -709,9 +738,10 @@ Partial Class frmstudent
         fillactivity.Controls.Add(lblactivitypct)
         fillactivity.CornerRadius = 11
         fillactivity.Dock = DockStyle.Left
-        fillactivity.Location = New Point(6, 6)
+        fillactivity.Location = New Point(7, 8)
+        fillactivity.Margin = New Padding(3, 4, 3, 4)
         fillactivity.Name = "fillactivity"
-        fillactivity.Size = New Size(873, 13)
+        fillactivity.Size = New Size(998, 17)
         fillactivity.TabIndex = 1
         ' 
         ' lblactivitypct
@@ -719,9 +749,9 @@ Partial Class frmstudent
         lblactivitypct.AutoSize = True
         lblactivitypct.Font = New Font("Segoe UI", 9.75F, FontStyle.Bold, GraphicsUnit.Point, CByte(0))
         lblactivitypct.ForeColor = Color.White
-        lblactivitypct.Location = New Point(12, 3)
+        lblactivitypct.Location = New Point(14, 4)
         lblactivitypct.Name = "lblactivitypct"
-        lblactivitypct.Size = New Size(26, 17)
+        lblactivitypct.Size = New Size(35, 23)
         lblactivitypct.TabIndex = 1
         lblactivitypct.Text = "0%"
         ' 
@@ -732,10 +762,11 @@ Partial Class frmstudent
         trackQuiz.BorderColor = Color.FromArgb(CByte(0), CByte(85), CByte(0))
         trackQuiz.Controls.Add(fillQuiz)
         trackQuiz.CornerRadius = 13
-        trackQuiz.Location = New Point(113, 3)
+        trackQuiz.Location = New Point(129, 4)
+        trackQuiz.Margin = New Padding(3, 4, 3, 4)
         trackQuiz.Name = "trackQuiz"
-        trackQuiz.Padding = New Padding(6)
-        trackQuiz.Size = New Size(983, 25)
+        trackQuiz.Padding = New Padding(7, 8, 7, 8)
+        trackQuiz.Size = New Size(1124, 33)
         trackQuiz.TabIndex = 19
         ' 
         ' fillQuiz
@@ -746,9 +777,10 @@ Partial Class frmstudent
         fillQuiz.Controls.Add(lblQuizPct)
         fillQuiz.CornerRadius = 11
         fillQuiz.Dock = DockStyle.Left
-        fillQuiz.Location = New Point(6, 6)
+        fillQuiz.Location = New Point(7, 8)
+        fillQuiz.Margin = New Padding(3, 4, 3, 4)
         fillQuiz.Name = "fillQuiz"
-        fillQuiz.Size = New Size(873, 13)
+        fillQuiz.Size = New Size(998, 17)
         fillQuiz.TabIndex = 0
         ' 
         ' lblQuizPct
@@ -756,9 +788,9 @@ Partial Class frmstudent
         lblQuizPct.AutoSize = True
         lblQuizPct.Font = New Font("Segoe UI", 9.75F, FontStyle.Bold, GraphicsUnit.Point, CByte(0))
         lblQuizPct.ForeColor = Color.White
-        lblQuizPct.Location = New Point(12, 3)
+        lblQuizPct.Location = New Point(14, 4)
         lblQuizPct.Name = "lblQuizPct"
-        lblQuizPct.Size = New Size(26, 17)
+        lblQuizPct.Size = New Size(35, 23)
         lblQuizPct.TabIndex = 0
         lblQuizPct.Text = "0%"
         ' 
@@ -768,9 +800,9 @@ Partial Class frmstudent
         Label12.BackColor = Color.White
         Label12.Font = New Font("Segoe UI", 9.75F, FontStyle.Bold, GraphicsUnit.Point, CByte(0))
         Label12.ForeColor = Color.DarkGreen
-        Label12.Location = New Point(27, 100)
+        Label12.Location = New Point(31, 132)
         Label12.Name = "Label12"
-        Label12.Size = New Size(55, 17)
+        Label12.Size = New Size(63, 23)
         Label12.TabIndex = 15
         Label12.Text = "Projects"
         ' 
@@ -780,9 +812,9 @@ Partial Class frmstudent
         Label13.BackColor = Color.White
         Label13.Font = New Font("Segoe UI", 9.75F, FontStyle.Bold, GraphicsUnit.Point, CByte(0))
         Label13.ForeColor = Color.DarkGreen
-        Label13.Location = New Point(27, 69)
+        Label13.Location = New Point(31, 91)
         Label13.Name = "Label13"
-        Label13.Size = New Size(55, 17)
+        Label13.Size = New Size(63, 23)
         Label13.TabIndex = 16
         Label13.Text = "Exams "
         ' 
@@ -792,9 +824,9 @@ Partial Class frmstudent
         Label14.BackColor = Color.White
         Label14.Font = New Font("Segoe UI", 9.75F, FontStyle.Bold, GraphicsUnit.Point, CByte(0))
         Label14.ForeColor = Color.DarkGreen
-        Label14.Location = New Point(21, 37)
+        Label14.Location = New Point(24, 49)
         Label14.Name = "Label14"
-        Label14.Size = New Size(67, 18)
+        Label14.Size = New Size(77, 24)
         Label14.TabIndex = 17
         Label14.Text = "Activities"
         ' 
@@ -804,9 +836,9 @@ Partial Class frmstudent
         Label11.BackColor = Color.White
         Label11.Font = New Font("Segoe UI", 9.75F, FontStyle.Bold, GraphicsUnit.Point, CByte(0))
         Label11.ForeColor = Color.DarkGreen
-        Label11.Location = New Point(26, 6)
+        Label11.Location = New Point(30, 8)
         Label11.Name = "Label11"
-        Label11.Size = New Size(58, 19)
+        Label11.Size = New Size(66, 25)
         Label11.TabIndex = 14
         Label11.Text = "Quizzes"
         ' 
@@ -822,11 +854,12 @@ Partial Class frmstudent
         tlpstats.Controls.Add(RoundedPanel7, 2, 0)
         tlpstats.Controls.Add(RoundedPanel9, 3, 0)
         tlpstats.Dock = DockStyle.Top
-        tlpstats.Location = New Point(20, 80)
+        tlpstats.Location = New Point(23, 107)
+        tlpstats.Margin = New Padding(3, 4, 3, 4)
         tlpstats.Name = "tlpstats"
         tlpstats.RowCount = 1
         tlpstats.RowStyles.Add(New RowStyle(SizeType.Percent, 100F))
-        tlpstats.Size = New Size(1099, 112)
+        tlpstats.Size = New Size(1256, 149)
         tlpstats.TabIndex = 21
         ' 
         ' RoundedPanel6
@@ -836,11 +869,11 @@ Partial Class frmstudent
         RoundedPanel6.Controls.Add(lblAverageCaption)
         RoundedPanel6.Controls.Add(lblAverageValue)
         RoundedPanel6.Dock = DockStyle.Fill
-        RoundedPanel6.Location = New Point(10, 10)
-        RoundedPanel6.Margin = New Padding(10)
+        RoundedPanel6.Location = New Point(11, 13)
+        RoundedPanel6.Margin = New Padding(11, 13, 11, 13)
         RoundedPanel6.Name = "RoundedPanel6"
-        RoundedPanel6.Padding = New Padding(6)
-        RoundedPanel6.Size = New Size(254, 92)
+        RoundedPanel6.Padding = New Padding(7, 8, 7, 8)
+        RoundedPanel6.Size = New Size(292, 123)
         RoundedPanel6.TabIndex = 11
         ' 
         ' lblAverageCaption
@@ -849,9 +882,9 @@ Partial Class frmstudent
         lblAverageCaption.Dock = DockStyle.Fill
         lblAverageCaption.Font = New Font("Segoe UI", 11.25F, FontStyle.Bold, GraphicsUnit.Point, CByte(0))
         lblAverageCaption.ForeColor = Color.DarkGreen
-        lblAverageCaption.Location = New Point(6, 64)
+        lblAverageCaption.Location = New Point(7, 85)
         lblAverageCaption.Name = "lblAverageCaption"
-        lblAverageCaption.Size = New Size(242, 22)
+        lblAverageCaption.Size = New Size(278, 30)
         lblAverageCaption.TabIndex = 15
         lblAverageCaption.Text = "Current Average"
         lblAverageCaption.TextAlign = ContentAlignment.MiddleCenter
@@ -862,9 +895,9 @@ Partial Class frmstudent
         lblAverageValue.Dock = DockStyle.Top
         lblAverageValue.Font = New Font("Segoe UI", 15.75F, FontStyle.Bold, GraphicsUnit.Point, CByte(0))
         lblAverageValue.ForeColor = Color.DarkGreen
-        lblAverageValue.Location = New Point(6, 6)
+        lblAverageValue.Location = New Point(7, 8)
         lblAverageValue.Name = "lblAverageValue"
-        lblAverageValue.Size = New Size(242, 58)
+        lblAverageValue.Size = New Size(278, 77)
         lblAverageValue.TabIndex = 20
         lblAverageValue.Text = "0"
         lblAverageValue.TextAlign = ContentAlignment.MiddleCenter
@@ -876,11 +909,11 @@ Partial Class frmstudent
         RoundedPanel8.Controls.Add(lblPassedCaption)
         RoundedPanel8.Controls.Add(lblPassedValue)
         RoundedPanel8.Dock = DockStyle.Bottom
-        RoundedPanel8.Location = New Point(284, 10)
-        RoundedPanel8.Margin = New Padding(10)
+        RoundedPanel8.Location = New Point(325, 13)
+        RoundedPanel8.Margin = New Padding(11, 13, 11, 13)
         RoundedPanel8.Name = "RoundedPanel8"
-        RoundedPanel8.Padding = New Padding(6)
-        RoundedPanel8.Size = New Size(254, 92)
+        RoundedPanel8.Padding = New Padding(7, 8, 7, 8)
+        RoundedPanel8.Size = New Size(292, 123)
         RoundedPanel8.TabIndex = 12
         ' 
         ' lblPassedCaption
@@ -889,9 +922,9 @@ Partial Class frmstudent
         lblPassedCaption.Dock = DockStyle.Fill
         lblPassedCaption.Font = New Font("Segoe UI", 11.25F, FontStyle.Bold, GraphicsUnit.Point, CByte(0))
         lblPassedCaption.ForeColor = Color.DarkGreen
-        lblPassedCaption.Location = New Point(6, 66)
+        lblPassedCaption.Location = New Point(7, 88)
         lblPassedCaption.Name = "lblPassedCaption"
-        lblPassedCaption.Size = New Size(242, 20)
+        lblPassedCaption.Size = New Size(278, 27)
         lblPassedCaption.TabIndex = 16
         lblPassedCaption.Text = "Activities Passed"
         lblPassedCaption.TextAlign = ContentAlignment.TopCenter
@@ -902,9 +935,9 @@ Partial Class frmstudent
         lblPassedValue.Dock = DockStyle.Top
         lblPassedValue.Font = New Font("Segoe UI", 15.75F, FontStyle.Bold, GraphicsUnit.Point, CByte(0))
         lblPassedValue.ForeColor = Color.DarkGreen
-        lblPassedValue.Location = New Point(6, 6)
+        lblPassedValue.Location = New Point(7, 8)
         lblPassedValue.Name = "lblPassedValue"
-        lblPassedValue.Size = New Size(242, 60)
+        lblPassedValue.Size = New Size(278, 80)
         lblPassedValue.TabIndex = 19
         lblPassedValue.Text = "0"
         lblPassedValue.TextAlign = ContentAlignment.MiddleCenter
@@ -916,11 +949,11 @@ Partial Class frmstudent
         RoundedPanel7.Controls.Add(lblPendingCaption)
         RoundedPanel7.Controls.Add(lblPendingValue)
         RoundedPanel7.Dock = DockStyle.Fill
-        RoundedPanel7.Location = New Point(558, 10)
-        RoundedPanel7.Margin = New Padding(10)
+        RoundedPanel7.Location = New Point(639, 13)
+        RoundedPanel7.Margin = New Padding(11, 13, 11, 13)
         RoundedPanel7.Name = "RoundedPanel7"
-        RoundedPanel7.Padding = New Padding(6)
-        RoundedPanel7.Size = New Size(254, 92)
+        RoundedPanel7.Padding = New Padding(7, 8, 7, 8)
+        RoundedPanel7.Size = New Size(292, 123)
         RoundedPanel7.TabIndex = 12
         ' 
         ' lblPendingCaption
@@ -929,9 +962,9 @@ Partial Class frmstudent
         lblPendingCaption.Dock = DockStyle.Fill
         lblPendingCaption.Font = New Font("Segoe UI", 11.25F, FontStyle.Bold, GraphicsUnit.Point, CByte(0))
         lblPendingCaption.ForeColor = Color.DarkGreen
-        lblPendingCaption.Location = New Point(6, 65)
+        lblPendingCaption.Location = New Point(7, 87)
         lblPendingCaption.Name = "lblPendingCaption"
-        lblPendingCaption.Size = New Size(242, 21)
+        lblPendingCaption.Size = New Size(278, 28)
         lblPendingCaption.TabIndex = 16
         lblPendingCaption.Text = "Pending"
         lblPendingCaption.TextAlign = ContentAlignment.TopCenter
@@ -942,9 +975,9 @@ Partial Class frmstudent
         lblPendingValue.Dock = DockStyle.Top
         lblPendingValue.Font = New Font("Segoe UI", 15.75F, FontStyle.Bold, GraphicsUnit.Point, CByte(0))
         lblPendingValue.ForeColor = Color.DarkGreen
-        lblPendingValue.Location = New Point(6, 6)
+        lblPendingValue.Location = New Point(7, 8)
         lblPendingValue.Name = "lblPendingValue"
-        lblPendingValue.Size = New Size(242, 59)
+        lblPendingValue.Size = New Size(278, 79)
         lblPendingValue.TabIndex = 19
         lblPendingValue.Text = "0"
         lblPendingValue.TextAlign = ContentAlignment.MiddleCenter
@@ -956,11 +989,11 @@ Partial Class frmstudent
         RoundedPanel9.Controls.Add(lblHighestCaption)
         RoundedPanel9.Controls.Add(lblHighestValue)
         RoundedPanel9.Dock = DockStyle.Fill
-        RoundedPanel9.Location = New Point(832, 10)
-        RoundedPanel9.Margin = New Padding(10)
+        RoundedPanel9.Location = New Point(953, 13)
+        RoundedPanel9.Margin = New Padding(11, 13, 11, 13)
         RoundedPanel9.Name = "RoundedPanel9"
-        RoundedPanel9.Padding = New Padding(6)
-        RoundedPanel9.Size = New Size(257, 92)
+        RoundedPanel9.Padding = New Padding(7, 8, 7, 8)
+        RoundedPanel9.Size = New Size(292, 123)
         RoundedPanel9.TabIndex = 12
         ' 
         ' lblHighestCaption
@@ -969,9 +1002,9 @@ Partial Class frmstudent
         lblHighestCaption.Dock = DockStyle.Fill
         lblHighestCaption.Font = New Font("Segoe UI", 11.25F, FontStyle.Bold, GraphicsUnit.Point, CByte(0))
         lblHighestCaption.ForeColor = Color.DarkGreen
-        lblHighestCaption.Location = New Point(6, 66)
+        lblHighestCaption.Location = New Point(7, 88)
         lblHighestCaption.Name = "lblHighestCaption"
-        lblHighestCaption.Size = New Size(245, 20)
+        lblHighestCaption.Size = New Size(278, 27)
         lblHighestCaption.TabIndex = 17
         lblHighestCaption.Text = "Highest Score"
         lblHighestCaption.TextAlign = ContentAlignment.TopCenter
@@ -982,9 +1015,9 @@ Partial Class frmstudent
         lblHighestValue.Dock = DockStyle.Top
         lblHighestValue.Font = New Font("Segoe UI", 15.75F, FontStyle.Bold, GraphicsUnit.Point, CByte(0))
         lblHighestValue.ForeColor = Color.DarkGreen
-        lblHighestValue.Location = New Point(6, 6)
+        lblHighestValue.Location = New Point(7, 8)
         lblHighestValue.Name = "lblHighestValue"
-        lblHighestValue.Size = New Size(245, 60)
+        lblHighestValue.Size = New Size(278, 80)
         lblHighestValue.TabIndex = 18
         lblHighestValue.Text = "0"
         lblHighestValue.TextAlign = ContentAlignment.MiddleCenter
@@ -996,9 +1029,10 @@ Partial Class frmstudent
         pnlperfheader.Controls.Add(Label10)
         pnlperfheader.Controls.Add(PictureBox6)
         pnlperfheader.Dock = DockStyle.Top
-        pnlperfheader.Location = New Point(20, 20)
+        pnlperfheader.Location = New Point(23, 27)
+        pnlperfheader.Margin = New Padding(3, 4, 3, 4)
         pnlperfheader.Name = "pnlperfheader"
-        pnlperfheader.Size = New Size(1099, 60)
+        pnlperfheader.Size = New Size(1256, 80)
         pnlperfheader.TabIndex = 20
         ' 
         ' cboperfterm
@@ -1006,9 +1040,10 @@ Partial Class frmstudent
         cboperfterm.Anchor = AnchorStyles.Top Or AnchorStyles.Right
         cboperfterm.DropDownStyle = ComboBoxStyle.DropDownList
         cboperfterm.FormattingEnabled = True
-        cboperfterm.Location = New Point(678, 19)
+        cboperfterm.Location = New Point(775, 25)
+        cboperfterm.Margin = New Padding(3, 4, 3, 4)
         cboperfterm.Name = "cboperfterm"
-        cboperfterm.Size = New Size(121, 23)
+        cboperfterm.Size = New Size(138, 28)
         cboperfterm.TabIndex = 12
         ' 
         ' cboperfcourse
@@ -1016,9 +1051,10 @@ Partial Class frmstudent
         cboperfcourse.Anchor = AnchorStyles.Top Or AnchorStyles.Right
         cboperfcourse.DropDownStyle = ComboBoxStyle.DropDownList
         cboperfcourse.FormattingEnabled = True
-        cboperfcourse.Location = New Point(811, 19)
+        cboperfcourse.Location = New Point(927, 25)
+        cboperfcourse.Margin = New Padding(3, 4, 3, 4)
         cboperfcourse.Name = "cboperfcourse"
-        cboperfcourse.Size = New Size(275, 23)
+        cboperfcourse.Size = New Size(314, 28)
         cboperfcourse.TabIndex = 11
         ' 
         ' Label10
@@ -1027,18 +1063,19 @@ Partial Class frmstudent
         Label10.BackColor = Color.White
         Label10.Font = New Font("Segoe UI", 18F, FontStyle.Bold, GraphicsUnit.Point, CByte(0))
         Label10.ForeColor = Color.DarkGreen
-        Label10.Location = New Point(72, 12)
+        Label10.Location = New Point(82, 16)
         Label10.Name = "Label10"
-        Label10.Size = New Size(318, 32)
+        Label10.Size = New Size(391, 41)
         Label10.TabIndex = 10
         Label10.Text = "My Performance Overview"
         ' 
         ' PictureBox6
         ' 
         PictureBox6.Image = CType(resources.GetObject("PictureBox6.Image"), Image)
-        PictureBox6.Location = New Point(9, 1)
+        PictureBox6.Location = New Point(10, 1)
+        PictureBox6.Margin = New Padding(3, 4, 3, 4)
         PictureBox6.Name = "PictureBox6"
-        PictureBox6.Size = New Size(59, 55)
+        PictureBox6.Size = New Size(67, 73)
         PictureBox6.SizeMode = PictureBoxSizeMode.Zoom
         PictureBox6.TabIndex = 1
         PictureBox6.TabStop = False
@@ -1046,9 +1083,10 @@ Partial Class frmstudent
         ' Panel1
         ' 
         Panel1.BackColor = Color.DimGray
-        Panel1.Location = New Point(30, 77)
+        Panel1.Location = New Point(34, 103)
+        Panel1.Margin = New Padding(3, 4, 3, 4)
         Panel1.Name = "Panel1"
-        Panel1.Size = New Size(1022, 2)
+        Panel1.Size = New Size(1168, 3)
         Panel1.TabIndex = 19
         ' 
         ' pnlMyGrades
@@ -1057,9 +1095,10 @@ Partial Class frmstudent
         pnlMyGrades.Controls.Add(Label1)
         pnlMyGrades.Controls.Add(RoundedPanel1)
         pnlMyGrades.Dock = DockStyle.Fill
-        pnlMyGrades.Location = New Point(0, 3)
+        pnlMyGrades.Location = New Point(0, 4)
+        pnlMyGrades.Margin = New Padding(3, 4, 3, 4)
         pnlMyGrades.Name = "pnlMyGrades"
-        pnlMyGrades.Size = New Size(1199, 418)
+        pnlMyGrades.Size = New Size(1370, 557)
         pnlMyGrades.TabIndex = 7
         ' 
         ' Label1
@@ -1068,9 +1107,9 @@ Partial Class frmstudent
         Label1.BackColor = Color.WhiteSmoke
         Label1.Font = New Font("Segoe UI", 18F, FontStyle.Bold, GraphicsUnit.Point, CByte(0))
         Label1.ForeColor = Color.DarkGreen
-        Label1.Location = New Point(144, 4)
+        Label1.Location = New Point(165, 5)
         Label1.Name = "Label1"
-        Label1.Size = New Size(167, 32)
+        Label1.Size = New Size(207, 41)
         Label1.TabIndex = 10
         Label1.Text = "Grade Report"
         ' 
@@ -1083,10 +1122,11 @@ Partial Class frmstudent
         RoundedPanel1.Controls.Add(dgvgrades)
         RoundedPanel1.Controls.Add(Panel3)
         RoundedPanel1.Controls.Add(Panel4)
-        RoundedPanel1.Location = New Point(140, 40)
+        RoundedPanel1.Location = New Point(160, 53)
+        RoundedPanel1.Margin = New Padding(3, 4, 3, 4)
         RoundedPanel1.Name = "RoundedPanel1"
-        RoundedPanel1.Padding = New Padding(14)
-        RoundedPanel1.Size = New Size(929, 325)
+        RoundedPanel1.Padding = New Padding(16, 19, 16, 19)
+        RoundedPanel1.Size = New Size(1062, 433)
         RoundedPanel1.TabIndex = 0
         ' 
         ' lblstanding
@@ -1095,10 +1135,10 @@ Partial Class frmstudent
         lblstanding.Dock = DockStyle.Bottom
         lblstanding.Font = New Font("Segoe UI", 9.75F, FontStyle.Bold, GraphicsUnit.Point, CByte(0))
         lblstanding.ForeColor = Color.DarkGreen
-        lblstanding.Location = New Point(14, 284)
+        lblstanding.Location = New Point(16, 378)
         lblstanding.Name = "lblstanding"
-        lblstanding.Padding = New Padding(10, 0, 0, 10)
-        lblstanding.Size = New Size(901, 27)
+        lblstanding.Padding = New Padding(11, 0, 0, 13)
+        lblstanding.Size = New Size(1030, 36)
         lblstanding.TabIndex = 12
         lblstanding.Text = "Current Standing: 0%"
         lblstanding.TextAlign = ContentAlignment.MiddleLeft
@@ -1108,19 +1148,21 @@ Partial Class frmstudent
         dgvgrades.BackgroundColor = Color.White
         dgvgrades.ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.AutoSize
         dgvgrades.Dock = DockStyle.Fill
-        dgvgrades.Location = New Point(14, 66)
+        dgvgrades.Location = New Point(16, 89)
+        dgvgrades.Margin = New Padding(3, 4, 3, 4)
         dgvgrades.Name = "dgvgrades"
         dgvgrades.RowHeadersWidth = 51
-        dgvgrades.Size = New Size(901, 245)
+        dgvgrades.Size = New Size(1030, 325)
         dgvgrades.TabIndex = 3
         ' 
         ' Panel3
         ' 
         Panel3.BackColor = Color.DimGray
         Panel3.Dock = DockStyle.Top
-        Panel3.Location = New Point(14, 64)
+        Panel3.Location = New Point(16, 86)
+        Panel3.Margin = New Padding(3, 4, 3, 4)
         Panel3.Name = "Panel3"
-        Panel3.Size = New Size(901, 2)
+        Panel3.Size = New Size(1030, 3)
         Panel3.TabIndex = 13
         ' 
         ' Panel4
@@ -1130,9 +1172,10 @@ Partial Class frmstudent
         Panel4.Controls.Add(PictureBox2)
         Panel4.Controls.Add(cboCourse)
         Panel4.Dock = DockStyle.Top
-        Panel4.Location = New Point(14, 14)
+        Panel4.Location = New Point(16, 19)
+        Panel4.Margin = New Padding(3, 4, 3, 4)
         Panel4.Name = "Panel4"
-        Panel4.Size = New Size(901, 50)
+        Panel4.Size = New Size(1030, 67)
         Panel4.TabIndex = 14
         ' 
         ' cboterm
@@ -1141,17 +1184,19 @@ Partial Class frmstudent
         cboterm.Font = New Font("Segoe UI Semibold", 9F, FontStyle.Bold, GraphicsUnit.Point, CByte(0))
         cboterm.ForeColor = Color.DarkGreen
         cboterm.FormattingEnabled = True
-        cboterm.Location = New Point(370, 14)
+        cboterm.Location = New Point(423, 19)
+        cboterm.Margin = New Padding(3, 4, 3, 4)
         cboterm.Name = "cboterm"
-        cboterm.Size = New Size(121, 23)
+        cboterm.Size = New Size(138, 28)
         cboterm.TabIndex = 3
         ' 
         ' PictureBox2
         ' 
         PictureBox2.Image = My.Resources.Resources.Gemini_Generated_Image_902bw4902bw4902b_removebg_preview
-        PictureBox2.Location = New Point(0, 3)
+        PictureBox2.Location = New Point(0, 4)
+        PictureBox2.Margin = New Padding(3, 4, 3, 4)
         PictureBox2.Name = "PictureBox2"
-        PictureBox2.Size = New Size(67, 43)
+        PictureBox2.Size = New Size(77, 57)
         PictureBox2.SizeMode = PictureBoxSizeMode.Zoom
         PictureBox2.TabIndex = 1
         PictureBox2.TabStop = False
@@ -1161,9 +1206,10 @@ Partial Class frmstudent
         cboCourse.BackColor = Color.FloralWhite
         cboCourse.DropDownStyle = ComboBoxStyle.DropDownList
         cboCourse.FormattingEnabled = True
-        cboCourse.Location = New Point(80, 14)
+        cboCourse.Location = New Point(91, 19)
+        cboCourse.Margin = New Padding(3, 4, 3, 4)
         cboCourse.Name = "cboCourse"
-        cboCourse.Size = New Size(277, 23)
+        cboCourse.Size = New Size(316, 28)
         cboCourse.TabIndex = 2
         ' 
         ' pnlGradeHistory
@@ -1171,9 +1217,10 @@ Partial Class frmstudent
         pnlGradeHistory.BackColor = Color.White
         pnlGradeHistory.Controls.Add(RoundedPanel2)
         pnlGradeHistory.Dock = DockStyle.Fill
-        pnlGradeHistory.Location = New Point(0, 3)
+        pnlGradeHistory.Location = New Point(0, 4)
+        pnlGradeHistory.Margin = New Padding(3, 4, 3, 4)
         pnlGradeHistory.Name = "pnlGradeHistory"
-        pnlGradeHistory.Size = New Size(1199, 418)
+        pnlGradeHistory.Size = New Size(1370, 557)
         pnlGradeHistory.TabIndex = 9
         pnlGradeHistory.Visible = False
         ' 
@@ -1185,10 +1232,11 @@ Partial Class frmstudent
         RoundedPanel2.Controls.Add(dgvHistory)
         RoundedPanel2.Controls.Add(Label5)
         RoundedPanel2.Controls.Add(pnlHistoryHeader)
-        RoundedPanel2.Location = New Point(80, 50)
+        RoundedPanel2.Location = New Point(91, 67)
+        RoundedPanel2.Margin = New Padding(3, 4, 3, 4)
         RoundedPanel2.Name = "RoundedPanel2"
-        RoundedPanel2.Padding = New Padding(14)
-        RoundedPanel2.Size = New Size(1026, 228)
+        RoundedPanel2.Padding = New Padding(16, 19, 16, 19)
+        RoundedPanel2.Size = New Size(1173, 304)
         RoundedPanel2.TabIndex = 0
         ' 
         ' dgvHistory
@@ -1196,10 +1244,11 @@ Partial Class frmstudent
         dgvHistory.BackgroundColor = Color.White
         dgvHistory.ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.AutoSize
         dgvHistory.Dock = DockStyle.Fill
-        dgvHistory.Location = New Point(14, 74)
+        dgvHistory.Location = New Point(16, 99)
+        dgvHistory.Margin = New Padding(3, 4, 3, 4)
         dgvHistory.Name = "dgvHistory"
         dgvHistory.RowHeadersWidth = 51
-        dgvHistory.Size = New Size(998, 110)
+        dgvHistory.Size = New Size(1141, 146)
         dgvHistory.TabIndex = 3
         ' 
         ' Label5
@@ -1207,9 +1256,9 @@ Partial Class frmstudent
         Label5.Dock = DockStyle.Bottom
         Label5.Font = New Font("Segoe UI", 8.25F, FontStyle.Regular, GraphicsUnit.Point, CByte(0))
         Label5.ForeColor = Color.DarkGreen
-        Label5.Location = New Point(14, 184)
+        Label5.Location = New Point(16, 245)
         Label5.Name = "Label5"
-        Label5.Size = New Size(998, 30)
+        Label5.Size = New Size(1141, 40)
         Label5.TabIndex = 4
         Label5.Text = "Every grade is stored in MYSQL"
         Label5.TextAlign = ContentAlignment.MiddleLeft
@@ -1219,17 +1268,19 @@ Partial Class frmstudent
         pnlHistoryHeader.Controls.Add(PictureBox3)
         pnlHistoryHeader.Controls.Add(Label4)
         pnlHistoryHeader.Dock = DockStyle.Top
-        pnlHistoryHeader.Location = New Point(14, 14)
+        pnlHistoryHeader.Location = New Point(16, 19)
+        pnlHistoryHeader.Margin = New Padding(3, 4, 3, 4)
         pnlHistoryHeader.Name = "pnlHistoryHeader"
-        pnlHistoryHeader.Size = New Size(998, 60)
+        pnlHistoryHeader.Size = New Size(1141, 80)
         pnlHistoryHeader.TabIndex = 5
         ' 
         ' PictureBox3
         ' 
         PictureBox3.Image = My.Resources.Resources.Gemini_Generated_Image_w8efogw8efogw8ef_removebg_preview
-        PictureBox3.Location = New Point(4, 5)
+        PictureBox3.Location = New Point(5, 7)
+        PictureBox3.Margin = New Padding(3, 4, 3, 4)
         PictureBox3.Name = "PictureBox3"
-        PictureBox3.Size = New Size(79, 50)
+        PictureBox3.Size = New Size(90, 67)
         PictureBox3.SizeMode = PictureBoxSizeMode.Zoom
         PictureBox3.TabIndex = 0
         PictureBox3.TabStop = False
@@ -1239,9 +1290,9 @@ Partial Class frmstudent
         Label4.AutoSize = True
         Label4.Font = New Font("Segoe UI", 15.75F, FontStyle.Bold, GraphicsUnit.Point, CByte(0))
         Label4.ForeColor = Color.DarkGreen
-        Label4.Location = New Point(85, 16)
+        Label4.Location = New Point(97, 21)
         Label4.Name = "Label4"
-        Label4.Size = New Size(186, 30)
+        Label4.Size = New Size(245, 37)
         Label4.TabIndex = 1
         Label4.Text = "My Grade History"
         ' 
@@ -1250,8 +1301,9 @@ Partial Class frmstudent
         Panel7.BackColor = Color.DimGray
         Panel7.Dock = DockStyle.Top
         Panel7.Location = New Point(0, 0)
+        Panel7.Margin = New Padding(3, 4, 3, 4)
         Panel7.Name = "Panel7"
-        Panel7.Size = New Size(1199, 3)
+        Panel7.Size = New Size(1370, 4)
         Panel7.TabIndex = 11
         ' 
         ' pnlheader
@@ -1264,9 +1316,10 @@ Partial Class frmstudent
         pnlheader.Controls.Add(PictureBox1)
         pnlheader.Controls.Add(btnLogout)
         pnlheader.Dock = DockStyle.Top
-        pnlheader.Location = New Point(0, 28)
+        pnlheader.Location = New Point(0, 37)
+        pnlheader.Margin = New Padding(3, 4, 3, 4)
         pnlheader.Name = "pnlheader"
-        pnlheader.Size = New Size(1199, 36)
+        pnlheader.Size = New Size(1370, 48)
         pnlheader.TabIndex = 2
         ' 
         ' btnChangePassword
@@ -1274,9 +1327,10 @@ Partial Class frmstudent
         btnChangePassword.Anchor = AnchorStyles.Top Or AnchorStyles.Right
         btnChangePassword.FlatStyle = FlatStyle.Flat
         btnChangePassword.Font = New Font("Segoe UI", 8.25F, FontStyle.Regular, GraphicsUnit.Point, CByte(0))
-        btnChangePassword.Location = New Point(981, 4)
+        btnChangePassword.Location = New Point(1121, 5)
+        btnChangePassword.Margin = New Padding(3, 4, 3, 4)
         btnChangePassword.Name = "btnChangePassword"
-        btnChangePassword.Size = New Size(135, 29)
+        btnChangePassword.Size = New Size(154, 39)
         btnChangePassword.TabIndex = 11
         btnChangePassword.Text = "Change Password"
         btnChangePassword.UseVisualStyleBackColor = True
@@ -1286,8 +1340,9 @@ Partial Class frmstudent
         Panel6.BackColor = Color.DimGray
         Panel6.Dock = DockStyle.Top
         Panel6.Location = New Point(0, 0)
+        Panel6.Margin = New Padding(3, 4, 3, 4)
         Panel6.Name = "Panel6"
-        Panel6.Size = New Size(1199, 2)
+        Panel6.Size = New Size(1370, 3)
         Panel6.TabIndex = 10
         ' 
         ' lblrole
@@ -1296,9 +1351,9 @@ Partial Class frmstudent
         lblrole.BackColor = Color.DarkGreen
         lblrole.Font = New Font("Segoe UI", 11.25F, FontStyle.Bold, GraphicsUnit.Point, CByte(0))
         lblrole.ForeColor = Color.White
-        lblrole.Location = New Point(211, 7)
+        lblrole.Location = New Point(241, 9)
         lblrole.Name = "lblrole"
-        lblrole.Size = New Size(77, 20)
+        lblrole.Size = New Size(98, 25)
         lblrole.TabIndex = 9
         lblrole.Text = "STUDENT"
         ' 
@@ -1306,18 +1361,19 @@ Partial Class frmstudent
         ' 
         lblstudentname.AutoSize = True
         lblstudentname.ForeColor = Color.DarkGreen
-        lblstudentname.Location = New Point(58, 10)
+        lblstudentname.Location = New Point(66, 13)
         lblstudentname.Name = "lblstudentname"
-        lblstudentname.Size = New Size(123, 15)
+        lblstudentname.Size = New Size(154, 20)
         lblstudentname.TabIndex = 0
         lblstudentname.Text = "Condes, Hope Gian D."
         ' 
         ' PictureBox1
         ' 
         PictureBox1.Image = My.Resources.Resources.Gemini_Generated_Image_3yvygi3yvygi3yvy_removebg_preview
-        PictureBox1.Location = New Point(14, 3)
+        PictureBox1.Location = New Point(16, 4)
+        PictureBox1.Margin = New Padding(3, 4, 3, 4)
         PictureBox1.Name = "PictureBox1"
-        PictureBox1.Size = New Size(39, 29)
+        PictureBox1.Size = New Size(45, 39)
         PictureBox1.SizeMode = PictureBoxSizeMode.Zoom
         PictureBox1.TabIndex = 0
         PictureBox1.TabStop = False
@@ -1327,23 +1383,25 @@ Partial Class frmstudent
         btnLogout.Anchor = AnchorStyles.Top Or AnchorStyles.Right
         btnLogout.FlatStyle = FlatStyle.Flat
         btnLogout.Font = New Font("Segoe UI", 8.25F, FontStyle.Regular, GraphicsUnit.Point, CByte(0))
-        btnLogout.Location = New Point(1122, 4)
+        btnLogout.Location = New Point(1282, 5)
+        btnLogout.Margin = New Padding(3, 4, 3, 4)
         btnLogout.Name = "btnLogout"
-        btnLogout.Size = New Size(69, 29)
+        btnLogout.Size = New Size(79, 39)
         btnLogout.TabIndex = 8
         btnLogout.Text = "Log out"
         btnLogout.UseVisualStyleBackColor = True
         ' 
         ' frmstudent
         ' 
-        AutoScaleDimensions = New SizeF(7F, 15F)
+        AutoScaleDimensions = New SizeF(8F, 20F)
         AutoScaleMode = AutoScaleMode.Font
-        ClientSize = New Size(1199, 562)
+        ClientSize = New Size(1370, 749)
         Controls.Add(pnlContent)
         Controls.Add(Pnltabs)
         Controls.Add(pnlheader)
         Controls.Add(Pnlfooter)
         Controls.Add(Pnlheaderheader)
+        Margin = New Padding(3, 4, 3, 4)
         Name = "frmstudent"
         StartPosition = FormStartPosition.CenterScreen
         Text = "Transparent Grading System - Dauntless Wolves"

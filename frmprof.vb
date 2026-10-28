@@ -209,6 +209,10 @@ Public Class frmprof
             col.AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill
             col.MinimumWidth = 85
             If col.Name = "Student" Then col.MinimumWidth = 180
+            If col.Name <> "Student" Then
+                col.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter
+                col.HeaderCell.Style.Alignment = DataGridViewContentAlignment.MiddleCenter
+            End If
             If col.Name = "RunningGrade" Then col.HeaderText = "Running Grade"
         Next
         Dim table = TryCast(dgvClassGrades.DataSource, DataTable)
@@ -934,7 +938,7 @@ Public Class frmprof
     Private Sub RefreshRightScoresList(studentId As String, classId As Integer, enrollmentId As Integer)
         If _pnlRightScoresContainer Is Nothing Then Return
 
-        _pnlRightScoresContainer.Controls.Clear()
+        ClearChildren(_pnlRightScoresContainer)
 
         Dim dt As DataTable = Nothing
         If classId > 0 Then
@@ -945,9 +949,18 @@ Public Class frmprof
             dt = _gradeService.GetGradesByEnrollment(enrollmentId)
         End If
 
-        Dim topOffset As Integer = 10
-
         If dt IsNot Nothing AndAlso dt.Rows.Count > 0 Then
+            Dim grid As New TableLayoutPanel With {
+                .Dock = DockStyle.Top,
+                .AutoSize = True,
+                .AutoSizeMode = AutoSizeMode.GrowAndShrink,
+                .ColumnCount = 2,
+                .BackColor = Color.Transparent
+            }
+            grid.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 100))   ' title
+            grid.ColumnStyles.Add(New ColumnStyle(SizeType.Absolute, 110))  ' badge, pinned right
+
+            Dim r As Integer = 0
             For Each row As DataRow In dt.Rows
                 Dim title As String = Convert.ToString(row("title"))
                 Dim totalScore As Double = If(dt.Columns.Contains("total_score") AndAlso Not IsDBNull(row("total_score")), Convert.ToDouble(row("total_score")), 100)
@@ -960,8 +973,11 @@ Public Class frmprof
                     .Text = title,
                     .Font = New Font("Segoe UI", 9.5F, FontStyle.Bold),
                     .ForeColor = Color.FromArgb(40, 110, 50),
-                    .Location = New Point(15, topOffset + 3),
-                    .AutoSize = True
+                    .Dock = DockStyle.Fill,
+                    .Size = New Size(100, 36),
+                    .Margin = New Padding(14, 0, 6, 0),
+                    .TextAlign = ContentAlignment.MiddleLeft,
+                    .AutoEllipsis = True
                 }
 
                 Dim lblBadge As New Label With {
@@ -970,14 +986,19 @@ Public Class frmprof
                     .BackColor = If(hasScore, Color.FromArgb(40, 167, 69), Color.FromArgb(70, 150, 80)),
                     .ForeColor = Color.White,
                     .TextAlign = ContentAlignment.MiddleCenter,
-                    .Size = New Size(80, 24),
-                    .Location = New Point(280, topOffset)
+                    .Size = New Size(80, 26),
+                    .Margin = New Padding(0, 5, 14, 5),
+                    .Anchor = AnchorStyles.Right
                 }
 
-                _pnlRightScoresContainer.Controls.Add(lblTitle)
-                _pnlRightScoresContainer.Controls.Add(lblBadge)
-                topOffset += 36
+                grid.RowStyles.Add(New RowStyle(SizeType.AutoSize))
+                grid.RowCount = r + 1
+                grid.Controls.Add(lblTitle, 0, r)
+                grid.Controls.Add(lblBadge, 1, r)
+                r += 1
             Next
+
+            _pnlRightScoresContainer.Controls.Add(grid)
         Else
             Dim lblEmpty As New Label With {
                 .Text = "No assessment scores recorded yet.",
@@ -988,6 +1009,69 @@ Public Class frmprof
             }
             _pnlRightScoresContainer.Controls.Add(lblEmpty)
         End If
+    End Sub
+
+    ' Fixed header + scrolling host (only the host is cleared on refresh).
+    Private Sub BuildRightScoresPanel()
+        RoundedPanel12.AutoScroll = False
+        RoundedPanel12.Padding = New Padding(3)
+        ClearChildren(RoundedPanel12)
+
+        Dim host As New Panel With {
+            .Dock = DockStyle.Fill,
+            .AutoScroll = True,
+            .BackColor = Color.Transparent
+        }
+
+        Dim header As New Panel With {
+            .Dock = DockStyle.Top,
+            .Height = 26,
+            .BackColor = Color.Transparent
+        }
+
+        Dim lblTitle As New Label With {
+            .Text = "Student Scores",
+            .Dock = DockStyle.Fill,
+            .Font = New Font("Segoe UI", 9.0F, FontStyle.Bold),
+            .ForeColor = Color.DarkGreen,
+            .TextAlign = ContentAlignment.MiddleLeft,
+            .Padding = New Padding(14, 0, 0, 0)
+        }
+
+        Dim lblName As New Label With {
+            .Dock = DockStyle.Right,
+            .Width = 260,
+            .Font = New Font("Segoe UI", 9.0F, FontStyle.Regular),
+            .ForeColor = Color.FromArgb(40, 110, 50),
+            .TextAlign = ContentAlignment.MiddleRight,
+            .AutoEllipsis = True,
+            .Padding = New Padding(0, 0, 14, 0)
+        }
+
+        header.Controls.Add(lblTitle)
+        header.Controls.Add(lblName)
+
+        AddHandler header.Paint, Sub(s, e)
+                                     Using pen As New Pen(Color.Black, 2)
+                                         e.Graphics.DrawLine(pen, 0, header.Height - 1, header.Width, header.Height - 1)
+                                     End Using
+                                 End Sub
+        AddHandler header.Resize, Sub() header.Invalidate()
+
+        RoundedPanel12.Controls.Add(host)
+        RoundedPanel12.Controls.Add(header)
+
+        _lblRightStudentName = lblName
+        _pnlRightScoresContainer = host
+        _isRightPanelInitialized = True
+    End Sub
+
+    Private Sub ClearChildren(parent As Control)
+        For i As Integer = parent.Controls.Count - 1 To 0 Step -1
+            Dim c = parent.Controls(i)
+            parent.Controls.RemoveAt(i)
+            c.Dispose()
+        Next
     End Sub
 
     Private Function ContainsControl(parent As Control, target As Control) As Boolean
@@ -1189,14 +1273,14 @@ Public Class frmprof
         dgvRequests.EditMode = DataGridViewEditMode.EditProgrammatically
         dgvRequests.Columns("Action").HeaderText = "Review / Approve"
         AddHandler Me.Activated, Sub(sender, args)
-                                    If Not isLoading AndAlso Not savingScore AndAlso AppSession.IsTeacher Then
-                                        Try
-                                            LoadTeacherInfo()
-                                        Catch ex As Exception
-                                            Console.WriteLine("[CLASS REFRESH] " & ex.Message)
-                                        End Try
-                                    End If
-                                End Sub
+                                     If Not isLoading AndAlso Not savingScore AndAlso AppSession.IsTeacher Then
+                                         Try
+                                             LoadTeacherInfo()
+                                         Catch ex As Exception
+                                             Console.WriteLine("[CLASS REFRESH] " & ex.Message)
+                                         End Try
+                                     End If
+                                 End Sub
         ComboBox1.Width = 360
         ComboBox1.DropDownWidth = 500
         Label2.Text = "Student (surname A–Z)"
@@ -1223,10 +1307,7 @@ Public Class frmprof
         Next
         RoundedPanel11.Dock = DockStyle.Fill
         RoundedPanel12.Dock = DockStyle.Fill
-        RoundedPanel12.AutoScroll = True
-        RoundedPanel12.AutoScrollMinSize = New Size(0, 300)
-        _pnlRightScoresContainer = RoundedPanel12
-        _isRightPanelInitialized = True
+        BuildRightScoresPanel()
         UpdateSelectedStudentDisplay()
     End Sub
 
@@ -1267,5 +1348,11 @@ Public Class frmprof
     Private Sub Label19_Click(sender As Object, e As EventArgs) Handles Label19.Click
     End Sub
 
+    Private Sub Label21_Click(sender As Object, e As EventArgs) Handles LblRole.Click
 
+    End Sub
+
+    Private Sub RoundedPanel12_Paint(sender As Object, e As PaintEventArgs) Handles RoundedPanel12.Paint
+
+    End Sub
 End Class
