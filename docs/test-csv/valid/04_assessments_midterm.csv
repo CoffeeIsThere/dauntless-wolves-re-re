@@ -1,0 +1,5 @@
+type,group,max_score,term,weight
+Quiz,Quiz,20,Midterm,10
+Quiz,Quiz,30,Midterm,10
+Activity,Class Work,50,Midterm,20
+Exam,Class Work,100,Midterm,60
