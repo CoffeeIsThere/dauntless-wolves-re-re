@@ -1,37 +1,23 @@
 # 2.1 Narrative Business Rules
 
-Revised 29 October 2026
+Revised 29 October 2026. Backend identifies application validation.
 
-1. Every student, teacher and admin must have their own account with a unique ID. Two accounts of the same role must not share an email, and passwords must never be stored in plain form.
-
-2. A student or teacher account that has protected related records, such as enrollments, assigned classes, reviewer references or audit entries, must not be deleted. These accounts may be deactivated to restrict access while preserving their records. Only an account with no blocking related records may be deleted, and only by an admin.
-
-3. A course may be offered in many classes. A course that has classes must not be deleted.
-
-4. Every class is one offering of a course for a section, semester and academic year, and must have exactly one teacher. The same offering must not be created twice. A teacher may handle many classes.
-
-5. A student may enroll in many classes, and a class may have many students. A student must not be enrolled in the same class twice.
-
-6. Every assessment must belong to one class and one term (Midterm or Finals), and must have a type, a maximum score above zero and a weight.
-
-7. A student must have no more than one grade for each assessment.
-
-8. A score stays blank until the assessment is graded. A score must not be negative, must not exceed the assessment’s maximum, must have at most two decimal places, and may be recorded only for an assessment in the student’s own class.
-
-9. A student’s running grade must count only the assessments already graded, weighted in proportion to each other. Weights need not total 100 and terms need not be split 50/50.
-
-10. A student is Passed at a running grade of 75% or higher and At risk below 75%. Until something is graded, the student is Not Yet.
-
-11. A student may ask for a re-check or a point increase only on their own graded assessment. A grade may have only one open request at a time.
-
-12. A new request starts as Pending. Only the class’s assigned active teacher may mark it Under Review, approve it or close it. Under Review is optional. The reviewer and review time must be recorded when the request is Approved or Closed. Marking a request Under Review must be recorded in the audit log but does not set the reviewer and review-time fields. A request that is Approved or Closed must not be processed again.
-
-13. Only an active teacher assigned to a class may record scores and decide revision requests for it. Authorized admins may also record scores, but request decisions stay with the assigned teacher.
-
-14. Every important action must be logged with who did it (exactly one person: a student, teacher or admin), and with the old and new values when a score changes.
-
-15. The history of an action must be kept even after the record it refers to is deleted.
-
-16. A teacher or course with classes, a student or class with enrollments, or an account referenced as an audit actor must not be deleted while those protected references remain. Where deletion is permitted, related records must follow the database’s defined deletion rules. Deleting an enrollment or assessment must also remove its related grades and the revision requests associated with those grades.
-
-17. Each user may see and do only what their role allows: students see their own grades and requests, teachers see their assigned classes, and admins manage accounts. Role, ownership and account status must be checked before any protected action.
+| Rule No. | Business Rule | Database/Relationship Impact | Validation/Constraint |
+| --- | --- | --- | --- |
+| 1 | Every student, teacher and admin must have their own account with a unique ID. Two accounts of the same role must not share an email, and passwords must never be stored in plain form. | Separate Student, Teacher and Admin tables. | PRIMARY KEY on each account ID. UNIQUE email within each role table. NOT NULL password_hash. Backend: password hashing. |
+| 2 | A student or teacher account that has protected related records, such as enrollments, assigned classes, reviewer references or audit entries, must not be deleted. These accounts may be deactivated to restrict access while preserving their records. Only an account with no blocking related records may be deleted, and only by an admin. | status on Student and Teacher. Account deletion depends on protected related records. | status ENUM('Active','Inactive') NOT NULL DEFAULT 'Active'. Restrictive foreign keys protect linked records. Backend: admin authorization and linked-record checks, including reviewer references. |
+| 3 | A course may be offered in many classes. A course that has classes must not be deleted. | Course 1 to many Class. | PRIMARY KEY course_code. FOREIGN KEY Class.course_code, ON DELETE RESTRICT. |
+| 4 | Every class is one offering of a course for a section, semester and academic year, and must have exactly one teacher. The same offering must not be created twice. A teacher may handle many classes. | Teacher 1 to many Class. | FOREIGN KEY teacher_id NOT NULL. UNIQUE uq_class (course_code, section, semester, academic_year). |
+| 5 | A student may enroll in many classes, and a class may have many students. A student must not be enrolled in the same class twice. | Many-to-many between Student and Class, resolved by Enrollment. | FOREIGN KEYS student_id and class_id. UNIQUE uq_enrollment (student_id, class_id). |
+| 6 | Every assessment must belong to one class and one term (Midterm or Finals), and must have a type, a maximum score above zero and a weight. | Class 1 to many Assessment. | FOREIGN KEY class_id ON DELETE CASCADE. ENUM term and type. CHECK total_score > 0. CHECK weight BETWEEN 0 AND 100. Backend: positive weight and at most two decimal places for maximum score and weight. |
+| 7 | A student must have no more than one grade for each assessment. | Many-to-many between Enrollment and Assessment, resolved by StudentGrade. | FOREIGN KEYS enrollment_id and assessment_id. UNIQUE uq_grade (enrollment_id, assessment_id). |
+| 8 | A score stays blank until the assessment is graded. A score must not be negative, must not exceed the assessment’s maximum, must have at most two decimal places, and may be recorded only for an assessment in the student’s own class. | StudentGrade.score compared with Assessment.total_score; Enrollment and Assessment must reference the same Class. | score DECIMAL(6,2) NULL. Backend: nonnegative score, maximum-score limit, at most two decimal places, and same-class validation. |
+| 9 | A student’s running grade must count only the assessments already graded, weighted in proportion to each other. Weights need not total 100 and terms need not be split 50/50. | Assessment.weight and StudentGrade.score feed Enrollment.running_grade. | Backend: [sum(score / max x weight) / sum(graded weights)] x 100. Include recorded zero; exclude ungraded items. NULL if no qualifying graded assessment exists. |
+| 10 | A student is Passed at a running grade of 75% or higher and At risk below 75%. Until something is graded, the student is Not Yet. | Enrollment.running_grade. | running_grade DECIMAL(5,2) NULL. Backend: recalculation and standing; passing threshold 75%. |
+| 11 | A student may ask for a re-check or a point increase only on their own graded assessment. A grade may have only one open request at a time. | StudentGrade 1 to many RevisionRequest. | FOREIGN KEY grade_id ON DELETE CASCADE. reason NOT NULL. requested_points NULL means re-check. Backend: ownership, graded assessment, positive requested points with at most two decimal places, and one open request (Pending or Under Review). |
+| 12 | A new request starts as Pending. Only the class’s assigned active teacher may mark it Under Review, approve it or close it. Under Review is optional. The reviewer and review time must be recorded when the request is Approved or Closed. Marking a request Under Review must be recorded in the audit log but does not set the reviewer and review-time fields. A request that is Approved or Closed must not be processed again. | RevisionRequest.status. Teacher 0 or 1 to many RevisionRequest. Review actions are also recorded in AuditLog. | status ENUM('Pending','Under Review','Approved','Closed') DEFAULT 'Pending'. reviewed_by FOREIGN KEY ON DELETE SET NULL. Backend: populate reviewed_by and reviewed_at on approval or closure; log Under Review in AuditLog; enforce ownership, active teacher and terminal-state protection. |
+| 13 | Only an active teacher assigned to a class may record scores and decide revision requests for it. Authorized admins may also record scores, but request decisions stay with the assigned teacher. | Class.teacher_id and Teacher.status; authorized Admin grade-entry workflow. | Backend: active assigned-teacher authorization for grading and request decisions; authorized admin access for administrative score entry. |
+| 14 | Every important action must be logged with who did it (exactly one person: a student, teacher or admin), and with the old and new values when a score changes. | AuditLog references Student, Teacher and Admin. | FOREIGN KEYS for actors ON DELETE RESTRICT. CHECK chk_audit_one_actor. logged_at DEFAULT CURRENT_TIMESTAMP. Old/new values are recorded where applicable; a first recorded score may have no old value. |
+| 15 | The history of an action must be kept even after the record it refers to is deleted. | entity_type and entity_id are not foreign keys. | NOT NULL entity_type and entity_id. INDEX idx_entity (entity_type, entity_id). Target references do not cascade-delete audit entries. |
+| 16 | A teacher or course with classes, a student or class with enrollments, or an account referenced as an audit actor must not be deleted while those protected references remain. Where deletion is permitted, related records must follow the database’s defined deletion rules. Deleting an enrollment or assessment must also remove its related grades and the revision requests associated with those grades. | Protects history through restrictive references and defined cascading relationships. | RESTRICT on protected Class, Enrollment and audit-actor references. CASCADE from Enrollment or Assessment to StudentGrade, then from StudentGrade to RevisionRequest. SET NULL on RevisionRequest.reviewed_by as defined in the schema. |
+| 17 | Each user may see and do only what their role allows: students see their own grades and requests, teachers see their assigned classes, and admins manage accounts. Role, ownership and account status must be checked before any protected action. | Role-based screens and protected service operations. | Backend: applicable role, ownership and account-status validation before protected actions. |
