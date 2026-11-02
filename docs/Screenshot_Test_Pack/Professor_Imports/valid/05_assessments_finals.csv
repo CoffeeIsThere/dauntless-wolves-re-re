@@ -1,0 +1,5 @@
+type,group,max_score,term,weight
+Quiz,Quiz,20,Finals,15
+Activity,Class Work,50,Finals,20
+Project,Class Work,100,Finals,25
+Exam,Class Work,100,Finals,40

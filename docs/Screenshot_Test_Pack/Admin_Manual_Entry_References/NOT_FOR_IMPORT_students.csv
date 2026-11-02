@@ -1,0 +1,3 @@
+﻿student_id,full_name,email,program,year_level,section
+99-10001,Test Student Alpha,test.student.alpha@example.invalid,Computer Science,2,TEST-A
+99-10002,Test Student Beta,test.student.beta@example.invalid,Information Technology,2,TEST-A

@@ -1,0 +1,3 @@
+﻿teacher_id,full_name,email,department,employment_type
+TEST001,Test Professor Alpha,test.prof.alpha@example.invalid,COED,Full-time
+TEST002,Test Professor Beta,test.prof.beta@example.invalid,COHM,Part-time
